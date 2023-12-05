@@ -2,9 +2,12 @@ export function isOrderFromToday(orderCreatedAt) {
 	const orderDate = new Date(orderCreatedAt)
 	const today = new Date()
 
+	// Convertendo a data do pedido para o fuso horário local
+	const orderDateLocal = new Date(orderDate.getTime() - orderDate.getTimezoneOffset() * 60000)
+
 	return (
-		orderDate.getFullYear() === today.getFullYear() &&
-    orderDate.getMonth() === today.getMonth() &&
-    orderDate.getDate() === today.getDate()
+		orderDateLocal.getFullYear() === today.getFullYear() &&
+    orderDateLocal.getMonth() === today.getMonth() &&
+    orderDateLocal.getDate() === today.getDate()
 	)
 }
