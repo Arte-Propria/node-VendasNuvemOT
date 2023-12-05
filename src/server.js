@@ -1,21 +1,17 @@
-const express = require('express');
-const axios = require('axios');
+import express from "express"
+import dotenv from "dotenv"
+import productRoutes from "./routes/router.js"
 
-const app = express();
-const PORT = process.env.PORT || 3000; // Define a porta do servidor
+dotenv.config()
 
-app.use(express.json());
+const app = express()
+const PORT = process.env.PORT || 3000 // Define a porta do servidor
 
-app.get('/products', async (req, res) => {
-  try {
-    const response = await axios.get('https://api.tiendanube.com/v1/3889735/products');
-    res.json(response.data);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Erro ao buscar produtos');
-  }
-});
+app.use(express.json())
+
+app.get("/products", productRoutes)
+app.get("/orders", productRoutes)
 
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+	console.log(`Servidor rodando na porta ${PORT}`)
+})
