@@ -1,14 +1,17 @@
 import axios from "axios"
 import dotenv from "dotenv"
+import { isOrderFromToday } from "../tools/isOrderFromToday.js"
 
 dotenv.config()
 
 export const fetchOrders = async () => {
 	const code = process.env.ACCESS_TOKEN
 	const storeId = process.env.STORE_ID
-	const url = `https://api.tiendanube.com/v1/${storeId}/orders`
+	let url = `https://api.tiendanube.com/v1/${storeId}/orders`
+	let allOrders = []
 	console.log("Recuperando dados dos pedidos...")
 
+	// while(url) {
 	const response = await axios({
 		method: "get",
 		url: url,
@@ -21,6 +24,24 @@ export const fetchOrders = async () => {
 
 	const data = response.data
 
-	return data
+	const orders = data.filter((order) => isOrderFromToday(order.created_at)).map((order) => ({
+		id: order.id,
+		total: order.total,
+		status: order.payment_status
+	}))
 
+	allOrders = allOrders.concat(orders)
+
+	// Verifique o cabeçalho "Link" para a próxima página
+	const linkHeader = response.headers.link
+	const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader)
+
+	if (nextLinkMatch) {
+		url = nextLinkMatch[1]
+	} else {
+		url = null // Não há mais páginas
+	}
+	// }
+
+	return allOrders
 }
