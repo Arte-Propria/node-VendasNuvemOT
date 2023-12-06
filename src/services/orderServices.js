@@ -24,7 +24,7 @@ export const fetchOrders = async () => {
 
 	const data = response.data
 
-	const orders = data.filter((order) => isOrderFromToday(order.created_at)).map((order) => ({
+	const orders = data.map((order) => ({
 		id: order.id,
 		client: order.customer.name,
 		createdAt: order.created_at,
