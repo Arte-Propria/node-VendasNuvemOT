@@ -11,40 +11,40 @@ export const fetchOrders = async () => {
 	let allOrders = []
 	console.log("Recuperando dados dos pedidos...")
 
-	// while(url) {
-	const response = await axios({
-		method: "get",
-		url: url,
-		headers: {
-			"Authentication": `bearer ${code}`,
-			"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
-			"Content-Type": "application/json"
+	while(url) {
+		const response = await axios({
+			method: "get",
+			url: url,
+			headers: {
+				"Authentication": `bearer ${code}`,
+				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+				"Content-Type": "application/json"
+			}
+		})
+
+		const data = response.data
+
+		const orders = data.map((order) => ({
+			id: order.id,
+			client: order.customer.name,
+			createdAt: order.created_at,
+			subtotal: order.subtotal,
+			total: order.total,
+			status: order.payment_status
+		}))
+
+		allOrders = allOrders.concat(orders)
+
+		// Verifique o cabeçalho "Link" para a próxima página
+		const linkHeader = response.headers.link
+		const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader)
+
+		if (nextLinkMatch) {
+			url = nextLinkMatch[1]
+		} else {
+			url = null // Não há mais páginas
 		}
-	})
-
-	const data = response.data
-
-	const orders = data.map((order) => ({
-		id: order.id,
-		client: order.customer.name,
-		createdAt: order.created_at,
-		subtotal: order.subtotal,
-		total: order.total,
-		status: order.payment_status
-	}))
-
-	allOrders = allOrders.concat(orders)
-
-	// Verifique o cabeçalho "Link" para a próxima página
-	const linkHeader = response.headers.link
-	const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader)
-
-	if (nextLinkMatch) {
-		url = nextLinkMatch[1]
-	} else {
-		url = null // Não há mais páginas
 	}
-	// }
 
 	return allOrders
 }
