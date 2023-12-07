@@ -30,7 +30,9 @@ export const fetchOrders = async () => {
 			createdAt: order.created_at,
 			subtotal: order.subtotal,
 			total: order.total,
-			status: order.payment_status
+			status: order.payment_status,
+			statusOrder: order.status,
+			products: order.products
 		}))
 
 		allOrders = allOrders.concat(orders)
