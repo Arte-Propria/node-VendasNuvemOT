@@ -1,17 +1,33 @@
 import axios from "axios"
 import dotenv from "dotenv"
-import { isOrderFromToday } from "../tools/isOrderFromToday.js"
 
 dotenv.config()
 
-export const fetchOrders = async () => {
+export const fetchOrders = async (params = {}) => {
 	const code = process.env.ACCESS_TOKEN
 	const storeId = process.env.STORE_ID
 	let url = `https://api.tiendanube.com/v1/${storeId}/orders`
+
+	// Define a data atual para o início do dia
+	const currentDateStart = new Date()
+	currentDateStart.setHours(
+		0, 0, 0, 0
+	)
+
+	// Define a data atual para o final do dia
+	const currentDateEnd = new Date()
+	currentDateEnd.setHours(
+		23, 59, 59, 999
+	)
+
+	// Desestruturação dos parâmetros com valores padrão
+	const { createdAtMin = currentDateStart, createdAtMax = currentDateEnd } = params
+
 	let allOrders = []
 	console.log("Recuperando dados dos pedidos...")
 
-	while(url) {
+	// Loop para lidar com a paginação da API
+	while (url) {
 		const response = await axios({
 			method: "get",
 			url: url,
@@ -19,6 +35,10 @@ export const fetchOrders = async () => {
 				"Authentication": `bearer ${code}`,
 				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
 				"Content-Type": "application/json"
+			},
+			params: {
+				"created_at_min": createdAtMin,
+				"created_at_max": createdAtMax
 			}
 		})
 
@@ -37,7 +57,7 @@ export const fetchOrders = async () => {
 
 		allOrders = allOrders.concat(orders)
 
-		// Verifique o cabeçalho "Link" para a próxima página
+		// Verifica o cabeçalho "Link" para a próxima página
 		const linkHeader = response.headers.link
 		const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader)
 

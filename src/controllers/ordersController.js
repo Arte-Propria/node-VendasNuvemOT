@@ -2,7 +2,8 @@ import { fetchOrders } from "../services/orderServices.js"
 
 export const getOrders = async (req, res) => {
 	try {
-		const orders = await fetchOrders()
+		const params = req.params
+		const orders = await fetchOrders(params)
 		res.json(orders)
 	} catch (error) {
 		console.error(error)

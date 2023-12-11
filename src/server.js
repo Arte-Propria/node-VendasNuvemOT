@@ -2,6 +2,7 @@ import express from "express"
 import dotenv from "dotenv"
 import cors from "cors"
 import productRoutes from "./routes/router.js"
+import router from "./routes/router.js"
 
 dotenv.config()
 
@@ -12,8 +13,7 @@ app.use(express.json())
 
 app.use(cors())
 
-app.get("/products", productRoutes)
-app.get("/orders", productRoutes)
+app.use(router)
 
 app.listen(PORT, () => {
 	console.log(`Servidor rodando na porta ${PORT}`)

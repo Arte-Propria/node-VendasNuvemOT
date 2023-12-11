@@ -5,7 +5,8 @@ import { getOrders } from "../controllers/ordersController.js"
 const router = express.Router()
 
 // Rota para buscar produtos
-router.use("/products", getProducts)
-router.use("/orders", getOrders)
+router.get("/products", getProducts)
+router.get("/orders/", getOrders)
+router.get("/orders/:createdAtMin/:createdAtMax", getOrders)
 
 export default router
