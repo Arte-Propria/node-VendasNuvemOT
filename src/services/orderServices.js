@@ -38,46 +38,34 @@ export const fetchOrders = async (params = {}) => {
 	console.log("Recuperando dados dos pedidos...")
 
 	// Loop para lidar com a paginação da API
-	while (url) {
-		const response = await axios({
-			method: "get",
-			url: url,
-			headers: {
-				"Authentication": `bearer ${code}`,
-				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
-				"Content-Type": "application/json"
-			},
-			params: {
-				"created_at_min": createdAtMin,
-				"created_at_max": createdAtMax
-			}
-		})
-
-		const data = response.data
-
-		const orders = data.map((order) => ({
-			id: order.id,
-			client: order.customer.name,
-			createdAt: order.created_at,
-			subtotal: order.subtotal,
-			total: order.total,
-			status: order.payment_status,
-			statusOrder: order.status,
-			products: order.products
-		}))
-
-		allOrders = allOrders.concat(orders)
-
-		// Verifica o cabeçalho "Link" para a próxima página
-		const linkHeader = response.headers.link
-		const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader)
-
-		if (nextLinkMatch) {
-			url = nextLinkMatch[1]
-		} else {
-			url = null // Não há mais páginas
+	const response = await axios({
+		method: "get",
+		url: url,
+		headers: {
+			"Authentication": `bearer ${code}`,
+			"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+			"Content-Type": "application/json"
+		},
+		params: {
+			"created_at_min": createdAtMin,
+			"created_at_max": createdAtMax
 		}
-	}
+	})
+
+	const data = response.data
+
+	const orders = data.map((order) => ({
+		id: order.id,
+		client: order.customer.name,
+		createdAt: order.created_at,
+		subtotal: order.subtotal,
+		total: order.total,
+		status: order.payment_status,
+		statusOrder: order.status,
+		products: order.products
+	}))
+
+	allOrders = allOrders.concat(orders)
 
 	return allOrders
 }
