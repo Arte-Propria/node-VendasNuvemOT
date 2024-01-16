@@ -67,6 +67,16 @@ export const fetchOrders = async (params = {}) => {
 		}))
 
 		allOrders = allOrders.concat(orders)
+
+		// Verifica o cabeçalho "Link" para a próxima página
+		const linkHeader = response.headers.link
+		const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader)
+
+		if (nextLinkMatch) {
+			url = nextLinkMatch[1]
+		} else {
+			url = null // Não há mais páginas
+		}
 	}
 
 	return allOrders
