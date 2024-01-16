@@ -7,6 +7,6 @@ export const getOrders = async (req, res) => {
 		res.json(orders)
 	} catch (error) {
 		console.error(error)
-		res.status(500).send("Erro ao buscar pedidos")
+		res.status(404).send("Erro ao buscar pedidos")
 	}
 }

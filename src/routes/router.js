@@ -7,6 +7,6 @@ const router = express.Router()
 // Rota para buscar produtos
 router.get("/products", getProducts)
 router.get("/orders/", getOrders)
-router.get("/orders/:createdAtMin/:createdAtMax", getOrders)
+router.get("/orders/:store/:createdAtMin/:createdAtMax", getOrders)
 
 export default router

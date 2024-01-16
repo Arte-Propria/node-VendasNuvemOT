@@ -4,8 +4,19 @@ import dotenv from "dotenv"
 dotenv.config()
 
 export const fetchOrders = async (params = {}) => {
-	const code = process.env.ACCESS_TOKEN
-	const storeId = process.env.STORE_ID
+	const { store } = params
+	let code
+	let storeId
+
+	if(store === "outlet"){
+		code = process.env.ACCESS_TOKEN_OUTLET
+		storeId = process.env.STORE_ID_OUTLET
+	}
+	if(store === "artepropria"){
+		code = process.env.ACCESS_TOKEN_ARTEPROPRIA
+		storeId = process.env.STORE_ID_ARTEPROPRIA
+	}
+
 	let url = `https://api.tiendanube.com/v1/${storeId}/orders`
 
 	// Define a data atual para o início do dia
@@ -56,16 +67,6 @@ export const fetchOrders = async (params = {}) => {
 		}))
 
 		allOrders = allOrders.concat(orders)
-
-		// Verifica o cabeçalho "Link" para a próxima página
-		const linkHeader = response.headers.link
-		const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader)
-
-		if (nextLinkMatch) {
-			url = nextLinkMatch[1]
-		} else {
-			url = null // Não há mais páginas
-		}
 	}
 
 	return allOrders
