@@ -1,4 +1,4 @@
-import { fetchCoupons } from "../services/couponServices"
+import { fetchCoupons } from "../services/couponServices.js"
 
 export const getCoupons = async (req, res) => {
 	try {
