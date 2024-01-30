@@ -3,7 +3,7 @@ import dotenv from "dotenv"
 
 dotenv.config()
 
-export const fetchCoupons = async () => {
+export const fetchCoupons = async (params = {}) => {
   const { store } = params
 	let code
 	let storeId
@@ -17,7 +17,7 @@ export const fetchCoupons = async () => {
 		storeId = process.env.STORE_ID_ARTEPROPRIA
 	}
 
-	let url = `https://api.tiendanube.com/v1/${storeId}/coupons`
+	let url = `https://api.tiendanube.com/v1/${storeId}/orders`
 	console.log("Recuperando dados dos cupons...")
 
   const response = await axios({
