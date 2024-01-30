@@ -17,7 +17,7 @@ export const fetchCoupons = async (params = {}) => {
 		storeId = process.env.STORE_ID_ARTEPROPRIA
 	}
 
-	let url = `https://api.tiendanube.com/v1/${storeId}/orders`
+	let url = `https://api.tiendanube.com/v1/${storeId}/coupons`
 	console.log("Recuperando dados dos cupons...")
 
   const response = await axios({

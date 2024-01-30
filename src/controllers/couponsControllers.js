@@ -2,7 +2,8 @@ import { fetchCoupons } from "../services/couponServices.js"
 
 export const getCoupons = async (req, res) => {
 	try {
-		const coupons = await fetchCoupons()
+		const params = req.params
+		const coupons = await fetchCoupons(params)
 		res.json(coupons)
 	} catch (error) {
 		console.error(error)
