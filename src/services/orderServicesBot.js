@@ -28,6 +28,9 @@ export const fetchOrdersBot = async (params = {}) => {
               "Authentication": `bearer ${code}`,
               "User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
               "Content-Type": "application/json"
+          },
+          params: {
+            "per_page": 156
           }
       });
 
@@ -39,6 +42,7 @@ export const fetchOrdersBot = async (params = {}) => {
           statusOrder: order.status,
           codigoRastreio: order.shipping_tracking_number,
           urlRastreio: order.shipping_tracking_url,
+          data: order
       }));
 
       // Verifica se algum pedido na página atual possui o CPF desejado

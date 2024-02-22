@@ -18,6 +18,9 @@ export const fetchProducts = async () => {
 				"Authentication": `bearer ${code}`,
 				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
 				"Content-Type": "application/json"
+			},
+			params: {
+				"per_page": 156
 			}
 		})
 

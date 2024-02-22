@@ -49,7 +49,8 @@ export const fetchOrders = async (params = {}) => {
 			},
 			params: {
 				"created_at_min": createdAtMin,
-				"created_at_max": createdAtMax
+				"created_at_max": createdAtMax,
+				"per_page": 156
 			}
 		})
 
