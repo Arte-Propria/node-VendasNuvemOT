@@ -30,7 +30,8 @@ export const fetchOrdersBot = async (params = {}) => {
               "Content-Type": "application/json"
           },
           params: {
-            "per_page": 156
+            "per_page": 156,
+            "q": cpf
           }
       });
 
