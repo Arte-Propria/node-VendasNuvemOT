@@ -72,7 +72,7 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
 
     // Processamento para calcular o total de usuários e por dispositivo
     let totalVisits = 0;
-    const usersByDevice = {};
+    let usersByDevice = {};
     response.data.rows.forEach(row => {
       const deviceType = row.dimensionValues[0].value;
       const users = parseInt(row.metricValues[0].value, 10);
