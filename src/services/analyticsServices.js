@@ -68,7 +68,7 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
       },
     });
 
-    console.log(response.data)
+    console.log(response.data.rows)
 
     // Processamento para calcular o total de usuários e por dispositivo
     let totalVisits = 0;
