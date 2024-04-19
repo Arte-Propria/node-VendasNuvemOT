@@ -55,3 +55,34 @@ export const fetchProducts = async () => {
 
 	return allProducts
 }
+
+export const fetchProduct = async ({ store, id }) => {
+	let code
+	let storeId
+
+	if(store === "outlet"){
+		code = process.env.ACCESS_TOKEN_OUTLET
+		storeId = process.env.STORE_ID_OUTLET
+	}
+	if(store === "artepropria"){
+		code = process.env.ACCESS_TOKEN_ARTEPROPRIA
+		storeId = process.env.STORE_ID_ARTEPROPRIA
+	}
+	
+	let url = `https://api.tiendanube.com/v1/${storeId}/products/${id}`
+	console.log("Recuperando dado do produto...")
+
+		const response = await axios({
+			method: "get",
+			url: url,
+			headers: {
+				"Authentication": `bearer ${code}`,
+				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+				"Content-Type": "application/json"
+			},
+		})
+
+		const data = response.data
+	
+	return data
+}

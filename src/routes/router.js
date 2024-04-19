@@ -1,5 +1,5 @@
 import express from "express"
-import { getProducts } from "../controllers/productsController.js"
+import { getProduct, getProducts } from "../controllers/productsController.js"
 import { getOrders } from "../controllers/ordersController.js"
 import { getOrdersBot } from "../controllers/ordersBotController.js"
 import { getCoupons } from "../controllers/couponsControllers.js"
@@ -9,6 +9,7 @@ const router = express.Router()
 
 // Rota para buscar produtos
 router.get("/products", getProducts)
+router.get("/product/:store/:id", getProduct)
 router.get("/coupons/:store", getCoupons)
 router.get("/orders/", getOrders)
 router.get("/orders/:store/:cpf", getOrdersBot)
