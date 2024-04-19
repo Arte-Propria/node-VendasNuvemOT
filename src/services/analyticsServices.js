@@ -68,22 +68,26 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
       },
     });
 
-    console.log(response.data.rows)
-
     // Processamento para calcular o total de usuários e por dispositivo
     let totalVisits = 0;
     let usersByDevice = {};
-    response.data.rows.forEach(row => {
-      const deviceType = row.dimensionValues[0].value;
-      const users = parseInt(row.metricValues[0].value, 10);
-      totalVisits += users;
-      usersByDevice[deviceType] = users;
-    });
+
+    let isData = response.data.rows ? true : false
+
+    if(isData) {
+      response.data.rows.forEach(row => {
+        const deviceType = row.dimensionValues[0].value;
+        const users = parseInt(row.metricValues[0].value, 10);
+        totalVisits += users;
+        usersByDevice[deviceType] = users;
+      });
+    }
 
     return {
       totalVisits,
       usersByDevice,
     };
+
   } catch (error) {
     console.error('Error fetching analytics data:', error);
     throw error;
