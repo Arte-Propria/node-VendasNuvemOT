@@ -15,7 +15,9 @@ router.get("/coupons/:store", getCoupons)
 router.get("/orders/", getOrders)
 router.get("/orders/:store/:cpf", getOrdersBot)
 router.get("/orders/:store/:createdAtMin/:createdAtMax", getOrders)
-router.get("/adsMeta/:store/:createdAtMin/:createdAtMax", getDataADSMeta)
+
+// Meta ADS
+router.get("/ads/meta/:store/:createdAtMin/:createdAtMax", getDataADSMeta)
 
 // Google Analytics
 router.get("/analytics/:store/:createdAtMin/:createdAtMax", getAnalytics)
