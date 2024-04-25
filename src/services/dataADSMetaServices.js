@@ -18,7 +18,6 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
   const url = `https://graph.facebook.com/v19.0/act_${accountID}/insights`;
   
   const params = {
-    time_increment: 7,
     time_range: `{"since":"${createdAtMin}","until":"${createdAtMax}"}`,
     access_token: accessToken
   };
