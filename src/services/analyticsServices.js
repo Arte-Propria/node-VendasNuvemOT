@@ -50,7 +50,8 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
 
     console.log('Recuperando dados do analytics...');
 
-    const response = await analytics.properties.runReport({
+    // Consulta para recuperar os dados dos dispositivos
+    const deviceResponse = await analytics.properties.runReport({
       property: `properties/${propertyID}`,
       requestBody: {
         dateRanges: [
@@ -60,10 +61,29 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
           },
         ],
         dimensions: [
-          {name: 'deviceCategory'}
+          { name: 'deviceCategory' },
         ],
         metrics: [
-          { name: 'activeUsers' }
+          { name: 'activeUsers' },
+        ],
+      },
+    });
+
+    // Consulta para recuperar os dados dos custos de anúncios
+    const costResponse = await analytics.properties.runReport({
+      property: `properties/${propertyID}`,
+      requestBody: {
+        dateRanges: [
+          {
+            startDate: createdAtMin,
+            endDate: createdAtMax,
+          },
+        ],
+        dimensions: [
+          { name: 'sessionCampaignName' }
+        ],
+        metrics: [
+          { name: 'advertiserAdCost' }
         ],
       },
     });
@@ -71,11 +91,12 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
     // Processamento para calcular o total de usuários e por dispositivo
     let totalVisits = 0;
     let usersByDevice = {};
+    let totalCost = 0;
 
-    let isData = response.data.rows ? true : false
-
-    if(isData) {
-      response.data.rows.forEach(row => {
+    // Processa os dados dos dispositivos
+    let isData = deviceResponse.data.rows ? true : false
+    if (isData) {
+      deviceResponse.data.rows.forEach(row => {
         const deviceType = row.dimensionValues[0].value;
         const users = parseInt(row.metricValues[0].value, 10);
         totalVisits += users;
@@ -83,9 +104,21 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
       });
     }
 
+    // Processa os dados dos custos de anúncios
+    isData = costResponse.data.rows ? true : false
+    if (isData) {
+      costResponse.data.rows.forEach(row => {
+        const spent = parseFloat(row.metricValues[0].value);
+        totalCost += spent;
+      });
+    }
+
+    totalCost = parseFloat(totalCost.toFixed(2));
+
     return {
       totalVisits,
       usersByDevice,
+      totalCost
     };
 
   } catch (error) {
