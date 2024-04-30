@@ -99,10 +99,10 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
           },
         ],
         dimensions: [
-          { name: 'eventName'}
+          { name: 'eventName' } // Adicionando a dimensão eventName
         ],
         metrics: [
-          { name: 'addToCarts' }
+          { name: 'activeUsers' },
         ],
       },
     });
@@ -136,10 +136,9 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
     // Processa os dados dos custos de anúncios
     isData = cartResponse.data.rows ? true : false
     if (isData) {
-      cartResponse.data.rows.forEach(row => {
-        const spent = parseFloat(row.metricValues[0].value);
-        carts += spent;
-      });
+        // Filtrando os eventos relacionados à adição de itens ao carrinho
+        const addToCartEvent = cartResponse.data.rows.find(row => row.dimensionValues[0].value === 'add_to_cart');
+        carts = addToCartEvent ? parseInt(addToCartEvent.metricValues[0].value, 10) : 0;
     }
 
     totalCost = parseFloat(totalCost.toFixed(2));
