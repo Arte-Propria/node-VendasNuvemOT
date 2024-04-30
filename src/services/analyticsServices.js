@@ -88,10 +88,30 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
       },
     });
 
+    // Consulta para recuperar os dados de carrinho
+    const cartResponse = await analytics.properties.runReport({
+      property: `properties/${propertyID}`,
+      requestBody: {
+        dateRanges: [
+          {
+            startDate: createdAtMin,
+            endDate: createdAtMax,
+          },
+        ],
+        dimensions: [
+          { name: 'eventName'}
+        ],
+        metrics: [
+          { name: 'addToCarts' }
+        ],
+      },
+    });
+
     // Processamento para calcular o total de usuários e por dispositivo
     let totalVisits = 0;
     let usersByDevice = {};
     let totalCost = 0;
+    let carts = 0
 
     // Processa os dados dos dispositivos
     let isData = deviceResponse.data.rows ? true : false
@@ -113,12 +133,22 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
       });
     }
 
+    // Processa os dados dos custos de anúncios
+    isData = cartResponse.data.rows ? true : false
+    if (isData) {
+      cartResponse.data.rows.forEach(row => {
+        const spent = parseFloat(row.metricValues[0].value);
+        carts += spent;
+      });
+    }
+
     totalCost = parseFloat(totalCost.toFixed(2));
 
     return {
       totalVisits,
       usersByDevice,
-      totalCost
+      totalCost,
+      carts
     };
 
   } catch (error) {
