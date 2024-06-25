@@ -106,7 +106,8 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
         ],
       },
     });
-    // Consulta para recuperar os dados de carrinho
+
+    // Consulta para recuperar os dados de checkout
     const beginCheckoutResponse = await analytics.properties.runReport({
       property: `properties/${propertyID}`,
       requestBody: {
@@ -125,16 +126,44 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
       },
     });
 
+    // Consulta para recuperar os dados de eventos de formulário submetido (gtm.formSubmit)
+    const formSubmitResponse = await analytics.properties.runReport({
+      property: `properties/${propertyID}`,
+      requestBody: {
+        dateRanges: [
+          {
+            startDate: createdAtMin,
+            endDate: createdAtMax,
+          },
+        ],
+        dimensions: [
+          { name: 'eventName' }
+        ],
+        metrics: [
+          { name: 'eventCount' }
+        ],
+        dimensionFilter: {
+          filter: {
+            fieldName: 'eventName',
+            stringFilter: {
+              matchType: 'EXACT',
+              value: 'gtm.formSubmit',
+            },
+          },
+        },
+      },
+    });
+
     // Processamento para calcular o total de usuários e por dispositivo
     let totalVisits = 0;
     let usersByDevice = {};
     let totalCost = 0;
-    let carts = 0
-    let beginCheckout = 0
+    let carts = 0;
+    let beginCheckout = 0;
+    let formSubmits = 0;
 
     // Processa os dados dos dispositivos
-    let isData = deviceResponse.data.rows ? true : false
-    if (isData) {
+    if (deviceResponse.data.rows) {
       deviceResponse.data.rows.forEach(row => {
         const deviceType = row.dimensionValues[0].value;
         const users = parseInt(row.metricValues[0].value, 10);
@@ -144,29 +173,30 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
     }
 
     // Processa os dados dos custos de anúncios
-    isData = costResponse.data.rows ? true : false
-    if (isData) {
+    if (costResponse.data.rows) {
       costResponse.data.rows.forEach(row => {
         const spent = parseFloat(row.metricValues[0].value);
         totalCost += spent;
       });
     }
-    
-    // Processa os dados dos custos de anúncios
-    isData = beginCheckoutResponse.data.rows ? true : false
-    if (isData) {
+
+    // Processa os dados de checkout
+    if (beginCheckoutResponse.data.rows) {
       beginCheckoutResponse.data.rows.forEach(row => {
-        const spent = parseFloat(row.metricValues[0].value);
-        beginCheckout += spent;
+        const checkouts = parseFloat(row.metricValues[0].value);
+        beginCheckout += checkouts;
       });
     }
 
-    // Processa os dados dos custos de anúncios
-    isData = cartResponse.data.rows ? true : false
-    if (isData) {
-        // Filtrando os eventos relacionados à adição de itens ao carrinho
-        const addToCartEvent = cartResponse.data.rows.find(row => row.dimensionValues[0].value === 'add_to_cart');
-        carts = addToCartEvent ? parseInt(addToCartEvent.metricValues[0].value, 10) : 0;
+    // Processa os dados de carrinho
+    if (cartResponse.data.rows) {
+      const addToCartEvent = cartResponse.data.rows.find(row => row.dimensionValues[0].value === 'add_to_cart');
+      carts = addToCartEvent ? parseInt(addToCartEvent.metricValues[0].value, 10) : 0;
+    }
+
+    // Processa os dados de eventos de formulário submetido
+    if (formSubmitResponse.data.rows) {
+      formSubmits = parseInt(formSubmitResponse.data.rows[0].metricValues[0].value, 10);
     }
 
     totalCost = parseFloat(totalCost.toFixed(2));
@@ -176,8 +206,8 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
       usersByDevice,
       totalCost,
       carts,
-      beginCheckout
-      
+      beginCheckout,
+      formSubmits // Adiciona a quantidade de eventos de formulário submetido
     };
 
   } catch (error) {
