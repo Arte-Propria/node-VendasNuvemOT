@@ -59,6 +59,7 @@ export const fetchOrders = async (params = {}) => {
 		const orders = data.map((order) => ({
 			id: order.id,
 			client: order.customer.name,
+			billingProvince: order.billing_province,
 			createdAt: order.created_at,
 			subtotal: order.subtotal,
 			total: order.total,
