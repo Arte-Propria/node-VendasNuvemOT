@@ -89,7 +89,5 @@ export const fetchCustomers = async (params = {}) => {
     }
   }
 
-  console.log(allCustomers.length)
-
   return allCustomers;
 };
