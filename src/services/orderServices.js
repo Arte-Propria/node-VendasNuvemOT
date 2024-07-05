@@ -58,14 +58,18 @@ export const fetchOrders = async (params = {}) => {
 
 		const orders = data.map((order) => ({
 			id: order.id,
+			orderId: order.number,
 			client: order.customer.name,
 			billingProvince: order.billing_province,
+			gateway: order.gateway_name,
+			gatewayLink: order.gateway_link,
 			createdAt: order.created_at,
 			subtotal: order.subtotal,
 			total: order.total,
 			status: order.payment_status,
 			statusOrder: order.status,
-			products: order.products
+			products: order.products,
+			data: order
 		}))
 
 		allOrders = allOrders.concat(orders)
