@@ -174,10 +174,20 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
 
     // Processa os dados dos custos de anúncios
     if (costResponse.data.rows) {
-      costResponse.data.rows.forEach(row => {
-        const spent = parseFloat(row.metricValues[0].value);
-        totalCost += spent;
-      });
+      if(store === 'artepropria') {
+        costResponse.data.rows.forEach(row => {
+          // Filtro para recuperar somente as campanhas para ao ecommerce
+          if (row.dimensionValues[0].value.includes("ECOM")) {
+            const spent = parseFloat(row.metricValues[0].value);
+            totalCost += spent;
+          }
+        });
+      } else {
+        costResponse.data.rows.forEach(row => {
+          const spent = parseFloat(row.metricValues[0].value);
+          totalCost += spent;
+        });
+      }
     }
 
     // Processa os dados de checkout
