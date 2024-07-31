@@ -21,11 +21,13 @@ app.listen(PORT, () => {
 
 	// updateAllOrders()
 
-	setInterval(() => {
-		updateTodayOrders();
-	}, 300000);
+	// Agendar a tarefa para rodar a cada 5 minutos
+	// cron.schedule('*/5 * * * *', () => {
+	// 	updateTodayOrders();
+	// });
 
-	setInterval(() => {
-		updateLastTwoMonthsOrders();
-	}, 600000);
+	// // Agendar a tarefa para rodar a cada 10 minutos
+	// cron.schedule('*/10 * * * *', () => {
+	// 	updateLastTwoMonthsOrders();
+	// });
 })
