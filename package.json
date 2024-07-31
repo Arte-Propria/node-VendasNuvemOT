@@ -14,7 +14,9 @@
     "express": "^4.18.2",
     "google-ads-api": "^16.0.0-rest-beta3",
     "google-auth-library": "^9.9.0",
-    "googleapis": "^134.0.0"
+    "googleapis": "^134.0.0",
+    "node-cron": "^3.0.3",
+    "pg": "^8.12.0"
   },
   "devDependencies": {
     "eslint-config-lasilveira": "^1.1.6",

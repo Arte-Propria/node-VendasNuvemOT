@@ -43,6 +43,7 @@ export const fetchCoupons = async (params = {}) => {
       type: element.type,
       value: element.value,
       used: element.used,
+      data: element
     }
   })
 
