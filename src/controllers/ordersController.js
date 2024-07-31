@@ -1,4 +1,4 @@
-import { updateTodayOrders } from "../automation.js";
+import { updateLastTwoMonthsOrders, updateTodayOrders } from "../automation.js";
 import { query } from "../db/db.js";
 import { fetchOrders, insertOrders } from "../services/orderServicesNuvem.js";
 
@@ -52,5 +52,6 @@ export const getOrdersByStore = async (req, res) => {
     res.status(500).json({ error: 'Erro ao buscar pedidos' });
   } finally {
     updateTodayOrders()
+    updateLastTwoMonthsOrders()
   }
 };
