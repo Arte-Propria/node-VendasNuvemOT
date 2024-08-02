@@ -6,7 +6,8 @@ import { getOrdersBot } from '../controllers/ordersBotController.js';
 import { getCoupons } from '../controllers/couponsControllers.js';
 import { getAnalytics } from '../controllers/analyticsControllers.js';
 import { getDataADSMeta } from '../controllers/dataADSMetaControllers.js';
-import { createOrder } from '../controllers/createOrderController.js'; // Importe o controlador de criação de pedidos
+import { createOrder } from '../controllers/createOrderController.js';
+import { getCategories } from '../controllers/categoriesControllers.js';
 
 const router = express.Router();
 
@@ -14,6 +15,7 @@ const router = express.Router();
 router.get('/products', getProducts);
 router.get('/product/:store/:id', getProduct);
 router.get('/coupons/:store', getCoupons);
+router.get('/categories/:store', getCategories);
 router.get('/orders/', getOrders);
 router.get('/orders/:store/:cpf', getOrdersBot);
 router.get('/orders/:store/:createdAtMin/:createdAtMax', getOrders);
