@@ -7,6 +7,7 @@ import { getCoupons } from '../controllers/couponsControllers.js';
 import { getAnalytics } from '../controllers/analyticsControllers.js';
 import { getDataADSMeta } from '../controllers/dataADSMetaControllers.js';
 import { createOrder } from '../controllers/createOrderController.js';
+import { postProduct } from '../controllers/createProductController.js';
 import { getCategories } from '../controllers/categoriesControllers.js';
 
 const router = express.Router();
@@ -20,6 +21,9 @@ router.get('/orders/', getOrders);
 router.get('/orders/:store/:cpf', getOrdersBot);
 router.get('/orders/:store/:createdAtMin/:createdAtMax', getOrders);
 router.get('/customers/:store/:createdAtMin/:createdAtMax', getCustomers);
+
+//Rota para cadastrar produto
+router.post('/product/:store', postProduct); // Adicione a rota para criar um novo pedido
 
 // Rota para buscar todos os pedidos de uma loja específica
 router.get('/db/orders/:store', getOrdersByStore);
