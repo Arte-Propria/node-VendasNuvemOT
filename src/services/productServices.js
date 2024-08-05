@@ -117,9 +117,11 @@ export async function fetchCreateProduct({ store, body }) {
 
     console.log(response.status);
 
-    if (response.status === 200 || response.status === 201) {
+		if (response.status === 200 || response.status === 201) {
       console.log(`Produto cadastrado com sucesso!`);
       return response;
+    } else {
+      throw new Error(`Erro ao cadastrar produto: ${response.statusText}`);
     }
 
   } catch (error) {
