@@ -7,15 +7,17 @@ dotenv.config();
 export const processOrders = async (store, startDate, endDate) => {
   try {
     const orders = await fetchOrders({ store, createdAtMin: startDate, createdAtMax: endDate });
-    await insertOrders(orders, store);
+    if(orders) {
+      await insertOrders(orders, store);
+    }
   } catch (err) {
-    console.error(`Erro ao processar pedidos da loja ${store}:`, err);
+    console.error(`Erro ao processar pedidos da loja ${store}:`, err.response.data);
   } finally {
     console.log(`Pedidos da loja ${store} processados com sucesso.`);
   }
 };
 
-export const updateTodayOrders = () => {
+export const updateTodayOrders = async () => {
   const currentDateStart = new Date();
   currentDateStart.setHours(0, 0, 0, 0);
 
@@ -23,8 +25,8 @@ export const updateTodayOrders = () => {
   currentDateEnd.setHours(currentDateEnd.getHours() - 3);
 
   console.log('Iniciando a atualização de pedidos do dia atual...');
-  processOrders('outlet', currentDateStart.toISOString(), currentDateEnd.toISOString());
-  processOrders('artepropria', currentDateStart.toISOString(), currentDateEnd.toISOString());
+  await processOrders('outlet', currentDateStart.toISOString(), currentDateEnd.toISOString());
+  await processOrders('artepropria', currentDateStart.toISOString(), currentDateEnd.toISOString());
 };
 
 export const updateLastTwoMonthsOrders = async () => {
