@@ -7,13 +7,12 @@ dotenv.config();
 export const processOrders = async (store, startDate, endDate) => {
   try {
     const orders = await fetchOrders({ store, createdAtMin: startDate, createdAtMax: endDate });
-    if(orders) {
+    if(orders.length > 0) {
       await insertOrders(orders, store);
+      console.log(`Pedidos da loja ${store} processados com sucesso.`);
     }
   } catch (err) {
     console.error(`Erro ao processar pedidos da loja ${store}:`, err.response.data);
-  } finally {
-    console.log(`Pedidos da loja ${store} processados com sucesso.`);
   }
 };
 

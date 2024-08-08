@@ -95,7 +95,7 @@ export const fetchOrders = async (params = {}) => {
   }
   } catch (error) {
     if (error.response && error.response.data) {
-      console.error('Erro ao recuperar pedidos:', error.response.data);
+      console.error(`Erro ao processar pedidos da loja ${store}:`, error.response.data);
     } else {
       console.error('Erro desconhecido ao recuperar pedidos:', error);
     }
