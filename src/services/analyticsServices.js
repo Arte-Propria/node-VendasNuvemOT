@@ -158,6 +158,7 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
     let totalVisits = 0;
     let usersByDevice = {};
     let totalCost = 0;
+    let totalCostEcom = 0;
     let carts = 0;
     let beginCheckout = 0;
     let formSubmits = 0;
@@ -174,20 +175,13 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
 
     // Processa os dados dos custos de anúncios
     if (costResponse.data.rows) {
-      if(store === 'artepropria') {
-        costResponse.data.rows.forEach(row => {
-          // Filtro para recuperar somente as campanhas para ao ecommerce
-          if (row.dimensionValues[0].value.includes("ecom")) {
-            const spent = parseFloat(row.metricValues[0].value);
-            totalCost += spent;
-          }
-        });
-      } else {
-        costResponse.data.rows.forEach(row => {
-          const spent = parseFloat(row.metricValues[0].value);
-          totalCost += spent;
-        });
-      }
+      costResponse.data.rows.forEach(row => {
+        const spent = parseFloat(row.metricValues[0].value);
+        totalCost += spent;
+        if (row.dimensionValues[0].value.includes("ecom")) {
+          totalCostEcom += spent;
+        }
+      });
     }
 
     // Processa os dados de checkout
@@ -210,11 +204,13 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
     }
 
     totalCost = parseFloat(totalCost.toFixed(2));
+    totalCostEcom = parseFloat(totalCostEcom.toFixed(2));
 
     return {
       totalVisits,
       usersByDevice,
       totalCost,
+      totalCostEcom, // Adiciona o novo campo com o custo das campanhas ecom
       carts,
       beginCheckout,
       formSubmits // Adiciona a quantidade de eventos de formulário submetido
