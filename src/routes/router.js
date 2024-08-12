@@ -22,7 +22,7 @@ router.get('/orders/:store/:cpf', getOrdersBot);
 router.get('/orders/:store/:createdAtMin/:createdAtMax', getOrders);
 router.get('/customers/:store/:createdAtMin/:createdAtMax', getCustomers);
 
-//Rota para cadastrar produto
+// Rota para cadastrar produto
 router.post('/product/:store', postProduct); // Adicione a rota para criar um novo pedido
 
 // Rota para buscar todos os pedidos de uma loja específica

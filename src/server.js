@@ -1,9 +1,8 @@
 import express from "express"
 import dotenv from "dotenv"
 import cors from "cors"
-import cron from 'node-cron';
 import router from "./routes/router.js"
-import { updateAllOrders, updateLastTwoMonthsOrders, updateTodayOrders } from "./automation.js"
+import { updateAllOrders } from "./automation.js"
 
 dotenv.config()
 

@@ -7,6 +7,7 @@ export const getOrders = async (req, res) => {
 		const params = req.params
 		const orders = await fetchOrders(params)
 		await insertOrders(orders, params.store);
+    res.status(200).send("Pedidos atualizados")
 	} catch (error) {
 		console.error(error)
 		res.status(404).send("Erro ao buscar pedidos")

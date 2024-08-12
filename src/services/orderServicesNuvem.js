@@ -248,7 +248,7 @@ export const insertOrders = async (orders, store) => {
         order.data.discount_gateway,
         order.data.extra,
         order.data.free_shipping_config,
-        order.data.fulfillments,
+        JSON.stringify(order.data.fulfillments),
         order.data.has_shippable_products,
         order.orderId, // corrigiu a ordem para colocar order_id
         order.data.number,
