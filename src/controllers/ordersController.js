@@ -37,7 +37,7 @@ export const getOrdersByDate = async (req, res) => {
     console.error('Erro ao buscar pedidos:', err);
     res.status(500).json({ error: 'Erro ao buscar pedidos' });
   } finally {
-    updateTodayOrders()
+    await updateTodayOrders()
   }
 };
 
@@ -47,12 +47,11 @@ export const getOrdersByStore = async (req, res) => {
   try {
     const tableName = store === 'outlet' ? 'pedidos_outlet' : 'pedidos_artepropria';
     const result = await query(`SELECT * FROM ${tableName}`);
-    res.json(result.rows);
+    res.status(200).json(result.rows);
   } catch (err) {
     console.error('Erro ao buscar pedidos:', err);
     res.status(500).json({ error: 'Erro ao buscar pedidos' });
   } finally {
-    updateTodayOrders()
-    updateLastTwoMonthsOrders()
+    await updateLastTwoMonthsOrders()
   }
 };
