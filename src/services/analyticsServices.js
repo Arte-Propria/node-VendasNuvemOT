@@ -177,7 +177,7 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
       if(store === 'artepropria') {
         costResponse.data.rows.forEach(row => {
           // Filtro para recuperar somente as campanhas para ao ecommerce
-          if (row.dimensionValues[0].value.includes("ECOM")) {
+          if (row.dimensionValues[0].value.includes("ecom")) {
             const spent = parseFloat(row.metricValues[0].value);
             totalCost += spent;
           }
