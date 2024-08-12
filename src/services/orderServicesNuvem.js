@@ -1,101 +1,107 @@
-import axios from "axios"
-import dotenv from "dotenv"
-import { query } from "../db/db.js"
+import axios from 'axios';
+import dotenv from 'dotenv';
+import { query } from '../db/db.js';
 
-dotenv.config()
+dotenv.config();
 
 export const fetchOrders = async (params = {}) => {
-	const { store } = params
-	let code
-	let storeId
+  const { store } = params;
+  let code;
+  let storeId;
 
-	if(store === "outlet"){
-		code = process.env.ACCESS_TOKEN_OUTLET
-		storeId = process.env.STORE_ID_OUTLET
-	}
-	if(store === "artepropria"){
-		code = process.env.ACCESS_TOKEN_ARTEPROPRIA
-		storeId = process.env.STORE_ID_ARTEPROPRIA
-	}
-
-	let url = `https://api.tiendanube.com/v1/${storeId}/orders`
-
-	// Define a data atual para o início do dia
-	const currentDateStart = new Date()
-	currentDateStart.setHours(
-		0, 0, 0, 0
-	)
-
-	// Define a data atual para o final do dia
-	const currentDateEnd = new Date()
-	currentDateEnd.setHours(currentDateEnd.getHours() - 3)
-
-	// Desestruturação dos parâmetros com valores padrão
-	const { createdAtMin = currentDateStart, createdAtMax = currentDateEnd } = params
-
-	let allOrders = []
-	console.log("Recuperando dados dos pedidos...")
-
-	try {
-    // Loop para lidar com a paginação da API
-	while (url) {
-		const response = await axios({
-			method: "get",
-			url: url,
-			headers: {
-				"Authentication": `bearer ${code}`,
-				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
-				"Content-Type": "application/json"
-			},
-			params: {
-				"created_at_min": createdAtMin,
-				"created_at_max": createdAtMax,
-				"per_page": 156
-			}
-		})
-
-    if (response.status === 404) {
-      console.log('Nenhum pedido encontrado para o intervalo de datas fornecido.');
-      break;
-    }
-
-		const data = response.data;
-
-    if (data.length === 0) {
-      console.log('Nenhum pedido encontrado para o intervalo de datas fornecido.');
-      break;
-    }
-
-    const orders = data.map((order) => ({
-      id: order.id,
-      orderId: order.number,
-      client: order.customer.name,
-      billingProvince: order.billing_province,
-      gateway: order.gateway_name,
-      gatewayLink: order.gateway_link,
-      createdAt: order.created_at,
-      subtotal: order.subtotal,
-      total: order.total,
-      status: order.payment_status,
-      statusOrder: order.status,
-      products: order.products,
-      data: order,
-    }));
-
-    allOrders = allOrders.concat(orders);
-
-    const linkHeader = response.headers.link;
-    const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader);
-
-    if (nextLinkMatch) {
-      url = nextLinkMatch[1];
-    } else {
-      url = null;
-    }
+  if (store === 'outlet') {
+    code = process.env.ACCESS_TOKEN_OUTLET;
+    storeId = process.env.STORE_ID_OUTLET;
   }
+  if (store === 'artepropria') {
+    code = process.env.ACCESS_TOKEN_ARTEPROPRIA;
+    storeId = process.env.STORE_ID_ARTEPROPRIA;
+  }
+
+  let url = `https://api.tiendanube.com/v1/${storeId}/orders`;
+
+  // Define a data atual para o início do dia
+  const currentDateStart = new Date();
+  currentDateStart.setHours(0, 0, 0, 0);
+
+  // Define a data atual para o final do dia
+  const currentDateEnd = new Date();
+  currentDateEnd.setHours(currentDateEnd.getHours() - 3);
+
+  // Desestruturação dos parâmetros com valores padrão
+  const { createdAtMin = currentDateStart, createdAtMax = currentDateEnd } =
+    params;
+
+  let allOrders = [];
+  console.log('Recuperando dados dos pedidos...');
+
+  try {
+    // Loop para lidar com a paginação da API
+    while (url) {
+      const response = await axios({
+        method: 'get',
+        url: url,
+        headers: {
+          Authentication: `bearer ${code}`,
+          'User-Agent': 'API-NuvemShop (lucasecom@artepropria.com)',
+          'Content-Type': 'application/json',
+        },
+        params: {
+          created_at_min: createdAtMin,
+          created_at_max: createdAtMax,
+          per_page: 156,
+        },
+      });
+
+      if (response.status === 404) {
+        console.log(
+          'Nenhum pedido encontrado para o intervalo de datas fornecido.',
+        );
+        return;
+      }
+
+      const data = response.data;
+
+      if (data.length === 0) {
+        console.log(
+          'Nenhum pedido encontrado para o intervalo de datas fornecido.',
+        );
+        return;
+      }
+
+      const orders = data.map(order => ({
+        id: order.id,
+        orderId: order.number,
+        client: order.customer.name,
+        billingProvince: order.billing_province,
+        gateway: order.gateway_name,
+        gatewayLink: order.gateway_link,
+        createdAt: order.created_at,
+        subtotal: order.subtotal,
+        total: order.total,
+        status: order.payment_status,
+        statusOrder: order.status,
+        products: order.products,
+        data: order,
+      }));
+
+      allOrders = allOrders.concat(orders);
+
+      const linkHeader = response.headers.link;
+      const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader);
+
+      if (nextLinkMatch) {
+        url = nextLinkMatch[1];
+      } else {
+        url = null;
+      }
+    }
   } catch (error) {
     if (error.response && error.response.data) {
-      console.error(`Erro ao processar pedidos da loja ${store}:`, error.response.data);
+      console.error(
+        `Erro ao processar pedidos da loja ${store}:`,
+        error.response.data,
+      );
     } else {
       console.error('Erro desconhecido ao recuperar pedidos:', error);
     }
@@ -105,7 +111,8 @@ export const fetchOrders = async (params = {}) => {
 };
 
 export const insertOrders = async (orders, store) => {
-	const tableName = store === "outlet" ? "pedidos_outlet" : "pedidos_artepropria";
+  const tableName =
+    store === 'outlet' ? 'pedidos_outlet' : 'pedidos_artepropria';
   const queryText = `
     INSERT INTO ${tableName} (
       weight, app_id, attributes, cancelled_at, checkout_enabled, client_details,
@@ -224,7 +231,7 @@ export const insertOrders = async (orders, store) => {
     RETURNING *`;
 
   for (const order of orders) {
-    const adjustDate = (date) => {
+    const adjustDate = date => {
       const newDate = new Date(date);
       newDate.setHours(newDate.getHours() - 3);
       return newDate.toISOString();
@@ -318,7 +325,7 @@ export const insertOrders = async (orders, store) => {
         order.data.gateway,
         order.data.gateway_id,
         order.data.gateway_link,
-        order.data.gateway_name
+        order.data.gateway_name,
       ]);
     } catch (err) {
       console.error('Erro ao inserir pedido:', err);

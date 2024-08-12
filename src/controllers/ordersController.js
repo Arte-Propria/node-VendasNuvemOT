@@ -6,7 +6,9 @@ export const getOrders = async (req, res) => {
 	try {
 		const params = req.params
 		const orders = await fetchOrders(params)
-		await insertOrders(orders, params.store);
+    if(orders.length > 0) {
+      await insertOrders(orders, params.store);
+    }
     res.status(200).send("Pedidos atualizados")
 	} catch (error) {
 		console.error(error)
