@@ -7,7 +7,6 @@ dotenv.config();
 export const processOrders = async (store, startDate, endDate) => {
   try {
     const orders = await fetchOrders({ store, createdAtMin: startDate, createdAtMax: endDate });
-    console.log('orders', orders.length)
     if(orders.length > 0) {
       await insertOrders(orders, store);
       console.log(`Pedidos da loja ${store} processados com sucesso.`);
@@ -59,7 +58,6 @@ export const updateLastTwoMonthsOrders = async ({ store }) => {
     // Avança para o próximo mês
     startMonth.setMonth(startMonth.getMonth() + 1);
     startMonth.setDate(1); // Ajusta para o primeiro dia do mês
-    console.log('Acabou');
   }
 };
 
