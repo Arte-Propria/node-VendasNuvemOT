@@ -54,6 +54,6 @@ export const getOrdersByStore = async (req, res) => {
     console.error('Erro ao buscar pedidos:', err);
     res.status(500).json({ error: 'Erro ao buscar pedidos' });
   } finally {
-    await updateLastTwoMonthsOrders()
+    await updateLastTwoMonthsOrders({ store })
   }
 };

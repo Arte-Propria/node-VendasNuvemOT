@@ -7,6 +7,7 @@ dotenv.config();
 export const processOrders = async (store, startDate, endDate) => {
   try {
     const orders = await fetchOrders({ store, createdAtMin: startDate, createdAtMax: endDate });
+    console.log('orders', orders.length)
     if(orders.length > 0) {
       await insertOrders(orders, store);
       console.log(`Pedidos da loja ${store} processados com sucesso.`);
@@ -28,26 +29,37 @@ export const updateTodayOrders = async () => {
   await processOrders('artepropria', currentDateStart.toISOString(), currentDateEnd.toISOString());
 };
 
-export const updateLastTwoMonthsOrders = async () => {
-  let currentMonth = new Date();
-  currentMonth.setMonth(currentMonth.getMonth() - 1);
+export const updateLastTwoMonthsOrders = async ({ store }) => {
+  // Define o mês de dois meses atrás
+  let startMonth = new Date();
+  startMonth.setMonth(startMonth.getMonth() - 2);
+  startMonth.setDate(1);
+
+  // Define o mês atual como o limite final
+  const currentMonth = new Date();
   currentMonth.setDate(1);
-  
-  const twoMonthsAgo = new Date(currentMonth);
-  twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 1);
 
-  while (currentMonth > twoMonthsAgo) {
-    const startDate = new Date(currentMonth);
-    const endDate = new Date(currentMonth);
-    endDate.setMonth(endDate.getMonth() + 1);
-    endDate.setDate(0);
+  while (startMonth <= currentMonth) {
+    const startDate = new Date(startMonth);
+    let endDate = new Date(startMonth);
 
-    console.log(`Iniciando a atualização de pedidos de ${startDate.toISOString()} até ${endDate.toISOString()}...`);
+    if (startMonth.getMonth() === currentMonth.getMonth() && startMonth.getFullYear() === currentMonth.getFullYear()) {
+      // Se for o mês atual, define o dia final como o dia atual
+      endDate = new Date();
+    } else {
+      // Se não for o mês atual, define o último dia do mês
+      endDate.setMonth(endDate.getMonth() + 1);
+      endDate.setDate(0);
+    }
+
+    console.log(`Iniciando a atualização de pedidos de ${store} ${startDate.toISOString()} até ${endDate.toISOString()}...`);
     
-    await processOrders('outlet', startDate.toISOString(), endDate.toISOString());
-    await processOrders('artepropria', startDate.toISOString(), endDate.toISOString());
+    await processOrders(store, startDate.toISOString(), endDate.toISOString());
 
-    currentMonth.setMonth(currentMonth.getMonth() - 1);
+    // Avança para o próximo mês
+    startMonth.setMonth(startMonth.getMonth() + 1);
+    startMonth.setDate(1); // Ajusta para o primeiro dia do mês
+    console.log('Acabou');
   }
 };
 
