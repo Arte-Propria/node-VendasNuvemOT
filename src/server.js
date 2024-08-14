@@ -9,9 +9,15 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 3000 // Define a porta do servidor
 
-app.use(express.json())
+app.use(cors({
+  origin: 'https://vendas-nuvem-ot.vercel.app', // Permitir apenas essa origem
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Métodos HTTP permitidos
+  allowedHeaders: ['Content-Type', 'Authorization'], // Cabeçalhos permitidos
+  credentials: true, // Permitir envio de cookies, se necessário
+}));
 
-app.use(cors())
+
+app.use(express.json())
 
 app.use(router)
 
