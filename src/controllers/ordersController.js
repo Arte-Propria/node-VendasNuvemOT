@@ -22,10 +22,10 @@ export const getOrdersByDate = async (req, res) => {
 
   let startDate = new Date(createdAtMin);
   startDate.setHours(0, 0, 0, 0); // Início do dia
-  startDate.setHours(startDate.getHours() - 3); // Ajuste para UTC-3
   
   let endDate = new Date(createdAtMax);
   endDate.setHours(23, 59, 59, 999); // Final do dia
+  endDate.setHours(endDate.getHours() - 3); // Ajuste para UTC-3
 
   try {
     const tableName = store === 'outlet' ? 'pedidos_outlet' : 'pedidos_artepropria';
