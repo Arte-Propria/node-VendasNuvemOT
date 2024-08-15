@@ -231,11 +231,6 @@ export const insertOrders = async (orders, store) => {
     RETURNING *`;
 
   for (const order of orders) {
-    const adjustDate = date => {
-      const newDate = new Date(date);
-      newDate.setHours(newDate.getHours() - 3);
-      return newDate.toISOString();
-    };
     try {
       await query(queryText, [
         order.data.weight,

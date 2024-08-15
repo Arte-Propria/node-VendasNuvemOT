@@ -22,11 +22,9 @@ export const getOrdersByDate = async (req, res) => {
 
   let startDate = new Date(createdAtMin);
   startDate.setHours(0, 0, 0, 0); // Início do dia
-  startDate.setHours(startDate.getHours() - 3); // Ajuste para UTC-3
 
   let endDate = new Date(createdAtMax);
   endDate.setHours(23, 59, 59, 999); // Final do dia
-  endDate.setHours(endDate.getHours() - 3); // Ajuste para UTC-3
 
   try {
     const tableName = store === 'outlet' ? 'pedidos_outlet' : 'pedidos_artepropria';
@@ -54,6 +52,14 @@ export const getOrdersByStore = async (req, res) => {
     console.error('Erro ao buscar pedidos:', err);
     res.status(500).json({ error: 'Erro ao buscar pedidos' });
   } finally {
-    await updateLastTwoMonthsOrders({ store })
+    // Executa a função em segundo plano sem bloquear a resposta
+    setImmediate(async () => {
+      try {
+        await updateLastTwoMonthsOrders({ store });
+        console.log(`Atualização dos pedidos para ${store} concluída em segundo plano.`);
+      } catch (err) {
+        console.error(`Erro ao atualizar pedidos para ${store}:`, err);
+      }
+    });
   }
 };
