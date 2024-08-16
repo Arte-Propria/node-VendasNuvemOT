@@ -30,9 +30,12 @@ export const getOrdersByDate = async (req, res) => {
 
   try {
     const tableName = store === 'outlet' ? 'pedidos_outlet' : 'pedidos_artepropria';
+    // Formatando as datas para o formato YYYY-MM-DD
+    const startDateSQL = startDate.toISOString().slice(0, 10);
+    const endDateSQL = endDate.toISOString().slice(0, 10);
+
     const result = await query(
-      `SELECT * FROM ${tableName} WHERE created_at >= $1 AND created_at <= $2`,
-      [startDate, endDate]
+      `SELECT * FROM ${tableName} WHERE DATE(created_at) BETWEEN '${startDateSQL}' AND '${endDateSQL}'`
     );
     res.json(result.rows);
   } catch (err) {
