@@ -21,11 +21,11 @@ export const getOrdersByDate = async (req, res) => {
   const { store, createdAtMin, createdAtMax } = req.params;
 
   let startDate = new Date(createdAtMin);
-  startDate.setHours(0, 0, 0, 0); // Início do dia
+  startDate.setDate(startDate.getDate() - 1); // Subtrai um dia
   startDate.setHours(startDate.getHours() - 3); // Ajuste para UTC-3
   
   let endDate = new Date(createdAtMax);
-  endDate.setHours(23, 59, 59, 999); // Final do dia
+  endDate.setDate(endDate.getDate() + 1); // Adiciona um dia
   endDate.setHours(endDate.getHours() - 3); // Ajuste para UTC-3
 
   try {
