@@ -16,7 +16,8 @@
     "google-auth-library": "^9.9.0",
     "googleapis": "^134.0.0",
     "node-cron": "^3.0.3",
-    "pg": "^8.12.0"
+    "pg": "^8.12.0",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "eslint-config-lasilveira": "^1.1.6",

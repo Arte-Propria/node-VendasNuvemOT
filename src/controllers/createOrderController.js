@@ -1,143 +1,20 @@
-import { query } from '../db/db.js';
+import { insertOrder, insertOrders } from '../services/orderServicesNuvem.js';
 
 export const createOrder = async (req, res) => {
-  const {
-    app_id,
-    attributes,
-    billing_address,
-    billing_business_name,
-    billing_city,
-    billing_country,
-    billing_customer_type,
-    billing_document_type,
-    billing_floor,
-    billing_locality,
-    billing_name,
-    billing_number,
-    billing_phone,
-    billing_province,
-    billing_state_registration,
-    billing_trade_name,
-    billing_zipcode,
-    cancel_reason,
-    cancelled_at,
-    checkout_enabled,
-    client_details,
-    closed_at,
-    completed_at,
-    contact_email,
-    contact_identification,
-    contact_name,
-    contact_phone,
-    coupon,
-    created_at,
-    currency,
-    customer,
-    customer_visit,
-    discount,
-    discount_coupon,
-    discount_gateway,
-    extra,
-    free_shipping_config,
-    fulfillments,
-    gateway,
-    gateway_id,
-    gateway_link,
-    gateway_name,
-    has_shippable_products,
-    order_id,
-    landing_url,
-    language,
-    next_action,
-    note,
-    number,
-    order_origin,
-    owner_note,
-    paid_at,
-    payment_count,
-    payment_details,
-    payment_status,
-    products,
-    promotional_discount,
-    read_at,
-    same_billing_and_shipping_address,
-    shipped_at,
-    shipping,
-    shipping_address,
-    shipping_carrier_name,
-    shipping_cost_customer,
-    shipping_cost_owner,
-    shipping_max_days,
-    shipping_min_days,
-    shipping_option,
-    shipping_option_code,
-    shipping_option_reference,
-    shipping_pickup_details,
-    shipping_pickup_type,
-    shipping_status,
-    shipping_store_branch_extra,
-    shipping_store_branch_name,
-    shipping_suboption,
-    shipping_tracking_number,
-    shipping_tracking_url,
-    status,
-    store_id,
-    storefront,
-    subtotal,
-    token,
-    total,
-    total_usd,
-    updated_at,
-    weight
-  } = req.body;
+  const { store } = req.params;
+  const order = req.body;
 
-  const queryText = `
-    INSERT INTO pedidos (
-      app_id, attributes, billing_address, billing_business_name, billing_city, billing_country,
-      billing_customer_type, billing_document_type, billing_floor, billing_locality, billing_name,
-      billing_number, billing_phone, billing_province, billing_state_registration, billing_trade_name,
-      billing_zipcode, cancel_reason, cancelled_at, checkout_enabled, client_details, closed_at,
-      completed_at, contact_email, contact_identification, contact_name, contact_phone, coupon,
-      created_at, currency, customer, customer_visit, discount, discount_coupon, discount_gateway,
-      extra, free_shipping_config, fulfillments, gateway, gateway_id, gateway_link, gateway_name,
-      has_shippable_products, order_id, landing_url, language, next_action, note, number, order_origin,
-      owner_note, paid_at, payment_count, payment_details, payment_status, products, promotional_discount,
-      read_at, same_billing_and_shipping_address, shipped_at, shipping, shipping_address, shipping_carrier_name,
-      shipping_cost_customer, shipping_cost_owner, shipping_max_days, shipping_min_days, shipping_option,
-      shipping_option_code, shipping_option_reference, shipping_pickup_details, shipping_pickup_type,
-      shipping_status, shipping_store_branch_extra, shipping_store_branch_name, shipping_suboption,
-      shipping_tracking_number, shipping_tracking_url, status, store_id, storefront, subtotal, token, total,
-      total_usd, updated_at, weight
-    )
-    VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
-      $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44,
-      $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65,
-      $66, $67, $68, $69, $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $80, $81, $82, $83
-    )
-    RETURNING *`;
+  if (!order || !store) {
+    return res.status(400).json({ error: 'Store and order are required' });
+  }
 
   try {
-    const result = await query(queryText, [
-      app_id, attributes, billing_address, billing_business_name, billing_city, billing_country,
-      billing_customer_type, billing_document_type, billing_floor, billing_locality, billing_name,
-      billing_number, billing_phone, billing_province, billing_state_registration, billing_trade_name,
-      billing_zipcode, cancel_reason, cancelled_at, checkout_enabled, client_details, closed_at,
-      completed_at, contact_email, contact_identification, contact_name, contact_phone, coupon,
-      created_at, currency, customer, customer_visit, discount, discount_coupon, discount_gateway,
-      extra, free_shipping_config, fulfillments, gateway, gateway_id, gateway_link, gateway_name,
-      has_shippable_products, order_id, landing_url, language, next_action, note, number, order_origin,
-      owner_note, paid_at, payment_count, payment_details, payment_status, products, promotional_discount,
-      read_at, same_billing_and_shipping_address, shipped_at, shipping, shipping_address, shipping_carrier_name,
-      shipping_cost_customer, shipping_cost_owner, shipping_max_days, shipping_min_days, shipping_option,
-      shipping_option_code, shipping_option_reference, shipping_pickup_details, shipping_pickup_type,
-      shipping_status, shipping_store_branch_extra, shipping_store_branch_name, shipping_suboption,
-      shipping_tracking_number, shipping_tracking_url, status, store_id, storefront, subtotal, token, total,
-      total_usd, updated_at, weight
-    ]);
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao inserir pedido' });
+    console.log('Cadastrando pedido', order[0])
+    await insertOrder(order[0], store); // Chama a função para inserir os pedidos no banco de dados
+
+    res.status(201).json({ message: 'Pedido cadastrado!' });
+  } catch (error) {
+    console.error('Erro ao criar pedido:', error);
+    res.status(500).json({ error: 'Erro ao criar pedido' });
   }
 };

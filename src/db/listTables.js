@@ -2,7 +2,9 @@ import { query } from '../db/db.js';
 
 const listTables = async () => {
   const queryText = `
-    SELECT * from pedidos_artepropria
+    SELECT column_name 
+    FROM information_schema.columns 
+    WHERE table_name = 'pedidos_artepropria' AND is_nullable = 'NO'
   `;
 
   try {

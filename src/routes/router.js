@@ -9,6 +9,7 @@ import { getDataADSMeta } from '../controllers/dataADSMetaControllers.js';
 import { createOrder } from '../controllers/createOrderController.js';
 import { postProduct } from '../controllers/createProductController.js';
 import { getCategories } from '../controllers/categoriesControllers.js';
+import { deleteOrderByOwnerNote } from '../controllers/deleteOrderController.js';
 
 const router = express.Router();
 
@@ -38,6 +39,8 @@ router.get('/ads/meta/:store/:createdAtMin/:createdAtMax', getDataADSMeta);
 router.get('/analytics/:store/:createdAtMin/:createdAtMax', getAnalytics);
 
 // Rota para criar pedidos
-router.post('/order', createOrder); // Adicione a rota para criar um novo pedido
+router.post('/order/:store', createOrder); // Adicione a rota para criar um novo pedido
+// Rota para excluir pedidos
+router.delete('/order/:store/:ownerNote', deleteOrderByOwnerNote); // Adicione a rota para criar um novo pedido
 
 export default router;
