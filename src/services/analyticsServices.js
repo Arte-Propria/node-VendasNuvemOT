@@ -64,7 +64,7 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
           { name: 'deviceCategory' },
         ],
         metrics: [
-          { name: 'engagedSessions' },
+          { name: 'sessions' },
         ],
       },
     });
