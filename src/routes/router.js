@@ -19,9 +19,12 @@ router.get('/product/:store/:id', getProduct);
 router.get('/coupons/:store', getCoupons);
 router.get('/categories/:store', getCategories);
 router.get('/orders/', getOrders);
-router.get('/orders/:store/:cpf', getOrdersBot);
+
 router.get('/orders/:store/:createdAtMin/:createdAtMax', getOrders);
 router.get('/customers/:store/:createdAtMin/:createdAtMax', getCustomers);
+
+// Rota de chatbot para enviar o código e link de rastreamento
+router.get('/orders/:store/:cpf', getOrdersBot);
 
 // Rota para cadastrar produto
 router.post('/product/:store', postProduct); // Adicione a rota para criar um novo pedido
