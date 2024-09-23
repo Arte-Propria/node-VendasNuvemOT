@@ -1,4 +1,4 @@
-import { fetchOrder } from "../services/orderServicesNuvem.js";
+import { fetchOrder, insertOrderWebhook } from "../services/orderServicesNuvem.js";
 
 export const createdOrderWebhook = async  (req, res) => {
   try {
@@ -17,7 +17,8 @@ export const createdOrderWebhook = async  (req, res) => {
     } 
 
     const order = await fetchOrder(data)
-    console.log(`Order: ${order}`)
+    await insertOrderWebhook(order, stores[store_id])
+    console.log(`Pedido ID: ${id} atualizado`)
     
     // Confirmação de recebimento do webhook
     res.sendStatus(200); // Nuvemshop espera um status 2XX para considerar o webhook processado

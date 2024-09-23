@@ -1,6 +1,6 @@
 import { updateLastTwoMonthsOrders, updateTodayOrders } from "../automation.js";
 import { query } from "../db/db.js";
-import { fetchOrders, insertOrders } from "../services/orderServicesNuvem.js";
+import { fetchOrder, fetchOrders, insertOrders } from "../services/orderServicesNuvem.js";
 
 export const getOrders = async (req, res) => {
 	try {
@@ -13,6 +13,18 @@ export const getOrders = async (req, res) => {
 	} catch (error) {
 		console.error(error)
 		res.status(404).send("Erro ao buscar pedidos")
+	}
+}
+
+export const getOrder = async (req, res) => {
+	try {
+		const params = req.params
+		const orders = await fetchOrder(params)
+    console.log(orders)
+    res.status(200).send("Pedido encontrado")
+	} catch (error) {
+		console.error(error)
+		res.status(404).send("Erro ao buscar pedido")
 	}
 }
 

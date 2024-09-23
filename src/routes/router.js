@@ -1,6 +1,6 @@
 import express from 'express';
 import { getProduct, getProducts } from '../controllers/productsController.js';
-import { getOrders, getOrdersByDate, getOrdersByStore } from '../controllers/ordersController.js';
+import { getOrder, getOrders, getOrdersByDate, getOrdersByStore } from '../controllers/ordersController.js';
 import { getCustomers } from '../controllers/customersController.js';
 import { getOrdersBot } from '../controllers/ordersBotController.js';
 import { getCoupons } from '../controllers/couponsControllers.js';
@@ -20,6 +20,7 @@ router.get('/product/:store/:id', getProduct);
 router.get('/coupons/:store', getCoupons);
 router.get('/categories/:store', getCategories);
 router.get('/orders/', getOrders);
+router.get('/order/:store/:id', getOrder);
 
 router.get('/orders/:store/:createdAtMin/:createdAtMax', getOrders);
 router.get('/customers/:store/:createdAtMin/:createdAtMax', getCustomers);
