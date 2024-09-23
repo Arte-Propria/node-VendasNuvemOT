@@ -10,6 +10,7 @@ import { createOrder } from '../controllers/createOrderController.js';
 import { postProduct } from '../controllers/createProductController.js';
 import { getCategories } from '../controllers/categoriesControllers.js';
 import { deleteOrderByOwnerNote } from '../controllers/deleteOrderController.js';
+import { createdOrderWebhook } from '../controllers/webhooksController.js';
 
 const router = express.Router();
 
@@ -45,5 +46,8 @@ router.get('/analytics/:store/:createdAtMin/:createdAtMax', getAnalytics);
 router.post('/order/:store', createOrder); // Adicione a rota para criar um novo pedido
 // Rota para excluir pedidos
 router.delete('/order/:store/:ownerNote', deleteOrderByOwnerNote); // Adicione a rota para criar um novo pedido
+
+// WEBHOOKS
+router.post('/webhooks/order-created', createdOrderWebhook)
 
 export default router;
