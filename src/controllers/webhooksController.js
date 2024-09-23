@@ -16,13 +16,15 @@ export const createdOrderWebhook = async  (req, res) => {
       id
     } 
 
+    console.log(data)
+
     const order = await fetchProduct(data)
     console.log(`Order: ${order}`)
     
     // Confirmação de recebimento do webhook
     res.sendStatus(200); // Nuvemshop espera um status 2XX para considerar o webhook processado
   } catch (error) {
-    res.error(error);
+    console.log(error)
   }
  
 }
