@@ -1,4 +1,4 @@
-import { fetchProduct } from "../services/productServices.js";
+import { fetchOrder } from "../services/orderServicesNuvem.js";
 
 export const createdOrderWebhook = async  (req, res) => {
   try {
@@ -16,9 +16,7 @@ export const createdOrderWebhook = async  (req, res) => {
       id
     } 
 
-    console.log(data)
-
-    const order = await fetchProduct(data)
+    const order = await fetchOrder(data)
     console.log(`Order: ${order}`)
     
     // Confirmação de recebimento do webhook
