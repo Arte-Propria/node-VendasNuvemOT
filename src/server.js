@@ -2,7 +2,6 @@ import express from "express"
 import dotenv from "dotenv"
 import cors from "cors"
 import router from "./routes/router.js"
-import { updateAllOrders } from "./automation.js"
 
 dotenv.config()
 
@@ -18,16 +17,4 @@ app.use(router)
 
 app.listen(PORT, () => {
 	console.log(`Servidor rodando na porta ${PORT}`)
-
-	// updateAllOrders()
-
-	// Agendar a tarefa para rodar a cada 5 minutos
-	// cron.schedule('*/5 * * * *', () => {
-	// 	updateTodayOrders();
-	// });
-
-	// // Agendar a tarefa para rodar a cada 10 minutos
-	// cron.schedule('*/10 * * * *', () => {
-	// 	updateLastTwoMonthsOrders();
-	// });
 })

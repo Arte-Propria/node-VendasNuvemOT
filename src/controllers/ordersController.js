@@ -1,4 +1,3 @@
-import { updateLastTwoMonthsOrders, updateTodayOrders } from "../automation.js";
 import { query } from "../db/db.js";
 import { fetchOrder, fetchOrders, insertOrders } from "../services/orderServicesNuvem.js";
 
@@ -53,8 +52,6 @@ export const getOrdersByDate = async (req, res) => {
   } catch (err) {
     console.error('Erro ao buscar pedidos:', err);
     res.status(500).json({ error: 'Erro ao buscar pedidos' });
-  } finally {
-    await updateTodayOrders()
   }
 };
 
@@ -68,15 +65,5 @@ export const getOrdersByStore = async (req, res) => {
   } catch (err) {
     console.error('Erro ao buscar pedidos:', err);
     res.status(500).json({ error: 'Erro ao buscar pedidos' });
-  } finally {
-    // Executa a função em segundo plano sem bloquear a resposta
-    setImmediate(async () => {
-      try {
-        await updateLastTwoMonthsOrders({ store });
-        console.log(`Atualização dos pedidos para ${store} concluída em segundo plano.`);
-      } catch (err) {
-        console.error(`Erro ao atualizar pedidos para ${store}:`, err);
-      }
-    });
   }
 };
