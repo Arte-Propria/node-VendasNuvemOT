@@ -283,7 +283,7 @@ export const insertOrderWebhook = async (order, store) => {
         order.free_shipping_config || null,
         JSON.stringify(order.fulfillments) || null,
         order.has_shippable_products || null,
-        order.orderId || null, // corrigiu a ordem para colocar order_id
+        order.order_id || null, // corrigiu a ordem para colocar order_id
         order.number || null,
         order.paid_at || null,
         order.payment_count || null,
