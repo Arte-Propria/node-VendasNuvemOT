@@ -66,4 +66,46 @@ export const getOrdersByStore = async (req, res) => {
     console.error('Erro ao buscar pedidos:', err);
     res.status(500).json({ error: 'Erro ao buscar pedidos' });
   }
+}
+
+export const updateAllOrdersFromDateRange = async (req, res) => {
+  const { store } = req.params;
+  const endDate = new Date("2023-11-20");  // Data final da busca
+  let currentDate = new Date();            // Inicia a busca a partir de hoje
+
+  try {
+    // Loop até que a data atual seja menor que a data de 2023-11-20
+    while (currentDate > endDate) {
+      const previousMonth = new Date(currentDate);
+      previousMonth.setMonth(previousMonth.getMonth() - 1); // Retrocede um mês
+
+      if (previousMonth < endDate) {
+        previousMonth.setDate(endDate.getDate()); // Se o mês anterior for menor que a data final, ajusta para a data final
+      }
+
+      const startDateISO = previousMonth.toISOString().slice(0, 10);
+      const currentDateISO = currentDate.toISOString().slice(0, 10);
+
+      console.log(`Buscando pedidos entre ${startDateISO} e ${currentDateISO}`);
+
+      // Buscando pedidos mês a mês
+      const orders = await fetchOrders({ store, createdAtMin: startDateISO, createdAtMax: currentDateISO });
+
+      if (orders.length > 0) {
+        console.log('Salvando no banco de dados...')
+        await insertOrders(orders, store);
+        console.log(`Pedidos de ${startDateISO} até ${currentDateISO} foram salvos no banco.`);
+      } else {
+        console.log(`Nenhum pedido encontrado entre ${startDateISO} e ${currentDateISO}`);
+      }
+
+      // Atualiza a data atual para o mês anterior
+      currentDate = previousMonth;
+    }
+
+    res.status(200).send("Todos os pedidos foram recuperados e atualizados com sucesso.");
+  } catch (error) {
+    console.error("Erro ao buscar pedidos:", error);
+    res.status(500).send("Erro ao buscar e salvar pedidos.");
+  }
 };

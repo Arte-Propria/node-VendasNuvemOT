@@ -1,6 +1,6 @@
 import express from 'express';
 import { getProduct, getProducts } from '../controllers/productsController.js';
-import { getOrder, getOrders, getOrdersByDate, getOrdersByStore } from '../controllers/ordersController.js';
+import { getOrder, getOrders, getOrdersByDate, getOrdersByStore, updateAllOrdersFromDateRange } from '../controllers/ordersController.js';
 import { getCustomers } from '../controllers/customersController.js';
 import { getOrdersBot } from '../controllers/ordersBotController.js';
 import { getCoupons } from '../controllers/couponsControllers.js';
@@ -19,8 +19,10 @@ router.get('/products', getProducts);
 router.get('/product/:store/:id', getProduct);
 router.get('/coupons/:store', getCoupons);
 router.get('/categories/:store', getCategories);
-router.get('/orders/', getOrders);
 router.get('/order/:store/:id', getOrder);
+
+// Rota que puxa todos os pedidos
+// router.get('/orders/:store', updateAllOrdersFromDateRange);
 
 router.get('/orders/:store/:createdAtMin/:createdAtMax', getOrders);
 router.get('/customers/:store/:createdAtMin/:createdAtMax', getCustomers);

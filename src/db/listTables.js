@@ -1,18 +1,17 @@
 import { query } from '../db/db.js';
 
-const listTables = async () => {
+const listOrdersOutlet = async () => {
   const queryText = `
-    SELECT column_name 
-    FROM information_schema.columns 
-    WHERE table_name = 'pedidos_artepropria' AND is_nullable = 'NO'
+    SELECT * 
+    FROM pedidos_outlet
   `;
 
   try {
     const res = await query(queryText);
-    console.log('Tabelas no banco de dados:', res.rows);
+    console.log('Pedidos na tabela pedidos_outlet:', res.rows);
   } catch (err) {
-    console.error('Erro ao listar tabelas:', err);
+    console.error('Erro ao listar pedidos:', err);
   }
 };
 
-listTables();
+listOrdersOutlet();
