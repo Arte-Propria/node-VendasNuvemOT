@@ -44,6 +44,7 @@ router.get('/analytics/:store/:createdAtMin/:createdAtMax', getAnalytics);
 
 // Rota para criar pedidos
 router.post('/order/:store', createOrder); // Adicione a rota para criar um novo pedido
+
 // Rota para excluir pedidos
 router.delete('/order/:store/:ownerNote', deleteOrderByOwnerNote); // Adicione a rota para criar um novo pedido
 
