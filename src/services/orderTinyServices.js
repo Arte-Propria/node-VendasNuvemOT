@@ -6,7 +6,7 @@ dotenv.config();
 const token = process.env.TINY_API_TOKEN;
 const baseUrl = process.env.TINY_API_URL;
 
-export async function fetchOrderTiny(id) {
+export async function fetchOrderTiny(id, cpf) {
   const response = await axios.get(`${baseUrl}/pedidos.pesquisa.php`, {
     headers: {
       'Content-Type': 'application/json',
@@ -14,6 +14,7 @@ export async function fetchOrderTiny(id) {
     params: {
       token,
       formato: 'json',
+      cpf_cnpj: cpf,
       numeroEcommerce: id,
     },
   });

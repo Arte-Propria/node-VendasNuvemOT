@@ -56,6 +56,6 @@ router.delete('/order/:store/:ownerNote', deleteOrderByOwnerNote); // Adicione a
 router.post('/webhooks/order-created', createdOrderWebhook)
 
 // Rotas TINY
-router.get('/tiny/order/:id', getOrderTiny);
+router.get('/tiny/order/:id/:cpf', getOrderTiny);
 
 export default router;

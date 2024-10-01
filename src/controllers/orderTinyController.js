@@ -1,10 +1,10 @@
 import { fetchOrderTiny } from "../services/orderTinyServices.js";
 
 export const getOrderTiny = async (req, res) => {
-  const { id } = req.params
+  const { id, cpf } = req.params
 
   try {
-    const order = await fetchOrderTiny(id)
+    const order = await fetchOrderTiny(id, cpf)
     res.status(200).json(order);
 
   } catch (err) {
