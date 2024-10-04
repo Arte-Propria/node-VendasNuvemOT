@@ -3,7 +3,7 @@ import { getProduct, getProducts } from '../controllers/productsController.js';
 import { getOrder, getOrders, getOrdersByDate, getOrdersByStore, updateAllOrdersFromDateRange } from '../controllers/ordersController.js';
 import { getCustomers } from '../controllers/customersController.js';
 import { getOrdersBot } from '../controllers/ordersBotController.js';
-import { getCoupons } from '../controllers/couponsControllers.js';
+import { getCoupons, postCoupon } from '../controllers/couponsControllers.js';
 import { getAnalytics } from '../controllers/analyticsControllers.js';
 import { getDataADSMeta } from '../controllers/dataADSMetaControllers.js';
 import { createOrder } from '../controllers/createOrderController.js';
@@ -21,6 +21,7 @@ router.get('/product/:store/:id', getProduct);
 
 // Rota para cupons
 router.get('/coupons/:store', getCoupons);
+router.get('/coupons/:store/:code', postCoupon);
 
 router.get('/categories/:store', getCategories);
 router.get('/order/:store/:id', getOrder);
