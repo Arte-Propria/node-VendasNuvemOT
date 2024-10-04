@@ -42,32 +42,45 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
 
     const insightsArray = await Promise.all(insightsPromises);
     
-    // Soma o gasto total, o gasto em campanhas ECOM e as impressões
+    // Variáveis para armazenar os gastos
     let totalSpend = 0;
     let totalSpendEcom = 0;
+    let totalSpendQuadros = 0;
+    let totalSpendEspelhos = 0;
+    let totalSpendGeral = 0;
     let totalImpressions = 0;
     let account_id = accountID;
 
     insightsArray.forEach(({ campaignName, insights }) => {
       insights.forEach(insight => {
         const spend = parseFloat(insight.spend);
-        const impressions = parseInt(insight.impressions, 10);
-
         totalSpend += spend;
-        totalImpressions += impressions;
 
-        if (campaignName.includes("ECOM")) {
+        if (campaignName.toLowerCase().includes("ecom")) {
           totalSpendEcom += spend;
+        } else if (campaignName.toLowerCase().includes("quadro")) {
+          totalSpendQuadros += spend;
+        } else if (campaignName.toLowerCase().includes("espelho")) {
+          totalSpendEspelhos += spend;
+        } else if (campaignName.toLowerCase().includes("geral")){
+          totalSpendGeral += spend;
         }
 
+        totalImpressions += parseInt(insight.impressions, 10);
         account_id = insight.account_id;
       });
     });
 
+    // Retorna os valores formatados com `toFixed(2)`
     const result = [{
       account_id,
-      spend: totalSpend.toFixed(2),
-      spendEcom: totalSpendEcom.toFixed(2),
+      totalCost: {
+        all: parseFloat(totalSpend.toFixed(2)),
+        ecom: parseFloat(totalSpendEcom.toFixed(2)),
+        quadros: parseFloat(totalSpendQuadros.toFixed(2)),
+        espelhos: parseFloat(totalSpendEspelhos.toFixed(2)),
+        geral: parseFloat(totalSpendGeral.toFixed(2)),
+      },
       impressions: totalImpressions
     }];
 

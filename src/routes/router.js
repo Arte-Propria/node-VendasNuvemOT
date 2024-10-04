@@ -18,7 +18,10 @@ const router = express.Router();
 // Rota para buscar produtos
 router.get('/products', getProducts);
 router.get('/product/:store/:id', getProduct);
+
+// Rota para cupons
 router.get('/coupons/:store', getCoupons);
+
 router.get('/categories/:store', getCategories);
 router.get('/order/:store/:id', getOrder);
 
@@ -32,7 +35,7 @@ router.get('/customers/:store/:createdAtMin/:createdAtMax', getCustomers);
 router.get('/orders/:store/:cpf', getOrdersBot);
 
 // Rota para cadastrar produto
-router.post('/product/:store', postProduct); // Adicione a rota para criar um novo pedido
+router.post('/product/:store', postProduct);
 
 // Rota para buscar todos os pedidos de uma loja específica
 router.get('/db/orders/:store', getOrdersByStore);

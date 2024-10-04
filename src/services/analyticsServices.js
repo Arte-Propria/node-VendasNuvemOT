@@ -5,12 +5,10 @@ dotenv.config();
 
 // Função para buscar dados do Analytics
 export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
-  // Definindo valores padrões para datas caso não sejam fornecidos
   const currentDate = new Date();
-  const defaultStartDate = currentDate.toISOString().split('T')[0]; // Obtem a data no formato 'YYYY-MM-DD'
-  const defaultEndDate = currentDate.toISOString().split('T')[0]; // Obtem a data no formato 'YYYY-MM-DD'
+  const defaultStartDate = currentDate.toISOString().split('T')[0];
+  const defaultEndDate = currentDate.toISOString().split('T')[0];
 
-  // Se createdAtMin e createdAtMax forem fornecidos, converte para o formato 'YYYY-MM-DD'
   createdAtMin = createdAtMin
     ? new Date(createdAtMin).toISOString().split('T')[0]
     : defaultStartDate;
@@ -22,7 +20,6 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
   let clientEmail;
   let privateKey;
 
-  // Seleciona o propertyID com base na loja
   if (store === 'outlet') {
     propertyID = process.env.GOOGLE_PROPERTY_ID_OUTLET;
     clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
@@ -50,122 +47,79 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
 
     console.log('Recuperando dados do analytics...');
 
-    // Consulta para recuperar os dados dos dispositivos
-    const deviceResponse = await analytics.properties.runReport({
-      property: `properties/${propertyID}`,
-      requestBody: {
-        dateRanges: [
-          {
-            startDate: createdAtMin,
-            endDate: createdAtMax,
-          },
-        ],
-        dimensions: [
-          { name: 'deviceCategory' },
-        ],
-        metrics: [
-          { name: 'sessions' },
-        ],
-      },
-    });
-
-    // Consulta para recuperar os dados dos custos de anúncios
-    const costResponse = await analytics.properties.runReport({
-      property: `properties/${propertyID}`,
-      requestBody: {
-        dateRanges: [
-          {
-            startDate: createdAtMin,
-            endDate: createdAtMax,
-          },
-        ],
-        dimensions: [
-          { name: 'sessionCampaignName' }
-        ],
-        metrics: [
-          { name: 'advertiserAdCost' }
-        ],
-      },
-    });
-
-    // Consulta para recuperar os dados de carrinho
-    const cartResponse = await analytics.properties.runReport({
-      property: `properties/${propertyID}`,
-      requestBody: {
-        dateRanges: [
-          {
-            startDate: createdAtMin,
-            endDate: createdAtMax,
-          },
-        ],
-        dimensions: [
-          { name: 'eventName' } // Adicionando a dimensão eventName
-        ],
-        metrics: [
-          { name: 'activeUsers' },
-        ],
-      },
-    });
-
-    // Consulta para recuperar os dados de checkout
-    const beginCheckoutResponse = await analytics.properties.runReport({
-      property: `properties/${propertyID}`,
-      requestBody: {
-        dateRanges: [
-          {
-            startDate: createdAtMin,
-            endDate: createdAtMax,
-          },
-        ],
-        dimensions: [
-          { name: 'eventName' } // Adicionando a dimensão eventName
-        ],
-        metrics: [
-          { name: 'checkouts' },
-        ],
-      },
-    });
-
-    // Consulta para recuperar os dados de eventos de formulário submetido (gtm.formSubmit)
-    const formSubmitResponse = await analytics.properties.runReport({
-      property: `properties/${propertyID}`,
-      requestBody: {
-        dateRanges: [
-          {
-            startDate: createdAtMin,
-            endDate: createdAtMax,
-          },
-        ],
-        dimensions: [
-          { name: 'eventName' }
-        ],
-        metrics: [
-          { name: 'eventCount' }
-        ],
-        dimensionFilter: {
-          filter: {
-            fieldName: 'eventName',
-            stringFilter: {
-              matchType: 'EXACT',
-              value: 'gtm.formSubmit',
+    // Definindo as consultas em paralelo
+    const queries = [
+      analytics.properties.runReport({
+        property: `properties/${propertyID}`,
+        requestBody: {
+          dateRanges: [{ startDate: createdAtMin, endDate: createdAtMax }],
+          dimensions: [{ name: 'deviceCategory' }],
+          metrics: [{ name: 'sessions' }],
+        },
+      }),
+      analytics.properties.runReport({
+        property: `properties/${propertyID}`,
+        requestBody: {
+          dateRanges: [{ startDate: createdAtMin, endDate: createdAtMax }],
+          dimensions: [{ name: 'sessionCampaignName' }],
+          metrics: [{ name: 'advertiserAdCost' }],
+        },
+      }),
+      analytics.properties.runReport({
+        property: `properties/${propertyID}`,
+        requestBody: {
+          dateRanges: [{ startDate: createdAtMin, endDate: createdAtMax }],
+          dimensions: [{ name: 'eventName' }],
+          metrics: [{ name: 'activeUsers' }],
+        },
+      }),
+      analytics.properties.runReport({
+        property: `properties/${propertyID}`,
+        requestBody: {
+          dateRanges: [{ startDate: createdAtMin, endDate: createdAtMax }],
+          dimensions: [{ name: 'eventName' }],
+          metrics: [{ name: 'checkouts' }],
+        },
+      }),
+      analytics.properties.runReport({
+        property: `properties/${propertyID}`,
+        requestBody: {
+          dateRanges: [{ startDate: createdAtMin, endDate: createdAtMax }],
+          dimensions: [{ name: 'eventName' }],
+          metrics: [{ name: 'eventCount' }],
+          dimensionFilter: {
+            filter: {
+              fieldName: 'eventName',
+              stringFilter: { matchType: 'EXACT', value: 'gtm.formSubmit' },
             },
           },
         },
-      },
-    });
+      }),
+    ];
 
-    // Processamento para calcular o total de usuários e por dispositivo
+    // Executa as consultas em paralelo
+    const [
+      deviceResponse,
+      costResponse,
+      cartResponse,
+      beginCheckoutResponse,
+      formSubmitResponse,
+    ] = await Promise.all(queries);
+
+    // Processa os dados simultaneamente
     let totalVisits = 0;
     let usersByDevice = {};
-    let totalCost = 0;
-    let totalCostEcom = 0;
+    let all = 0;
+    let ecom = 0;
+    let quadros = 0;
+    let espelhos = 0;
+    let geral = 0;
     let carts = 0;
     let beginCheckout = 0;
     let formSubmits = 0;
 
-    // Processa os dados dos dispositivos
     if (deviceResponse.data.rows) {
-      deviceResponse.data.rows.forEach(row => {
+      deviceResponse.data.rows.forEach((row) => {
         const deviceType = row.dimensionValues[0].value;
         const users = parseInt(row.metricValues[0].value, 10);
         totalVisits += users;
@@ -173,49 +127,68 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
       });
     }
 
-    // Processa os dados dos custos de anúncios
     if (costResponse.data.rows) {
-      costResponse.data.rows.forEach(row => {
+      costResponse.data.rows.forEach((row) => {
+        const campaignName = row.dimensionValues[0].value.toLowerCase();
         const spent = parseFloat(row.metricValues[0].value);
-        totalCost += spent;
-        if (row.dimensionValues[0].value.includes("ecom")) {
-          totalCostEcom += spent;
+
+        all += spent;
+
+        if (campaignName.includes('ecom')) {
+          ecom += spent;
+        } else if (campaignName.includes('quadro')) {
+          quadros += spent;
+        } else if (campaignName.includes('espelho')) {
+          espelhos += spent;
+        } else if (campaignName.includes('geral')) {
+          geral += spent;
         }
       });
     }
 
-    // Processa os dados de checkout
     if (beginCheckoutResponse.data.rows) {
-      beginCheckoutResponse.data.rows.forEach(row => {
+      beginCheckoutResponse.data.rows.forEach((row) => {
         const checkouts = parseFloat(row.metricValues[0].value);
         beginCheckout += checkouts;
       });
     }
 
-    // Processa os dados de carrinho
     if (cartResponse.data.rows) {
-      const addToCartEvent = cartResponse.data.rows.find(row => row.dimensionValues[0].value === 'add_to_cart');
-      carts = addToCartEvent ? parseInt(addToCartEvent.metricValues[0].value, 10) : 0;
+      const addToCartEvent = cartResponse.data.rows.find(
+        (row) => row.dimensionValues[0].value === 'add_to_cart'
+      );
+      carts = addToCartEvent
+        ? parseInt(addToCartEvent.metricValues[0].value, 10)
+        : 0;
     }
 
-    // Processa os dados de eventos de formulário submetido
     if (formSubmitResponse.data.rows) {
-      formSubmits = parseInt(formSubmitResponse.data.rows[0].metricValues[0].value, 10);
+      formSubmits = parseInt(
+        formSubmitResponse.data.rows[0].metricValues[0].value,
+        10
+      );
     }
 
-    totalCost = parseFloat(totalCost.toFixed(2));
-    totalCostEcom = parseFloat(totalCostEcom.toFixed(2));
+    all = parseFloat(all.toFixed(2));
+    ecom = parseFloat(ecom.toFixed(2));
+    quadros = parseFloat(quadros.toFixed(2));
+    espelhos = parseFloat(espelhos.toFixed(2));
+    geral = parseFloat(geral.toFixed(2));
 
     return {
       totalVisits,
       usersByDevice,
-      totalCost,
-      totalCostEcom, // Adiciona o novo campo com o custo das campanhas ecom
+      totalCost: {
+        all,
+        ecom,
+        quadros,
+        espelhos,
+        geral,
+      },
       carts,
       beginCheckout,
-      formSubmits // Adiciona a quantidade de eventos de formulário submetido
+      formSubmits,
     };
-
   } catch (error) {
     console.error('Error fetching analytics data:', error);
     throw error;
