@@ -21,7 +21,7 @@ router.get('/product/:store/:id', getProduct);
 
 // Rota para cupons
 router.get('/coupons/:store', getCoupons);
-router.get('/coupons/:store/:code', postCoupon);
+router.post('/coupons/:store/:code', postCoupon);
 
 router.get('/categories/:store', getCategories);
 router.get('/order/:store/:id', getOrder);
