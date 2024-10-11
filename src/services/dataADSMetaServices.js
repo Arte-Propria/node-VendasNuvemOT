@@ -63,7 +63,7 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
           totalSpendQuadros += spend;
         } else if (campaignName.toLowerCase().includes("espelho")) {
           totalSpendEspelhos += spend;
-        } else if (campaignName.toLowerCase().includes("WSP")) {
+        } else if (campaignName.includes("WSP")) {
           totalSpendChatbot += spend;
         } else if (campaignName.toLowerCase().includes("geral")){
           totalSpendGeral += spend;
