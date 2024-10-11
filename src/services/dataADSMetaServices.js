@@ -47,6 +47,7 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
     let totalSpendEcom = 0;
     let totalSpendQuadros = 0;
     let totalSpendEspelhos = 0;
+    let totalSpendChatbot = 0;
     let totalSpendGeral = 0;
     let totalImpressions = 0;
     let account_id = accountID;
@@ -62,6 +63,8 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
           totalSpendQuadros += spend;
         } else if (campaignName.toLowerCase().includes("espelho")) {
           totalSpendEspelhos += spend;
+        } else if (campaignName.toLowerCase().includes("WSP")) {
+          totalSpendChatbot += spend;
         } else if (campaignName.toLowerCase().includes("geral")){
           totalSpendGeral += spend;
         }
@@ -79,6 +82,7 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
         ecom: parseFloat(totalSpendEcom.toFixed(2)),
         quadros: parseFloat(totalSpendQuadros.toFixed(2)),
         espelhos: parseFloat(totalSpendEspelhos.toFixed(2)),
+        chatbot: parseFloat(totalSpendChatbot.toFixed(2)),
         geral: parseFloat(totalSpendGeral.toFixed(2)),
       },
       impressions: totalImpressions
