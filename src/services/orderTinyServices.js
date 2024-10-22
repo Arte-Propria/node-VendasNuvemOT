@@ -7,7 +7,7 @@ const token = process.env.TINY_API_TOKEN;
 const baseUrl = process.env.TINY_API_URL;
 
 export async function fetchOrderTiny(id, cpf) {
-  const response = await axios.get(`${baseUrl}/pedidos.pesquisa.php`, {
+  const order = await axios.get(`${baseUrl}/pedidos.pesquisa.php`, {
     headers: {
       'Content-Type': 'application/json',
     },
@@ -18,14 +18,30 @@ export async function fetchOrderTiny(id, cpf) {
       numeroEcommerce: id,
     },
   });
+  
+  if (order.data.retorno.status === 'OK') {
+    const idTiny = order.data.retorno.pedidos[0].pedido.id;
 
-  if (response.data.retorno.status === 'OK') {
-    const order = response.data.retorno.pedidos[0].pedido;
+    const orderFull = await axios.get(`${baseUrl}/pedido.obter.php`, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      params: {
+        token,
+        formato: 'json',
+        id: idTiny,
+      },
+    });
 
-    return order;
+    if (orderFull.data.retorno.status === 'OK') {
+      
+      return orderFull.data.retorno.pedido
+    }
+
   } else {
     throw new Error('Pedido não encontrado');
   }
+
 }
 
 export async function fetchNoteOrderTiny(id, cpf) {
