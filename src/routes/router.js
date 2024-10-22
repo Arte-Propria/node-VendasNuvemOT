@@ -11,7 +11,7 @@ import { postProduct } from '../controllers/createProductController.js';
 import { getCategories } from '../controllers/categoriesControllers.js';
 import { deleteOrderByOwnerNote } from '../controllers/deleteOrderController.js';
 import { createdOrderWebhook } from '../controllers/webhooksController.js';
-import { getOrderTiny } from '../controllers/orderTinyController.js';
+import { getNoteOrderTiny, getOrderTiny } from '../controllers/orderTinyController.js';
 
 const router = express.Router();
 
@@ -61,5 +61,6 @@ router.post('/webhooks/order-created', createdOrderWebhook)
 
 // Rotas TINY
 router.get('/tiny/order/:id/:cpf', getOrderTiny);
+router.get('/tiny/note/:id/:cpf', getNoteOrderTiny);
 
 export default router;
