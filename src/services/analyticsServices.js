@@ -113,6 +113,7 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
     let ecom = 0;
     let quadros = 0;
     let espelhos = 0;
+    let loja = 0;
     let geral = 0;
     let carts = 0;
     let beginCheckout = 0;
@@ -140,6 +141,8 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
           quadros += spent;
         } else if (campaignName.includes('espelho')) {
           espelhos += spent;
+        } else if (campaignName.includes('visits')) {
+          loja += spent;
         } else if (campaignName.includes('geral')) {
           geral += spent;
         }
@@ -173,6 +176,7 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
     ecom = parseFloat(ecom.toFixed(2));
     quadros = parseFloat(quadros.toFixed(2));
     espelhos = parseFloat(espelhos.toFixed(2));
+    loja = parseFloat(loja.toFixed(2));
     geral = parseFloat(geral.toFixed(2));
 
     return {
@@ -183,6 +187,7 @@ export const fetchAnalytics = async ({ store, createdAtMin, createdAtMax }) => {
         ecom,
         quadros,
         espelhos,
+        loja,
         geral,
       },
       carts,

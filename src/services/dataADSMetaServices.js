@@ -48,6 +48,7 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
     let totalSpendQuadros = 0;
     let totalSpendEspelhos = 0;
     let totalSpendChatbot = 0;
+    let totalSpendInsta = 0;
     let totalSpendGeral = 0;
     let totalImpressions = 0;
     let account_id = accountID;
@@ -65,6 +66,8 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
           totalSpendEspelhos += spend;
         } else if (campaignName.includes("WSP")) {
           totalSpendChatbot += spend;
+        } else if (campaignName.toLowerCase().includes("instagram")){
+          totalSpendInsta += spend;
         } else if (campaignName.toLowerCase().includes("geral")){
           totalSpendGeral += spend;
         }
@@ -83,6 +86,7 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
         quadros: parseFloat(totalSpendQuadros.toFixed(2)),
         espelhos: parseFloat(totalSpendEspelhos.toFixed(2)),
         chatbot: parseFloat(totalSpendChatbot.toFixed(2)),
+        instagram: parseFloat(totalSpendInsta.toFixed(2)),
         geral: parseFloat(totalSpendGeral.toFixed(2)),
       },
       impressions: totalImpressions
