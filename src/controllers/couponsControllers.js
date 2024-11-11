@@ -14,7 +14,7 @@ export const getCoupons = async (req, res) => {
 export const postCoupon = async (req, res) => {
   const params = req.params;
 	const nameClient = params.code.toUpperCase();
-	const codeCoupon = `${nameClient}-10`;
+	const codeCoupon = `${nameClient}-5`;
 
   try {
     // Cria o cupom
