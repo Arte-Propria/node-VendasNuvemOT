@@ -87,7 +87,7 @@ export const createCoupon = async (params = {}, codeCoupon) => {
   const body =  {
     code: codeCoupon,
     type: "percentage",
-    value: "10.00",
+    value: "5.00",
     max_uses: null,
     includes_shipping: true,
     first_consumer_purchase: true,
