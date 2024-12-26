@@ -4,85 +4,88 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const token = process.env.TINY_API_TOKEN;
+const tokenAbstract = process.env.TINY_API_TOKEN_ABSTRACT;
 const baseUrl = process.env.TINY_API_URL;
 
-export async function fetchOrderTiny(id, cpf) {
-  const order = await axios.get(`${baseUrl}/pedidos.pesquisa.php`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    params: {
-      token,
-      formato: 'json',
-      cpf_cnpj: cpf,
-      numeroEcommerce: id,
-    },
-  });
-  
-  if (order.data.retorno.status === 'OK') {
-    const idTiny = order.data.retorno.pedidos[0].pedido.id;
+async function fetchWithRetry(url, params, maxAttempts = 2) {
+  let attempts = 0;
+  let lastError;
 
-    const orderFull = await axios.get(`${baseUrl}/pedido.obter.php`, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      params: {
-        token,
-        formato: 'json',
-        id: idTiny,
-      },
-    });
-
-    if (orderFull.data.retorno.status === 'OK') {
-      
-      return orderFull.data.retorno.pedido
+  while (attempts < maxAttempts) {
+    try {
+      const response = await axios.get(url, {
+        headers: { 'Content-Type': 'application/json' },
+        params,
+      });
+      if (response.data.retorno.status === 'OK') {
+        return response.data.retorno;
+      }
+    } catch (error) {
+      lastError = error;
     }
 
-  } else {
-    throw new Error('Pedido não encontrado');
+    attempts++;
+    params.token = params.token === token ? tokenAbstract : token; // Alterna o token
   }
 
+  throw lastError || new Error('Erro desconhecido durante a requisição');
+}
+
+export async function fetchOrderTiny(id, cpf) {
+  const searchParams = {
+    token,
+    formato: 'json',
+    cpf_cnpj: cpf,
+    numeroEcommerce: id,
+  };
+
+  const searchResponse = await fetchWithRetry(`${baseUrl}/pedidos.pesquisa.php`, searchParams);
+
+  if (searchResponse.pedidos && searchResponse.pedidos.length > 0) {
+    const idTiny = searchResponse.pedidos[0].pedido.id;
+
+    const orderParams = {
+      token,
+      formato: 'json',
+      id: idTiny,
+    };
+
+    const orderResponse = await fetchWithRetry(`${baseUrl}/pedido.obter.php`, orderParams);
+    return orderResponse.pedido;
+  }
+
+  throw new Error('Pedido não encontrado');
 }
 
 export async function fetchNoteOrderTiny(id, cpf) {
-  const response = await axios.get(`${baseUrl}/notas.fiscais.pesquisa.php`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    params: {
-      token,
-      formato: 'json',
-      cpf_cnpj: cpf,
-      numeroEcommerce: id,
-    },
-  });
+  const searchParams = {
+    token,
+    formato: 'json',
+    cpf_cnpj: cpf,
+    numeroEcommerce: id,
+  };
 
-  if (response.data.retorno.status === 'OK') {
-    const note = response.data.retorno.notas_fiscais[0].nota_fiscal;
+  const noteResponse = await fetchWithRetry(`${baseUrl}/notas.fiscais.pesquisa.php`, searchParams);
 
-    return note;
-  } else {
-    throw new Error('Pedido não encontrado no Tiny');
+  if (noteResponse.notas_fiscais && noteResponse.notas_fiscais.length > 0) {
+    return noteResponse.notas_fiscais[0].nota_fiscal;
   }
+
+  throw new Error('Nota fiscal não encontrada no Tiny');
 }
 
 export async function fetchLinkNote(id) {
-  const response = await axios.get(`${baseUrl}/nota.fiscal.obter.link.php`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    params: {
-      token,
-      formato: 'json',
-      id,
-    },
-  });
+  const params = {
+    token,
+    formato: 'json',
+    id,
+  };
 
-  if (response.data.retorno.status === 'OK') {
-    const linkNote = response.data.retorno.link_nfe;
+  const linkResponse = await fetchWithRetry(`${baseUrl}/nota.fiscal.obter.link.php`, params);
 
-    return linkNote;
-  } else {
-    throw new Error('Nota não encontrada no Tiny');
+  if (linkResponse.link_nfe) {
+    return linkResponse.link_nfe;
   }
+
+  throw new Error('Link da nota fiscal não encontrado no Tiny');
 }
