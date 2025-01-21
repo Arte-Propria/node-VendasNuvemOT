@@ -693,18 +693,10 @@ export const insertOrder = async (order, store) => {
     RETURNING *`
 
 	try {
-		let numericUuid
-		let finalOwnerNote
+		const numericUuid = generateNumericId()
 
-		if(store === "artepropria") {
-			finalOwnerNote = `${order.data.owner_note}_${numericUuid}`
-			numericUuid = generateNumericId()
-		}
-
-		if(store === "outlet") {
-			finalOwnerNote = order.data.owner_note || null
-			numericUuid = order.data.id || null
-		}
+		// Concatena o owner_note com o UUID
+		const finalOwnerNote = `${order.data.owner_note}_${numericUuid}`
 
 		await query(queryText, [
 			order.data.weight || null,
