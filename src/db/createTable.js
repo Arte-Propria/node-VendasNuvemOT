@@ -1,7 +1,7 @@
-import { query } from './db.js';
+import { query } from "./db.js"
 
 const createTable = async () => {
-  const queryText = `
+	const queryText = `
     CREATE TABLE pedidos_artepropria (
       weight numeric,
       app_id integer,
@@ -92,14 +92,14 @@ const createTable = async () => {
       gateway_link text,
       gateway_name character varying
     );
-  `;
+  `
 
-  try {
-    await query(queryText);
-    console.log('Tabela criada com sucesso');
-  } catch (err) {
-    console.error('Erro ao criar tabela', err);
-  }
-};
+	try {
+		await query(queryText)
+		console.log("Tabela criada com sucesso")
+	} catch (err) {
+		console.error("Erro ao criar tabela", err)
+	}
+}
 
-createTable().then(() => process.exit());
+createTable().then(() => process.exit())
