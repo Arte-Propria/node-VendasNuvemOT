@@ -4,9 +4,10 @@ export const getDataADSMeta = async (req, res) => {
 	try {
 		const params = req.params
 		const dataADSMeta = await fetchDataADSMeta(params)
-		res.json(dataADSMeta)
+		res.status(200).json(dataADSMeta)
 	} catch (error) {
-		// console.error(error)
-		res.status(500).send("Erro ao buscar dados do ADS")
+		console.error(error.data)
+		const status = error.status
+		res.status(status).send("Erro ao buscar dados do ADS")
 	}
 }

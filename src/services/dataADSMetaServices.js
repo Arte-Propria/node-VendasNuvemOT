@@ -16,12 +16,12 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
 		accountID = process.env.META_ID_ACCOUNT_ARTEPROPRIA
 	}
 
-	const campaignsUrl = `https://graph.facebook.com/v22.0/act_${accountID}/campaigns`
+	const campaignsUrl = `https://graph.facebook.com/v20.0/act_${accountID}/campaigns`
 
 	const campaignParams = {
 		fields: "id,name",
 		access_token: accessToken,
-		limit: 200
+		limit: 150
 	}
 
 	try {
@@ -96,7 +96,7 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
 		return result
     
 	} catch (error) {
-		console.error("Error fetching data ADS:", error)
-		throw error
+		// console.error("Error fetching data ADS:", error.response.data)
+		throw error.response
 	}
 }
