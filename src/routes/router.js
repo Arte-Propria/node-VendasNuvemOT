@@ -12,6 +12,7 @@ import { getCategories } from "../controllers/categoriesControllers.js"
 import { deleteOrderByOwnerNote } from "../controllers/deleteOrderController.js"
 import { createdOrderWebhook } from "../controllers/webhooksController.js"
 import { getNoteOrderTiny, getOrderTiny } from "../controllers/orderTinyController.js"
+import { getRefunds, createRefund, deleteRefund } from "../controllers/refundsControllers.js"
 
 const router = express.Router()
 
@@ -62,5 +63,10 @@ router.post("/webhooks/order-created", createdOrderWebhook)
 // Rotas TINY
 router.get("/tiny/order/:id/:cpf", getOrderTiny)
 router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
+
+// Rotas de reembolsos
+router.get("/refunds/:store/:createdAtMin/:createdAtMax", getRefunds)
+router.post("/refunds/:store", createRefund)
+router.delete("/refunds/:store/:id", deleteRefund)
 
 export default router

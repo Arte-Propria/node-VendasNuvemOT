@@ -102,4 +102,26 @@ const createTable = async () => {
 	}
 }
 
-createTable().then(() => process.exit())
+// createTable().then(() => process.exit())
+
+const createTableRefund = async () => {
+	const queryText = `
+  CREATE TABLE reembolsos_artepropria (
+    id SERIAL PRIMARY KEY,
+    order_id int UNIQUE,
+    category VARCHAR(50),
+    total numeric,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN DEFAULT FALSE
+    );
+    `
+    
+	try {
+		await query(queryText)
+		console.log("Tabela reembolsos_artepropria criada com sucesso")
+	} catch (err) {
+		console.error("Erro ao criar tabela", err)
+	}
+}
+  
+createTableRefund().then(() => process.exit())
