@@ -7,7 +7,10 @@ export const getTikTokAuth = async (req, res) => {
 }
 
 export const getTikTokAds = async (req, res) => {
-	const ads = await fetchTiktokAds()
+	const { store, createdAtMin, createdAtMax } = req.params
+
+	const ads = await fetchTiktokAds(store, createdAtMin, createdAtMax)
+	
 	res.status(200).json(ads)
 }
 

@@ -33,7 +33,7 @@ export const fetchTiktokAuth = async () => {
 	}
 }
 
-export const fetchTiktokAds = async () => {
+export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
 	try {
 		const response = await axios.get("", {
 			headers: {
