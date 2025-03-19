@@ -13,6 +13,7 @@ import { deleteOrderByOwnerNote } from "../controllers/deleteOrderController.js"
 import { createdOrderWebhook } from "../controllers/webhooksController.js"
 import { getNoteOrderTiny, getOrderTiny } from "../controllers/orderTinyController.js"
 import { getRefunds, createRefund, deleteRefund } from "../controllers/refundsControllers.js"
+import { getTikTokAuth } from "../controllers/tiktokControllers.js"
 
 const router = express.Router()
 
@@ -50,6 +51,9 @@ router.get("/ads/meta/:store/:createdAtMin/:createdAtMax", getDataADSMeta)
 
 // Google Analytics
 router.get("/analytics/:store/:createdAtMin/:createdAtMax", getAnalytics)
+
+// Rotas TikTok
+router.get("/tiktok/auth", getTikTokAuth)
 
 // Rota para criar pedidos
 router.post("/order/:store", createOrder) // Adicione a rota para criar um novo pedido
