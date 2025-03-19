@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import axios from "axios"
 import dotenv from "dotenv"
 
@@ -7,6 +8,10 @@ const appId = process.env.TIKTOK_CLIENT_APP_ID
 const appSecret = process.env.TIKTOK_CLIENT_SECRET
 const redirectUri = process.env.TIKTOK_REDIRECT_URI
 const authCode = process.env.TIKTOK_AUTH_CODE
+const accessToken = process.env.TIKTOK_ACCESS_TOKEN
+const advertiserId = process.env.TIKTOK_ADVERTISER_ID
+const adAccountIdOutlet = process.env.TIKTOK_AD_ACCOUNT_ID_OUTLET
+
 
 export const fetchTiktokAuth = async () => {
 	try {
@@ -25,5 +30,20 @@ export const fetchTiktokAuth = async () => {
 	} catch (error) {
 		console.error("Error getting TikTok access token:", error)
 		return redirectUri + "?success=false&error=" + error.message
+	}
+}
+
+export const fetchTiktokAds = async () => {
+	try {
+		const response = await axios.get("", {
+			headers: {
+				"Access-Token": accessToken
+			}
+		})
+
+		return response.data
+	} catch (error) {
+		console.error("Erro ao buscar dados do ADS:", error)
+		return error.message
 	}
 }
