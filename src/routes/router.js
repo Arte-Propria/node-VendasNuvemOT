@@ -14,6 +14,7 @@ import { createdOrderWebhook, createOrderMarketplaceWebhook } from "../controlle
 import { getNoteOrderTiny, getOrderTiny } from "../controllers/orderTinyController.js"
 import { getRefunds, createRefund, deleteRefund } from "../controllers/refundsControllers.js"
 import { getTikTokAuth, getTikTokAds } from "../controllers/tiktokControllers.js"
+import { getOrdersAllMarketplace, getOrdersByMarketplace } from "../controllers/marketplaceControllers.js"
 
 const router = express.Router()
 
@@ -74,5 +75,9 @@ router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
 router.get("/refunds/:store/:createdAtMin/:createdAtMax", getRefunds)
 router.post("/refunds/:store", createRefund)
 router.delete("/refunds/:store/:id", deleteRefund)
+
+// Rotas Marketplace
+router.get("/marketplace/orders/:marketplace/:createdAtMin/:createdAtMax", getOrdersByMarketplace)
+router.get("/marketplace/orders/:createdAtMin/:createdAtMax", getOrdersAllMarketplace)
 
 export default router

@@ -29,8 +29,8 @@ const tinyApiRequest = async (endpoint, params) => {
 export const getOrderDetails = async (orderId) => {
 	const { pedido } = await tinyApiRequest("pedido.obter.php", { id: orderId })
 	if(!pedido) {
-		logWebhook(`Erro ao obter detalhes do pedido ${orderId} na API Tiny. Aguardando 30 segundos para tentar novamente.`)
-		await new Promise((resolve) => setTimeout(resolve, 30000))
+		logWebhook(`Erro ao obter detalhes do pedido ${orderId} na API Tiny. Aguardando 60 segundos para tentar novamente.`)
+		await new Promise((resolve) => setTimeout(resolve, 60000))
 		const { pedido: retryPedido } = await tinyApiRequest("pedido.obter.php", { id: orderId })
 		return retryPedido
 	}
