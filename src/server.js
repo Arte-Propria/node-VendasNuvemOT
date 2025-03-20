@@ -2,11 +2,12 @@ import express from "express"
 import dotenv from "dotenv"
 import cors from "cors"
 import router from "./routes/router.js"
+import { config } from "./config/env.js"
 
 dotenv.config()
 
 const app = express()
-const PORT = process.env.PORT || 3000 // Define a porta do servidor
+const PORT = config.port
 
 const allowedOrigins = [
 	"https://vendas-nuvem-ot.vercel.app", // Seu front-end na Vercel
