@@ -9,12 +9,6 @@ dotenv.config()
 const app = express()
 const PORT = config.port
 
-const allowedOrigins = [
-	"https://vendas-nuvem-ot.vercel.app", // Seu front-end na Vercel
-	"http://localhost:8001", // Ambiente local
-	"http://localhost:5173" // Ambiente local
-]
-
 app.use(cors({ origin: "*" }))
 
 app.use(express.json())

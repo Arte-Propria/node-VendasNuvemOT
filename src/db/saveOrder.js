@@ -1,59 +1,58 @@
 /* eslint-disable camelcase */
 import { query } from "./db.js"
-import { log } from "../utils/logger.js"
+import { logWebhook } from "../utils/logger.js"
 
 export const saveOrder = async (order) => {
-	try {
-		// Validação básica dos parâmetros
-		if (!order) {
-			throw new Error("Parâmetro order é obrigatório")
-		}
+	// Validação básica dos parâmetros
+	if (!order) {
+		throw new Error("Parâmetro order é obrigatório")
+	}
 
-		const tableName = "pedidos_marketplace"
+	const tableName = "pedidos_marketplace"
 
-		// Formatação dos dados antes do salvamento
-		const formattedOrder = {
-			id: order.id,
-			numero: order.numero,
-			numero_ecommerce: order.numero_ecommerce || null,
-			data_pedido: order.data_pedido,
-			data_prevista: order.data_prevista || null,
-			data_faturamento: order.data_faturamento || null,
-			data_envio: order.data_envio || null,
-			data_entrega: order.data_entrega || null,
-			id_lista_preco: order.id_lista_preco || null,
-			descricao_lista_preco: order.descricao_lista_preco || null,
-			cliente: JSON.stringify(order.cliente || {}),
-			endereco_entrega: JSON.stringify(order.endereco_entrega || {}),
-			itens: JSON.stringify(order.itens || []),
-			parcelas: JSON.stringify(order.parcelas || []),
-			marcadores: JSON.stringify(order.marcadores || []),
-			condicao_pagamento: order.condicao_pagamento || null,
-			forma_pagamento: order.forma_pagamento || null,
-			meio_pagamento: order.meio_pagamento || null,
-			nome_transportador: order.nome_transportador || null,
-			frete_por_conta: order.frete_por_conta || null,
-			valor_frete: parseFloat(order.valor_frete) || 0,
-			valor_desconto: parseFloat(order.valor_desconto) || 0,
-			outras_despesas: parseFloat(order.outras_despesas) || 0,
-			total_produtos: parseFloat(order.total_produtos) || 0,
-			total_pedido: parseFloat(order.total_pedido) || 0,
-			numero_ordem_compra: order.numero_ordem_compra || null,
-			deposito: order.deposito || null,
-			ecommerce: order.ecommerce || null,
-			forma_envio: order.forma_envio || null,
-			situacao: order.situacao || null,
-			obs: order.obs || null,
-			obs_interna: order.obs_interna || null,
-			id_vendedor: order.id_vendedor || null,
-			codigo_rastreamento: order.codigo_rastreamento || null,
-			url_rastreamento: order.url_rastreamento || null,
-			id_nota_fiscal: order.id_nota_fiscal || null,
-			id_natureza_operacao: order.id_natureza_operacao || null,
-			produtos: JSON.stringify(order.produtos || [])
-		}
+	// Formatação dos dados antes do salvamento
+	const formattedOrder = {
+		id: order.id,
+		numero: order.numero,
+		numero_ecommerce: order.numero_ecommerce || null,
+		data_pedido: order.data_pedido,
+		data_prevista: order.data_prevista || null,
+		data_faturamento: order.data_faturamento || null,
+		data_envio: order.data_envio || null,
+		data_entrega: order.data_entrega || null,
+		id_lista_preco: order.id_lista_preco || null,
+		descricao_lista_preco: order.descricao_lista_preco || null,
+		cliente: JSON.stringify(order.cliente || {}),
+		endereco_entrega: JSON.stringify(order.endereco_entrega || {}),
+		itens: JSON.stringify(order.itens || []),
+		parcelas: JSON.stringify(order.parcelas || []),
+		marcadores: JSON.stringify(order.marcadores || []),
+		condicao_pagamento: order.condicao_pagamento || null,
+		forma_pagamento: order.forma_pagamento || null,
+		meio_pagamento: order.meio_pagamento || null,
+		nome_transportador: order.nome_transportador || null,
+		frete_por_conta: order.frete_por_conta || null,
+		valor_frete: parseFloat(order.valor_frete) || 0,
+		valor_desconto: parseFloat(order.valor_desconto) || 0,
+		outras_despesas: parseFloat(order.outras_despesas) || 0,
+		total_produtos: parseFloat(order.total_produtos) || 0,
+		total_pedido: parseFloat(order.total_pedido) || 0,
+		numero_ordem_compra: order.numero_ordem_compra || null,
+		deposito: order.deposito || null,
+		ecommerce: order.ecommerce || null,
+		forma_envio: order.forma_envio || null,
+		situacao: order.situacao || null,
+		obs: order.obs || null,
+		obs_interna: order.obs_interna || null,
+		id_vendedor: order.id_vendedor || null,
+		codigo_rastreamento: order.codigo_rastreamento || null,
+		url_rastreamento: order.url_rastreamento || null,
+		id_nota_fiscal: order.id_nota_fiscal || null,
+		id_natureza_operacao: order.id_natureza_operacao || null,
+		produtos: JSON.stringify(order.produtos || [])
+	}
 
-		const queryText = `
+	const queryText = `
       INSERT INTO ${tableName} (
         id,
         numero,
@@ -139,72 +138,74 @@ export const saveOrder = async (order) => {
       RETURNING *
     `
 
-		const values = Object.values(formattedOrder)
-		const result = await query(queryText, values)
+	const values = Object.values(formattedOrder)
+	const result = await query(queryText, values)
 
-		log(`Pedido ${order.id} salvo com sucesso na tabela ${tableName}`)
-		return result.rows[0]
-	} catch (error) {
-		log(`Erro ao salvar pedido ${order?.id}: ${error.message}`)
-		throw error
-	}
+	logWebhook(`Pedido ${order.id} salvo com sucesso na tabela ${tableName}`)
+	return result.rows[0]
 }
 
 export const updateOrderStatus = async (order) => {
-	try {
-		// Validação básica dos parâmetros
-		if (!order || !order.id) {
-			throw new Error("Parâmetro order e order.id são obrigatórios")
-		}
-
-		const tableName = "pedidos_marketplace"
-
-		// Formatação apenas dos campos que serão atualizados
-		const formattedOrder = {
-			data_prevista: order.data_prevista || null,
-			data_faturamento: order.data_faturamento || null,
-			data_envio: order.data_envio || null,
-			data_entrega: order.data_entrega || null,
-			nome_transportador: order.nome_transportador || null,
-			forma_envio: order.forma_envio || null,
-			situacao: order.situacao || null,
-			obs: order.obs || null,
-			obs_interna: order.obs_interna || null,
-			url_rastreamento: order.url_rastreamento || null,
-			id_nota_fiscal: order.id_nota_fiscal || null,
-			id_natureza_operacao: order.id_natureza_operacao || null
-		}
-
-		const queryText = `
-      UPDATE ${tableName} 
-      SET
-        data_prevista = $1,
-        data_faturamento = $2,
-        data_envio = $3,
-        data_entrega = $4,
-        nome_transportador = $5,
-        forma_envio = $6,
-        situacao = $7,
-        obs = $8,
-        obs_interna = $9,
-        url_rastreamento = $10,
-        id_nota_fiscal = $11,
-        id_natureza_operacao = $12
-      WHERE id = $13
-      RETURNING *
-    `
-
-		const values = [...Object.values(formattedOrder), order.id]
-		const result = await query(queryText, values)
-
-		if (result.rows.length === 0) {
-			throw new Error(`Pedido com ID ${order.id} não encontrado`)
-		}
-
-		log(`Status do pedido ${order.id} atualizado com sucesso na tabela ${tableName}`)
-		return result.rows[0]
-	} catch (error) {
-		log(`Erro ao atualizar status do pedido ${order?.id}: ${error.message}`)
-		throw error
+	// Validação básica dos parâmetros
+	if (!order || !order.id) {
+		throw new Error("Parâmetro order e order.id são obrigatórios")
 	}
+
+	const tableName = "pedidos_marketplace"
+
+	// Formatação apenas dos campos que serão atualizados
+	const formattedOrder = {
+		data_prevista: order.data_prevista || null,
+		data_faturamento: order.data_faturamento || null,
+		data_envio: order.data_envio || null,
+		data_entrega: order.data_entrega || null,
+		nome_transportador: order.nome_transportador || null,
+		forma_envio: order.forma_envio || null,
+		situacao: order.situacao || null,
+		obs: order.obs || null,
+		obs_interna: order.obs_interna || null,
+		url_rastreamento: order.url_rastreamento || null,
+		id_nota_fiscal: order.id_nota_fiscal || null,
+		id_natureza_operacao: order.id_natureza_operacao || null
+	}
+
+	const queryText = `
+    UPDATE ${tableName} 
+    SET
+      data_prevista = $1,
+      data_faturamento = $2,
+      data_envio = $3,
+      data_entrega = $4,
+      nome_transportador = $5,
+      forma_envio = $6,
+      situacao = $7,
+      obs = $8,
+      obs_interna = $9,
+      url_rastreamento = $10,
+      id_nota_fiscal = $11,
+      id_natureza_operacao = $12
+    WHERE id = $13
+    RETURNING *
+  `
+
+	const values = [...Object.values(formattedOrder), order.id]
+	const result = await query(queryText, values)
+
+	if (result.rows.length === 0) {
+		logWebhook(`Pedido com ID ${order.id} não encontrado`)
+		return {
+			success: false,
+			message: `Pedido com ID ${order.id} não encontrado`,
+			data: null
+		}
+	}
+
+	logWebhook(`Status do pedido ${order.id} atualizado com sucesso na tabela ${tableName}`)
+	return {
+		success: true,
+		message: "Pedido atualizado com sucesso",
+		data: result.rows[0],
+		code: 200
+	}
+
 }
