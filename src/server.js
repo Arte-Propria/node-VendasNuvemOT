@@ -15,18 +15,7 @@ const allowedOrigins = [
 	"http://localhost:5173" // Ambiente local
 ]
 
-app.use(cors({
-	origin: function (origin, callback) {
-		if (!origin || allowedOrigins.includes(origin)) {
-			callback(null, true)
-		} else {
-			callback(new Error("Not allowed by CORS"))
-		}
-	},
-	credentials: true, // Permite envio de cookies/sessões se necessário
-	methods: "GET,POST,PUT,DELETE,OPTIONS", // Métodos permitidos
-	allowedHeaders: "Content-Type,Authorization" // Headers permitidos
-}))
+app.use(cors({ origin: "*" }))
 
 app.use(express.json())
 
