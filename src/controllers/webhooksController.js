@@ -1,4 +1,6 @@
+/* eslint-disable camelcase */
 import { fetchOrder, insertOrderWebhook } from "../services/orderServicesNuvem.js"
+import { processMarketplaceWebhook } from "../services/webhookServices.js"
 
 export const createdOrderWebhook = async  (req, res) => {
 	try {
@@ -25,5 +27,17 @@ export const createdOrderWebhook = async  (req, res) => {
 	} catch (error) {
 		console.log(error)
 	}
- 
+}
+
+export const createOrderMarketplaceWebhook = async (req, res) => {
+	try {
+		const { body } = req
+
+		// Chamar o serviço para processar o webhook
+		const result = await processMarketplaceWebhook(body)
+
+		res.status(200).send(result)
+	} catch (error) {
+		console.log(error)
+	}
 }

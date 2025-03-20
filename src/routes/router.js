@@ -10,7 +10,7 @@ import { createOrder } from "../controllers/createOrderController.js"
 import { postProduct } from "../controllers/createProductController.js"
 import { getCategories } from "../controllers/categoriesControllers.js"
 import { deleteOrderByOwnerNote } from "../controllers/deleteOrderController.js"
-import { createdOrderWebhook } from "../controllers/webhooksController.js"
+import { createdOrderWebhook, createOrderMarketplaceWebhook } from "../controllers/webhooksController.js"
 import { getNoteOrderTiny, getOrderTiny } from "../controllers/orderTinyController.js"
 import { getRefunds, createRefund, deleteRefund } from "../controllers/refundsControllers.js"
 import { getTikTokAuth, getTikTokAds } from "../controllers/tiktokControllers.js"
@@ -64,6 +64,7 @@ router.delete("/order/:store/:ownerNote", deleteOrderByOwnerNote) // Adicione a 
 
 // WEBHOOKS
 router.post("/webhooks/order-created", createdOrderWebhook)
+router.post("/webhooks/order-marketplace", createOrderMarketplaceWebhook)
 
 // Rotas TINY
 router.get("/tiny/order/:id/:cpf", getOrderTiny)
