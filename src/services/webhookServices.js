@@ -95,7 +95,7 @@ async function processSaveOrder(dados) {
 			message: "Pedido salvo com sucesso"
 		}
 	} catch (error) {
-		logWebhook(`Erro ao processar o pedido: ${error}`)
+		logWebhook(`Erro ao processar o pedido: ${error}, ${dados}`)
 		return { status: "error", message: "Erro ao processar o pedido" }
 	}
 }	
@@ -115,7 +115,7 @@ async function processUpdateOrder(dados) {
 
 		return { status: "success", message: "Pedido atualizado com sucesso" }
 	} catch (error) {
-		logWebhook(`Erro ao processar o pedido: ${error}`)
+		logWebhook(`Erro ao processar o pedido: ${error}, ${dados}`)
 		return { status: "error", message: "Erro ao processar o pedido" }
 	}
 }

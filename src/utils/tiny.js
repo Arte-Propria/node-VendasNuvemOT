@@ -1,5 +1,6 @@
 import axios from "axios"
 import { config } from "../config/env.js"
+import { logWebhook } from "./logger.js"
 
 // Helper para realizar requisições à API Tiny
 const tinyApiRequest = async (endpoint, params) => {
@@ -27,6 +28,9 @@ const tinyApiRequest = async (endpoint, params) => {
 
 export const getOrderDetails = async (orderId) => {
 	const { pedido } = await tinyApiRequest("pedido.obter.php", { id: orderId })
+	if(!pedido) {
+		logWebhook(`Erro ao obter detalhes do pedido ${orderId} na API Tiny`)
+	}
 	return pedido
 }
 
