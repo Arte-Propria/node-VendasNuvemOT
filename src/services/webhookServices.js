@@ -21,6 +21,9 @@ export const processMarketplaceWebhook = async (body) => {
 
 		// Verificar se o pedido é de um marketplace configurado
 		if (!marketplaceNames.includes(nomeEcommerce)) {
+			console.log(
+				"Pedido não pertence aos marketplaces configurados", "id:", dados.id, "nomeEcommerce:", nomeEcommerce
+			)
 			return {
 				status: "ignored",
 				message: "Pedido não pertence aos marketplaces configurados"
@@ -29,10 +32,16 @@ export const processMarketplaceWebhook = async (body) => {
 
 		// Verificar o status do pedido
 		if (codigoSituacao === "cancelado") {
+			console.log(
+				"Pedido cancelado", "id:", dados.id, "nomeEcommerce:", nomeEcommerce
+			)
 			return { status: "ignored", message: "Pedido cancelado" }
 		}
 
 		if (codigoSituacao !== "aprovado") {
+			console.log(
+				"Pedido não aprovado", "id:", dados.id, "nomeEcommerce:", nomeEcommerce
+			)
 			return { status: "ignored", message: "Pedido não aprovado" }
 		}
 
