@@ -62,7 +62,7 @@ export const processMarketplaceWebhook = async (body) => {
 			return result
 
 		} catch (error) {
-			logWebhook(`Erro ao obter detalhes do pedido ${dados.id}:`, error)
+			logWebhook(`Erro ao obter detalhe do pedido ${dados.id}:`, error)
 			return { status: "error", message: "Erro ao obter detalhes do pedido" }
 		}
 	}
