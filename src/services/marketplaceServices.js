@@ -28,6 +28,7 @@ export const fetchOrdersByMarketplace = async (marketplace, createdAtMin, create
 			SELECT * FROM pedidos_marketplace 
 			WHERE data_pedido BETWEEN $1 AND $2
 			AND ecommerce->>'nomeEcommerce' = $3
+			AND situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
 		`, [startDate, endDate, marketplaceNames[marketplace]])
 
 		return result.rows
@@ -45,7 +46,7 @@ export const fetchOrdersAllMarketplace = async (createdAtMin, createdAtMax) => {
 		
 		const result = await query(`
 			SELECT * FROM pedidos_marketplace 
-			WHERE data_pedido BETWEEN $1 AND $2
+			WHERE data_pedido BETWEEN $1 AND $2 AND situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
 		`, [startDate, endDate])
 
 		return result.rows
