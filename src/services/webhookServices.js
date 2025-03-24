@@ -1,5 +1,5 @@
 import { saveOrder, updateOrderStatus } from "../db/saveOrder.js"
-import { log, logWebhook } from "../utils/logger.js"
+import { logWebhook } from "../utils/logger.js"
 import { getOrderDetails, getProductDetails } from "../utils/tiny.js"
 
 const marketplaceNames = [
@@ -7,6 +7,7 @@ const marketplaceNames = [
 	"Magalu Marketplace",
 	"Magazine Luiza",
 	"Mercado Livre Abstract",
+	"Mercado Livre",
 	"Mercado Livre Integrada",
 	"Mercado Livre Fulfillment",
 	"Amazon FBA Classic",
