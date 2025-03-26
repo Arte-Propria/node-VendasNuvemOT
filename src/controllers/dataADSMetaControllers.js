@@ -6,7 +6,7 @@ export const getDataADSMeta = async (req, res) => {
 		const dataADSMeta = await fetchDataADSMeta(params)
 		res.status(200).json(dataADSMeta)
 	} catch (error) {
-		console.error(error.data)
+		console.error(error)
 		const status = error.status
 		res.status(status).send("Erro ao buscar dados do ADS")
 	}

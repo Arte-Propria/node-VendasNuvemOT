@@ -55,18 +55,16 @@ export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
 		})
 		const dataTiktok = response.data
 		if (dataTiktok.data && dataTiktok.data.list) {
-			const adsTiktok = dataTiktok.data.list.map((ads)=>({
+			const adsTiktok = dataTiktok.data.list.map((ads) => ({
 				budget:ads.budget
 			}))
 
 			const insightsArray = await Promise.all(adsTiktok)
 			let totalBudget = 0
 
-			insightsArray.forEach(
-				({budget}) => (
-					totalBudget += budget
-				)
-			)
+			insightsArray.forEach(({budget}) => (
+				totalBudget += budget
+			))
 			// Retorna os valores formatados com `toFixed(2)`
 			const result = [{
 				totalCost: {
