@@ -83,3 +83,54 @@ export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
 		return error.message
 	}
 }
+
+export const fetchTiktokCreative = async (store, createdAtMin, createdAtMax) => {
+	let accessToken
+	if (store === "outlet") {
+		accessToken = process.env.TIKTOK_ACCESS_TOKEN_OT
+	} if (store === "artepropria") {
+		accessToken = process.env.TIKTOK_ACCESS_TOKEN_AP
+	}
+
+	try {
+		const response = await axios.get("https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/", {
+			headers: {
+				"Access-Token": accessToken, // Token de acesso
+				"Content-Type": "application/json"
+        
+			},
+			params: {
+				advertiser_id: advertiserId, // ID do anunciante (obrigatório)
+				service_type:"AUCTION",
+				report_type: "BASIC",
+				data_level: "AUCTION_AD",
+				dimensions: JSON.stringify(['stat_time_day']),
+				metrics: ["spend"],
+				start_date: createdAtMin,
+				end_date: createdAtMax
+			}
+		})
+
+		// Converte strings para números e calcula o total
+		const result = response.data.data.list.map((ads) => ({
+			metrics: parseFloat(ads.metrics.spend)  // Converte string para número
+		}))
+
+		// Soma todos os valores de metrics
+		const totalBudget = result.reduce((sum, item) => sum + item.metrics,	0)
+
+		const totalResult = [{
+			totalCost: {
+				//dailyData: result,
+				all: parseFloat(totalBudget.toFixed(2))
+			}
+		}]
+		
+		// Retorna tanto os dados individuais quanto o total formatado
+		return totalResult
+
+	} catch (error) {
+		console.error("Erro ao buscar dados do ADS:", error.response ? error.response.data : error.message)
+		return error.message
+	}
+}
