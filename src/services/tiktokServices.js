@@ -10,6 +10,7 @@ const redirectUri = process.env.TIKTOK_REDIRECT_URI
 const authCode = process.env.TIKTOK_AUTH_CODE
 const advertiserId = process.env.TIKTOK_ADVERTISER_ID
 const adAccountIdOutlet = process.env.TIKTOK_AD_ACCOUNT_ID_OUTLET
+const accessToken = process.env.TIKTOK_ACCESS_TOKEN
 
 
 export const fetchTiktokAuth = async () => {
@@ -32,13 +33,6 @@ export const fetchTiktokAuth = async () => {
 }
 
 export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
-	let accessToken
-	if (store === "outlet") {
-		accessToken = process.env.TIKTOK_ACCESS_TOKEN_OT
-	} if (store === "artepropria") {
-		accessToken = process.env.TIKTOK_ACCESS_TOKEN_AP
-	}
-
 	try {
 		const response = await axios.get("https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/", {
 			headers: {
@@ -51,7 +45,7 @@ export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
 				service_type:"AUCTION",
 				report_type: "BASIC",
 				data_level: "AUCTION_AD",
-				dimensions: JSON.stringify(['stat_time_day']),
+				dimensions: JSON.stringify(["stat_time_day"]),
 				metrics: ["spend"],
 				start_date: createdAtMin,
 				end_date: createdAtMax
