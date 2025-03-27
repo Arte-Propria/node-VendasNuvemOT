@@ -38,7 +38,6 @@ export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
 			headers: {
 				"Access-Token": accessToken, // Token de acesso
 				"Content-Type": "application/json"
-        
 			},
 			params: {
 				advertiser_id: advertiserId, // ID do anunciante (obrigatório)
