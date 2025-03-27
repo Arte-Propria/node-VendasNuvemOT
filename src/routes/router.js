@@ -13,7 +13,7 @@ import { deleteOrderByOwnerNote } from "../controllers/deleteOrderController.js"
 import { createdOrderWebhook, createOrderMarketplaceWebhook } from "../controllers/webhooksController.js"
 import { getNoteOrderTiny, getOrderTiny } from "../controllers/orderTinyController.js"
 import { getRefunds, createRefund, deleteRefund } from "../controllers/refundsControllers.js"
-import { getTikTokAuth, getTikTokAds, getTikTokCreative } from "../controllers/tiktokControllers.js"
+import { getTikTokAuth, getTikTokAds } from "../controllers/tiktokControllers.js"
 import { getOrdersAllMarketplace, getOrdersByMarketplace } from "../controllers/marketplaceControllers.js"
 
 const router = express.Router()
@@ -56,7 +56,6 @@ router.get("/analytics/:store/:createdAtMin/:createdAtMax", getAnalytics)
 // Rotas TikTok
 router.get("/tiktok/auth", getTikTokAuth)
 router.get("/ads/tiktok/:store/:createdAtMin/:createdAtMax", getTikTokAds)
-router.get('/creative/tiktok/:store/:createdAtMin/:createdAtMax', getTikTokCreative)
 
 // Rota para criar pedidos
 router.post("/order/:store", createOrder) // Adicione a rota para criar um novo pedido

@@ -36,57 +36,6 @@ export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
 	if (store === "outlet") {
 		accessToken = process.env.TIKTOK_ACCESS_TOKEN_OT
 	} if (store === "artepropria") {
-		accessToken = process.env.TIKTOK_ACCESS_TOKEN
-	}
-
-	try {
-		const response = await axios.get("https://business-api.tiktok.com/open_api/v1.3/campaign/get/", {
-			headers: {
-				"Access-Token": accessToken // Token de acesso
-			},
-			params: {
-				advertiser_id: advertiserId, // ID do anunciante (obrigatório)
-				fields: ["campaign_id","campaign_name","budget","operation_status"], // Campos desejados
-				filter: JSON.stringify({
-					creation_filter_start_date: createdAtMin, // Filtro de data mínima (opcional)
-					creation_filter_end_date: createdAtMax // Filtro de data máxima (	opcional)
-				})
-			}
-		})
-		const dataTiktok = response.data
-		if (dataTiktok.data && dataTiktok.data.list) {
-			const adsTiktok = dataTiktok.data.list.map((ads) => ({
-				budget:ads.budget
-			}))
-
-			const insightsArray = await Promise.all(adsTiktok)
-			let totalBudget = 0
-
-			insightsArray.forEach(({budget}) => (
-				totalBudget += budget
-			))
-			// Retorna os valores formatados com `toFixed(2)`
-			const result = [{
-				totalCost: {
-					all: parseFloat(totalBudget.toFixed(2))
-				}
-			}]
-		
-			return result
-		} else {
-			throw new Error("Nenhum dado de campanha encontrado na resposta.")
-		}
-	} catch (error) {
-		console.error("Erro ao buscar dados do ADS:", error.response ? error.response.data : error.message)
-		return error.message
-	}
-}
-
-export const fetchTiktokCreative = async (store, createdAtMin, createdAtMax) => {
-	let accessToken
-	if (store === "outlet") {
-		accessToken = process.env.TIKTOK_ACCESS_TOKEN_OT
-	} if (store === "artepropria") {
 		accessToken = process.env.TIKTOK_ACCESS_TOKEN_AP
 	}
 
