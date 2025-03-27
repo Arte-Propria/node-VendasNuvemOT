@@ -125,6 +125,7 @@ export const fetchTiktokCreative = async (store, createdAtMin, createdAtMax) => 
 		}]
 		
 		// Retorna tanto os dados individuais quanto o total formatado
+		// nesse caso, apenas o valor total
 		return totalResult
 
 	} catch (error) {
