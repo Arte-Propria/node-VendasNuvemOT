@@ -54,7 +54,8 @@ export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
 				dimensions: JSON.stringify(['stat_time_day']),
 				metrics: ["spend"],
 				start_date: createdAtMin,
-				end_date: createdAtMax
+				end_date: createdAtMax,
+				page_size:100
 			}
 		})
 
