@@ -54,6 +54,9 @@ const makeTikTokRequest = async (store, startDate, endDate) => {
 					page_size: 100 // Max page size to minimize requests
 				}
 			})
+			
+		//console.log(response.data.data?.list || [])
+			
 		return response.data.data?.list || []
 	} catch (error) {
 		console.error(`Error fetching TikTok data from ${startDate} to ${endDate}:`,error.message)
@@ -117,7 +120,7 @@ export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
 		// Sort by date
 		allResults.sort((a, b) => new Date(a.date) - new Date(b.date))
 
-		return [
+		const result = [
 			{
 				totalCost: {
 					//dailyData: allResults,
@@ -125,6 +128,10 @@ export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
 				}
 			}
 		]
+
+		console.log(result)
+
+		return result
 	} catch (error) {
 		console.error("Error in fetchTiktokAds:", error.message)
 		return [
