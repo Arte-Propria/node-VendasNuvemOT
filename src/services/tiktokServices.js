@@ -33,7 +33,7 @@ export const fetchTiktokAuth = async () => {
 
 // 1. Função para realizar o fetch básico (≤30 dias)
 const makeTikTokRequest = async (store, startDate, endDate) => {
-	const accessToken = process.env[`TIKTOK_ACCESS_TOKEN_${store === "outlet" ? "OT" : "AP"}`]
+	const accessToken = process.env[`TIKTOK_ACCESS_TOKEN${store === "outlet" ? "" : ""}`]
 	try {
 		const response = await axios.get("https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/",
 			{
