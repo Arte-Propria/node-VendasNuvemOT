@@ -1,7 +1,7 @@
 /* eslint-disable camelcase */
 import { fetchOrder, insertOrderWebhook } from "../services/orderServicesNuvem.js"
 import { processMarketplaceWebhook } from "../services/webhookServices.js"
-import { logWebhook } from "../utils/logger.js"
+import { logEcommerce, logWebhook } from "../utils/logger.js"
 
 export const createdOrderWebhook = async  (req, res) => {
 	try {
@@ -40,6 +40,18 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		res.status(200).send(result)
 	} catch (error) {
 		logWebhook(`Erro ao processar o webhook: ${error}`)
+		res.status(200)
+	}
+}
+
+export const createOrderEcommerceWebhook = async (req, res) => {
+	try {
+		const { body } = req
+		
+		console.log(body)
+		res.status(200)
+	} catch (error) {
+		logEcommerce(`Erro ao processar o webhook: ${error}`)
 		res.status(200)
 	}
 }
