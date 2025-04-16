@@ -1,4 +1,4 @@
-import { fetchTiktokAuth, fetchTiktokAds } from "../services/tiktokServices.js"
+import { fetchTiktokAuth, fetchTiktokAds, fetchTiktokCreatives } from "../services/tiktokServices.js"
 
 export const getTikTokAuth = async (req, res) => {
 	try {
@@ -23,3 +23,14 @@ export const getTikTokAds = async (req, res) => {
 	}
 }
 
+export const getTikTokCreatives = async (req, res) => {
+	try {
+		const { store, createdAtMin, createdAtMax } = req.params
+		const ads = await fetchTiktokCreatives(store, createdAtMin, createdAtMax)
+		res.status(200).json(ads)
+	} catch (error) {
+		console.error(error.data)
+		const status = error.status
+		res.status(status).send("Erro ao buscar dados do Tiktok")
+	}
+}

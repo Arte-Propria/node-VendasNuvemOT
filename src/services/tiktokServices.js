@@ -10,7 +10,7 @@ const redirectUri = process.env.TIKTOK_REDIRECT_URI
 const authCode = process.env.TIKTOK_AUTH_CODE
 const advertiserId = process.env.TIKTOK_ADVERTISER_ID
 const adAccountIdOutlet = process.env.TIKTOK_AD_ACCOUNT_ID_OUTLET
-
+const appToken = process.env.TIKTOK_ACCESS_TOKEN
 
 export const fetchTiktokAuth = async () => {
 	try {
@@ -33,7 +33,8 @@ export const fetchTiktokAuth = async () => {
 
 // 1. Função para realizar o fetch básico (≤30 dias)
 const makeTikTokRequest = async (store, startDate, endDate) => {
-	const accessToken = process.env[`TIKTOK_ACCESS_TOKEN${store === "outlet" ? "" : ""}`]
+	const accessToken = appToken
+
 	try {
 		const response = await axios.get("https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/",
 			{
@@ -41,7 +42,6 @@ const makeTikTokRequest = async (store, startDate, endDate) => {
 					"Access-Token": accessToken,
 					"Content-Type": "application/json"
 				},
-        
 				params: {
 					advertiser_id: advertiserId,
 					service_type: "AUCTION",
@@ -129,7 +129,110 @@ export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
 			}
 		]
 
-		console.log(result)
+		//console.log(result)
+
+		return result
+	} catch (error) {
+		console.error("Error in fetchTiktokAds:", error.message)
+		return [
+			{
+				totalCost: {
+					dailyData: [],
+					all: 0
+				}
+			}
+		]
+	}
+}
+
+// ---- Relatorio de criativos (Spending creatives) ----- //
+
+// 1. Função para realizar o fetch básico (≤30 dias)
+const fetchCreativesTikTokRequest = async (store, startDate, endDate) => {
+	const accessToken = appToken
+
+	try {
+		const response = await axios.get("https://business-api.tiktok.com/open_api/v1.3/creative/report/get/",
+			{
+				headers: {
+					"Access-Token": accessToken,
+					"Content-Type": "application/json"
+				},
+				params: {
+					advertiser_id: advertiserId,
+					report_type: "VIDEO_INSIGHT",
+					data_level: "CREATIVE",
+					material_type: "VIDEO",
+					dimensions: JSON.stringify(["video_id","stat_time_day","adgroup_id"]),
+					metrics: JSON.stringify(["spend","impressions","clicks","conversion"]),
+					start_date: startDate,
+					end_date: endDate,
+					page_size: 100 // Max page size to minimize requests
+				}
+			})
+			
+		const result =  response.data.data?.list
+
+		//console.log(response.data.data?.list || [])
+			
+		return result || []
+	} catch (error) {
+		console.error(`Error fetching TikTok data from ${startDate} to ${endDate}:`,error.message)
+		return []
+	}
+}
+
+export const fetchTiktokCreatives = async (store, createdAtMin, createdAtMax) => {
+  
+	try {
+		// Split date range into 30-day chunks if needed
+		const dateRanges = splitDateRange(createdAtMin, createdAtMax)
+		const Store_choose = store
+		let allResults = []
+
+		// Process each date range sequentially
+		for (const range of dateRanges) {
+			const chunkData = await fetchCreativesTikTokRequest(Store_choose, range.start, range.end)
+
+			// Transform and add to results
+			const formattedData = chunkData.map((item) => ({
+				id: item.info?.material_id || "N/A",
+				cost: parseFloat(item.metrics?.spend) || 0,
+				click: parseInt(item.metrics?.clicks) || 0,
+				impression: parseInt(item.metrics?.impressions) || 0,
+				conversions: parseInt(item.metrics?.conversion) || 0
+			}))
+
+			allResults = [...allResults, ...formattedData]
+		}
+
+		// Calculate total spend
+		const totalSpend = allResults.reduce((sum, item) => sum + item.cost, 0)
+
+		//
+		const groupData = allResults.reduce((acc, item) => {
+			if (!acc[item.id]) {
+				acc[item.id] = { id: item.id, cost: 0, click: 0, impression: 0, conversions: 0 }
+			}
+			acc[item.id].cost += item.cost
+			acc[item.id].click += item.click
+			acc[item.id].impression += item.impression
+			acc[item.id].conversions += item.conversions
+			return acc
+		}, {})
+
+		// Sort by date
+
+		const result = [
+			{
+				totalCost: {
+					dailyData: Object.values(groupData)
+					//all: parseFloat(totalSpend.toFixed(2))
+				}
+			}
+		]
+
+		//console.log(result[0].totalCost.dailyData)
 
 		return result
 	} catch (error) {
