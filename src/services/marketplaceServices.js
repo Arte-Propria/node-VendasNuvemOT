@@ -50,7 +50,6 @@ export const fetchOrdersAllMarketplace = async (createdAtMin, createdAtMax) => {
 			AND situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
 		`, [startDate, endDate])
 
-		console.log("result", result)
 		return result.rows
 	} catch (error) {
 		console.error("Erro ao buscar pedidos de todos os marketplaces:", error)
