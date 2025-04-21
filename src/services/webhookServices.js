@@ -1,6 +1,7 @@
+import { POSTtiny } from "../api/tiny.js"
 import { saveOrder, updateOrderStatus } from "../db/saveOrder.js"
 import { logWebhook } from "../utils/logger.js"
-import { getOrderDetails, getProductDetails } from "../utils/tiny.js"
+import { getOrderDetails, getProductDetails, getOrderDetailsES } from "../utils/tiny.js"
 
 const marketplaceNames = [
 	"Shopee",
@@ -118,5 +119,35 @@ async function processUpdateOrder(dados) {
 	} catch (error) {
 		logWebhook(`Erro ao processar o pedido: ${error}, ${dados}`)
 		return { status: "error", message: "Erro ao processar o pedido" }
+	}
+}
+
+export const processEcommerceWebhook = async (body) => {
+	const { tipo, dados } = body
+	const { codigoSituacao: status } = dados
+
+	if(tipo === "inclusao_pedido") {
+		return {
+			status: "ignored",
+			message: "Novo pedido criado"
+		}
+	}
+
+	if(tipo === "atualizacao_pedido" && status !== "faturado") {
+		return {
+			status: "ignored",
+			message: "Pedido não faturado"
+		}
+	}
+
+	if(tipo === "atualizacao_pedido" && status === "faturado") {
+		const orderDetails = await getOrderDetailsES(dados.id)
+		const result = await POSTtiny.ES("pedido.incluir.php", orderDetails)
+		console.log("result", result)
+	
+		return {
+			status: "success",
+			message: "Pedido faturado"
+		}
 	}
 }

@@ -26,7 +26,7 @@ export const fetchOrdersByMarketplace = async (marketplace, createdAtMin, create
 
 		const result = await query(`
 			SELECT * FROM pedidos_marketplace 
-			WHERE data_pedido BETWEEN $1 AND $2
+			WHERE TO_DATE(data_pedido, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'DD/MM/YYYY') AND TO_DATE($2, 'DD/MM/YYYY')
 			AND ecommerce->>'nomeEcommerce' = $3
 			AND situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
 		`, [startDate, endDate, marketplaceNames[marketplace]])
@@ -46,9 +46,11 @@ export const fetchOrdersAllMarketplace = async (createdAtMin, createdAtMax) => {
 		
 		const result = await query(`
 			SELECT * FROM pedidos_marketplace 
-			WHERE data_pedido BETWEEN $1 AND $2 AND situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
+			WHERE TO_DATE(data_pedido, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'DD/MM/YYYY') AND TO_DATE($2, 'DD/MM/YYYY') 
+			AND situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
 		`, [startDate, endDate])
 
+		console.log("result", result)
 		return result.rows
 	} catch (error) {
 		console.error("Erro ao buscar pedidos de todos os marketplaces:", error)
