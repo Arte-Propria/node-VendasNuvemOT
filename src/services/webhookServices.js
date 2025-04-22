@@ -142,12 +142,11 @@ export const processEcommerceWebhook = async (body) => {
 
 	if(tipo === "atualizacao_pedido" && status === "faturado") {
 		const orderDetails = await getOrderDetailsES(dados.id)
-		const result = await POSTtiny.ES("pedido.incluir.php", orderDetails)
-		console.log("result", result)
+		await POSTtiny.ABSTRACT("pedido.incluir.php", orderDetails)
 	
 		return {
 			status: "success",
-			message: "Pedido faturado"
+			message: "Pedido salvo na conta Abstract"
 		}
 	}
 }
