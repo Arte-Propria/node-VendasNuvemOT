@@ -1,6 +1,7 @@
-import { POSTtiny } from "../api/tiny.js"
+/* eslint-disable camelcase */
+import { GETtiny, POSTtiny, PUTtiny } from "../api/tiny.js"
 import { saveOrder, updateOrderStatus } from "../db/saveOrder.js"
-import { logWebhook } from "../utils/logger.js"
+import { logEcommerce, logWebhookMarketplace } from "../utils/logger.js"
 import { getOrderDetails, getProductDetails, getOrderDetailsES } from "../utils/tiny.js"
 
 const marketplaceNames = [
@@ -26,7 +27,7 @@ export const processMarketplaceWebhook = async (body) => {
 
 		// Verificar se o pedido é de um marketplace configurado
 		if (!marketplaceNames.includes(nomeEcommerce)) {
-			logWebhook(`Pedido não pertence aos marketplaces configurados, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
+			logWebhookMarketplace(`Pedido não pertence aos marketplaces configurados, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
 			return {
 				status: "ignored",
 				message: "Pedido não pertence aos marketplaces configurados"
@@ -35,12 +36,12 @@ export const processMarketplaceWebhook = async (body) => {
 
 		// Verificar o status do pedido
 		if (codigoSituacao === "cancelado") {
-			logWebhook(`Pedido cancelado, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
+			logWebhookMarketplace(`Pedido cancelado, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
 			return { status: "ignored", message: "Pedido cancelado" }
 		}
 
 		if (codigoSituacao !== "aprovado") {
-			logWebhook(`Pedido não aprovado, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
+			logWebhookMarketplace(`Pedido não aprovado, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
 			return { status: "ignored", message: "Pedido não aprovado" }
 		}
 
@@ -50,6 +51,11 @@ export const processMarketplaceWebhook = async (body) => {
 
 	if(tipo === "atualizacao_pedido") {
 		const { nomeEcommerce } = dados
+
+		if(nomeEcommerce === "Nuvemshop") {
+			const result = await updateOrderNuvemshop(dados)
+			return result
+		}
 
 		// Verificar se o pedido é de um marketplace configurado
 		if (!marketplaceNames.includes(nomeEcommerce)) {
@@ -64,7 +70,7 @@ export const processMarketplaceWebhook = async (body) => {
 			return result
 
 		} catch (error) {
-			logWebhook(`Erro ao obter detalhe do pedido ${dados.id}:`, error)
+			logWebhookMarketplace(`Erro ao obter detalhe do pedido ${dados.id}:`, error)
 			return { status: "error", message: "Erro ao obter detalhes do pedido" }
 		}
 	}
@@ -81,7 +87,7 @@ async function processSaveOrder(dados) {
 				const productDetails = await getProductDetails(item.id_produto)
 				return { ...item, ...productDetails }
 			} catch (error) {
-				logWebhook(`Erro ao obter detalhes do produto ${item.id_produto}:`, error)
+				logWebhookMarketplace(`Erro ao obter detalhes do produto ${item.id_produto}:`, error)
 				return { ...item, productDetails: null }
 			}
 		}))
@@ -97,7 +103,7 @@ async function processSaveOrder(dados) {
 			message: "Pedido salvo com sucesso"
 		}
 	} catch (error) {
-		logWebhook(`Erro ao processar o pedido: ${error}, ${dados}`)
+		logWebhookMarketplace(`Erro ao processar o pedido: ${error}, ${dados}`)
 		return { status: "error", message: "Erro ao processar o pedido" }
 	}
 }	
@@ -117,7 +123,7 @@ async function processUpdateOrder(dados) {
 
 		return { status: "success", message: "Pedido atualizado com sucesso" }
 	} catch (error) {
-		logWebhook(`Erro ao processar o pedido: ${error}, ${dados}`)
+		logWebhookMarketplace(`Erro ao processar o pedido: ${error}, ${dados}`)
 		return { status: "error", message: "Erro ao processar o pedido" }
 	}
 }
@@ -142,11 +148,40 @@ export const processEcommerceWebhook = async (body) => {
 
 	if(tipo === "atualizacao_pedido" && status === "faturado") {
 		const orderDetails = await getOrderDetailsES(dados.id)
-		await POSTtiny.ABSTRACT("pedido.incluir.php", orderDetails)
+		const result = await POSTtiny.ABSTRACT("pedido.incluir.php", orderDetails)
+		const id = result.retorno.registros.registro.id
 	
 		return {
 			status: "success",
-			message: "Pedido salvo na conta Abstract"
+			message: `Pedido salvo na conta Abstract. Pedido com ID: ${id}`
 		}
+	}
+}
+
+export const updateOrderNuvemshop = async (dados) => {
+	const orderDetailsABSTRACT = await getOrderDetails(dados.id)
+	const { id } = await GETtiny.ES("pedidos.pesquisa.php", { 
+		dataInicialOcorrencia: dados.data,
+		cliente: dados.cliente.nome,
+		cpf_cnpj: dados.cliente.cpfCnpj
+	})
+	if(!id) {
+		logWebhookMarketplace(`Não foram encontrados pedidos com o CPF/CNPJ: ${dados.cliente.cpfCnpj}`)
+		return { status: "error", message: `Não foram encontrados pedidos com o CPF/CNPJ: ${dados.cliente.cpfCnpj}` }
+	}
+
+	const data = {
+		id,
+		situacao: orderDetailsABSTRACT.situacao,
+		codigoRastreamento: orderDetailsABSTRACT.codigo_rastreamento,
+		urlRastreamento: encodeURI(orderDetailsABSTRACT.url_rastreamento)
+	}
+
+	await PUTtiny.ES(data)
+	logEcommerce(`Pedido atualizado no Tiny Integrada ES. Pedido com ID: ${id}`)
+
+	return {
+		status: "success",
+		message: `Pedido atualizado no Tiny Integrada ES. Pedido com ID: ${id}`
 	}
 }

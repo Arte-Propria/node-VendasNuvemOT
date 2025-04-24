@@ -3,11 +3,14 @@
 
 import axios from "axios"
 import { config } from "../config/env.js"
+import { logEcommerce } from "../utils/logger.js"
 
 export const POSTtinyES = async (endpoint, data) => {
+	const { id, numero, numero_ecommerce, cliente, ecommerce, id_nota_fiscal, ...dataPedido } = data
+	const { codigo, ...dataCliente } = cliente
 	try {
 		const pedido = {
-			cliente: { nome: data.cliente.nome },
+			cliente: { ...dataCliente	},
 			itens: data.itens.map(({item}) => ({
 				item: { 
 					descricao: item.descricao,
@@ -15,7 +18,12 @@ export const POSTtinyES = async (endpoint, data) => {
 					valor_unitario: item.valor_unitario,
 					unidade: item.unidade
 				}
-			}))
+			})),
+			situacao: data.situacao,
+			obs: `Numero da Nota Fiscal: ${data.id_nota_fiscal}`,
+			numero_pedido_ecommerce: data.ecommerce.numeroPedidoEcommerce,
+			ecommerce: data.ecommerce.nomeEcommerce,
+			...dataPedido
 		}
 
 		const payload = new URLSearchParams({
@@ -44,9 +52,11 @@ export const POSTtinyES = async (endpoint, data) => {
 }
 
 export const POSTtinyABSTRACT = async (endpoint, data) => {
+	const { id, numero, numero_ecommerce, cliente, ecommerce, obs, id_nota_fiscal, ...dataPedido } = data
+	const { codigo, ...dataCliente } = cliente
 	try {
 		const pedido = {
-			cliente: { nome: data.cliente.nome },
+			cliente: { ...dataCliente },
 			itens: data.itens.map(({item}) => ({
 				item: { 
 					descricao: item.descricao,
@@ -54,8 +64,15 @@ export const POSTtinyABSTRACT = async (endpoint, data) => {
 					valor_unitario: item.valor_unitario,
 					unidade: item.unidade
 				}
-			}))
+			})),
+			situacao: data.situacao,
+			obs: `Numero da Nota Fiscal: ${data.id_nota_fiscal}`,
+			numero_pedido_ecommerce: "17036",
+			ecommerce: "Nuvemshop",
+			...dataPedido
 		}
+
+		logEcommerce("Salvando pedido na conta Abstract. Pedido", pedido)
 
 		const payload = new URLSearchParams({
 			pedido: JSON.stringify({ pedido })

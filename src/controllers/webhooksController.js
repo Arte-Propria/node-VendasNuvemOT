@@ -39,7 +39,7 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 
 		res.status(200).send(result)
 	} catch (error) {
-		logWebhook(`Erro ao processar o webhook: ${error}`)
+		// logWebhook(`Erro ao processar o webhook: ${error}`)
 		res.status(200)
 	}
 }

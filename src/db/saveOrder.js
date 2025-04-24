@@ -1,6 +1,6 @@
 /* eslint-disable camelcase */
 import { query } from "./db.js"
-import { logWebhook } from "../utils/logger.js"
+import { logWebhookMarketplace } from "../utils/logger.js"
 
 export const saveOrder = async (order) => {
 	// Validação básica dos parâmetros
@@ -141,7 +141,7 @@ export const saveOrder = async (order) => {
 	const values = Object.values(formattedOrder)
 	const result = await query(queryText, values)
 
-	logWebhook(`Pedido ${order.id} salvo com sucesso na tabela ${tableName}`)
+	logWebhookMarketplace(`Pedido ${order.id} salvo com sucesso na tabela ${tableName}`)
 	return result.rows[0]
 }
 
@@ -192,7 +192,7 @@ export const updateOrderStatus = async (order) => {
 	const result = await query(queryText, values)
 
 	if (result.rows.length === 0) {
-		logWebhook(`Pedido com ID ${order.id} não encontrado`)
+		logWebhookMarketplace(`Pedido com ID ${order.id} não encontrado`)
 		return {
 			success: false,
 			message: `Pedido com ID ${order.id} não encontrado`,
@@ -200,7 +200,7 @@ export const updateOrderStatus = async (order) => {
 		}
 	}
 
-	logWebhook(`Status do pedido ${order.id} atualizado com sucesso na tabela ${tableName}`)
+	logWebhookMarketplace(`Status do pedido ${order.id} atualizado com sucesso na tabela ${tableName}`)
 	return {
 		success: true,
 		message: "Pedido atualizado com sucesso",

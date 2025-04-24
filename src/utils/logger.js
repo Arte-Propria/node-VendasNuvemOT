@@ -3,6 +3,10 @@ export const log = (message) => {
 }
 
 export const logWebhook = (message) => {
+	console.log(`WEBHOOK: ${message}`)
+}
+
+export const logWebhookMarketplace = (message) => {
 	console.log(`WEBHOOK Marketplace: ${message}`)
 }
 
