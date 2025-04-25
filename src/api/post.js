@@ -52,8 +52,27 @@ export const POSTtinyES = async (endpoint, data) => {
 }
 
 export const POSTtinyABSTRACT = async (endpoint, data) => {
-	const { id, numero, numero_ecommerce, cliente, ecommerce, obs, id_nota_fiscal, ...dataPedido } = data
+	const { id, numero, numero_ecommerce, cliente, ecommerce, situacao, obs, id_nota_fiscal, marcadores, id_natureza_operacao,...dataPedido } = data
+
+	const ecommerceName = ecommerce?.nomeEcommerce || "Nuvemshop"
+
+	const marcadoresINTEGRADAES = [
+		{
+			"marcador": {
+				"descricao": "INTEGRADAES"
+			}
+		},
+		{
+			"marcador": {
+				"descricao": ecommerceName
+			}
+		}
+	]
+
+	const observacao = `Remessa de mercadoria por conta e ordem de ARTE INTEGRADA COMERCIO DE ARTE LTDA, CNPJ nº 23.735.360/0003-07 e IE 84249188, conforme nota fiscal de venda nº ${data.id_nota_fiscal}. Endereço de cobrança: ${data.cliente.endereco}, ${data.cliente.numero} - ${data.cliente.bairro}, CEP ${data.cliente.cep},  ${data.cliente.cidade}/${data.cliente.uf}`
+
 	const { codigo, ...dataCliente } = cliente
+
 	try {
 		const pedido = {
 			cliente: { ...dataCliente },
@@ -65,14 +84,17 @@ export const POSTtinyABSTRACT = async (endpoint, data) => {
 					unidade: item.unidade
 				}
 			})),
-			situacao: data.situacao,
-			obs: `Numero da Nota Fiscal: ${data.id_nota_fiscal}`,
-			numero_pedido_ecommerce: "17036",
-			ecommerce: "Nuvemshop",
+			situacao: "aprovado",
+			obs: observacao,
+			numero_pedido_ecommerce: data.numero_ecommerce || data.numero_ordem_compra,
+			ecommerce: ecommerceName,
+			marcadores: marcadoresINTEGRADAES,
+			id_natureza_operacao: "798952072",
+			nome_natureza_operacao: "REMESSSA POR ORDEM DE TERCEIROS",
 			...dataPedido
 		}
 
-		logEcommerce("Salvando pedido na conta Abstract. Pedido", pedido)
+		logEcommerce(`Salvando pedido no TINY Abstract. Cliente: ${dataCliente.nome}, Pedido IntegradaES: ${id}`)
 
 		const payload = new URLSearchParams({
 			pedido: JSON.stringify({ pedido })
