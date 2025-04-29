@@ -150,6 +150,19 @@ export const processEcommerceWebhook = async (body) => {
 
 	if(tipo === "atualizacao_pedido" && status === "faturado") {
 		const orderDetails = await getOrderDetailsES(dados.id)
+		const isPedidoExistente = await GETtiny.ABSTRACT("pedidos.pesquisa.php", { 
+			dataInicialOcorrencia: dados.data,
+			cliente: dados.cliente.nome,
+			cpf_cnpj: dados.cliente.cpfCnpj
+		})
+
+		if(isPedidoExistente.id) {
+			return {
+				status: "success",
+				message: `Pedido já existe na conta Abstract. Pedido com ID: ${isPedidoExistente.retorno.registros.registro.id}`
+			}
+		}
+
 		const result = await POSTtiny.ABSTRACT("pedido.incluir.php", orderDetails)
 		const id = result.retorno.registros.registro.id
 	
