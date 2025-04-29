@@ -51,6 +51,7 @@ export const processMarketplaceWebhook = async (body) => {
 
 	if(tipo === "atualizacao_pedido") {
 		const { nomeEcommerce } = dados
+		console.log(nomeEcommerce)
 
 		if(nomeEcommerce === "Nuvemshop") {
 			const result = await updateOrderNuvemshop(dados)
