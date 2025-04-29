@@ -159,7 +159,7 @@ export const processEcommerceWebhook = async (body) => {
 		if(isPedidoExistente.id) {
 			return {
 				status: "success",
-				message: `Pedido já existe na conta Abstract. Pedido com ID: ${isPedidoExistente.retorno.registros.registro.id}`
+				message: `Pedido já existe na conta Abstract. Pedido com ID: ${dados.id}`
 			}
 		}
 
