@@ -50,10 +50,11 @@ export const processMarketplaceWebhook = async (body) => {
 	}
 
 	if(tipo === "atualizacao_pedido") {
-		const { nomeEcommerce } = dados
-		console.log(dados)
+		const { id, nomeEcommerce } = dados
+		const { marcadores } = await getOrderDetails(id)
+		const isIntegradaES = marcadores.some((marcador) => marcador.marcador.descricao.toLowerCase() === "integradaes")
 
-		if(nomeEcommerce === "Nuvemshop") {
+		if(isIntegradaES) {
 			const result = await updateOrderNuvemshop(dados)
 			return result
 		}
