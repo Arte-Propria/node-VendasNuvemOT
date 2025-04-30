@@ -177,11 +177,11 @@ export const updateOrderNuvemshop = async (dados) => {
 	const orderDetailsABSTRACT = await getOrderDetails(dados.id)
 	const { id } = await GETtiny.ES("pedidos.pesquisa.php", { 
 		dataInicialOcorrencia: dados.data,
-		cliente: dados.cliente.nome,
+		// cliente: dados.cliente.nome,
 		cpf_cnpj: dados.cliente.cpfCnpj
 	})
 	if(!id) {
-		logWebhookMarketplace(`Não foram encontrados pedidos com o CPF/CNPJ: ${dados.cliente.cpfCnpj}`)
+		logEcommerce(`Não foram encontrados pedidos com o CPF/CNPJ: ${dados.cliente.cpfCnpj}`)
 		return { status: "error", message: `Não foram encontrados pedidos com o CPF/CNPJ: ${dados.cliente.cpfCnpj}` }
 	}
 
