@@ -52,7 +52,7 @@ export const POSTtinyES = async (endpoint, data) => {
 }
 
 export const POSTtinyABSTRACT = async (endpoint, data) => {
-	const { id, numero, numero_ecommerce, cliente, ecommerce, situacao, obs, id_nota_fiscal, marcadores, id_natureza_operacao,...dataPedido } = data
+	const { id, numero, numero_ecommerce, cliente, ecommerce, situacao, obs, id_nota_fiscal, marcadores, id_natureza_operacao, nota_fiscal, ...dataPedido } = data
 
 	const ecommerceName = ecommerce?.nomeEcommerce || "Nuvemshop"
 
@@ -69,7 +69,7 @@ export const POSTtinyABSTRACT = async (endpoint, data) => {
 		}
 	]
 
-	const observacao = `Remessa de mercadoria por conta e ordem de ARTE INTEGRADA COMERCIO DE ARTE LTDA, CNPJ nº 23.735.360/0003-07 e IE 84249188, conforme nota fiscal de venda nº ${data.id_nota_fiscal}. Endereço de cobrança: ${data.cliente.endereco}, ${data.cliente.numero} - ${data.cliente.bairro}, CEP ${data.cliente.cep},  ${data.cliente.cidade}/${data.cliente.uf}`
+	const observacao = `Remessa de mercadoria por conta e ordem de ARTE INTEGRADA COMERCIO DE ARTE LTDA, CNPJ nº 23.735.360/0003-07 e IE 84249188, conforme nota fiscal de venda nº ${nota_fiscal}. Endereço de cobrança: ${data.cliente.endereco}, ${data.cliente.numero} - ${data.cliente.bairro}, CEP ${data.cliente.cep},  ${data.cliente.cidade}/${data.cliente.uf}`
 
 	const { codigo, ...dataCliente } = cliente
 

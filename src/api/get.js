@@ -46,5 +46,24 @@ const tinyApiRequest = async (endpoint, token, data) => {
 	return response.data.retorno.pedidos[0]
 }
 
+export const GETtinyESnote = async (endpoint, data) => {
+	const params = {
+		token: config.tinyApiTokenArteIntegradaES,
+		formato: "json",
+		...data
+	}
+
+	const url = `${config.tinyApiBaseUrl}/${endpoint}`
+	const response = await axios.get(url, {
+		headers: { "Content-Type": "application/json" },
+		params
+	})
+
+	if (!response.data.retorno.nota_fiscal || response.data.retorno.nota_fiscal.length === 0) {
+		return { nota_fiscal: 0 }
+	}
+
+	return response.data.retorno.nota_fiscal.numero
+}
 
 

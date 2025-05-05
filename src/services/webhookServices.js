@@ -163,7 +163,11 @@ export const processEcommerceWebhook = async (body) => {
 			}
 		}
 
-		const result = await POSTtiny.ABSTRACT("pedido.incluir.php", orderDetails)
+		const nota_fiscal = await GETtiny.ESnote("nota.fiscal.obter.php", {
+			id: dados.idNotaFiscal
+		})
+
+		const result = await POSTtiny.ABSTRACT("pedido.incluir.php", {...orderDetails, nota_fiscal})
 		const id = result.retorno.registros.registro.id
 	
 		return {
