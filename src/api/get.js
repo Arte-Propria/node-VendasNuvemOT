@@ -15,15 +15,15 @@ export const GETtinyES = async (endpoint, data) => {
 }
 
 export const GETtinyABSTRACT = async (endpoint, data) => {
-	const { pedido } = await tinyApiRequest(endpoint, config.tinyApiToken, data)
-	if(!pedido) {
+	const pedidos = await tinyApiRequest(endpoint, config.tinyApiToken, data)
+	if(!pedidos) {
 		logEcommerce(`Erro ao obter detalhes do pedido ${data.numeroEcommerce} na API Tiny. Aguardando 60 segundos para tentar novamente.`, data)
 		await new Promise((resolve) => setTimeout(resolve, 60000))
-		const { pedido: retryPedido } = await tinyApiRequest(endpoint, config.tinyApiToken, data)
-		return retryPedido
+		const retryPedidos = await tinyApiRequest(endpoint, config.tinyApiToken, data)
+		return retryPedidos
 	}
 	
-	return pedido
+	return pedidos
 }
 
 const tinyApiRequest = async (endpoint, token, data) => {
@@ -40,10 +40,10 @@ const tinyApiRequest = async (endpoint, token, data) => {
 	})
 	
 	if (!response.data.retorno.pedidos || response.data.retorno.pedidos.length === 0) {
-		return { pedido: [] }
+		return [{ pedido: [] }]
 	}
-	
-	return response.data.retorno.pedidos[0]
+
+	return response.data.retorno.pedidos
 }
 
 export const GETtinyESnote = async (endpoint, data) => {
