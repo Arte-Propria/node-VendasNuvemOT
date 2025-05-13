@@ -45,9 +45,8 @@ export const processMarketplaceWebhook = async (body) => {
 			return { status: "ignored", message: "Pedido não aprovado" }
 		}
 
-		return { status: "ignored", message: "Pedido ignorado" }
-		// const result = await processSaveOrder(dados)
-		// return result
+		const result = await processSaveOrder(dados)
+		return result
 	}
 
 	if(tipo === "atualizacao_pedido") {
@@ -68,16 +67,14 @@ export const processMarketplaceWebhook = async (body) => {
 			}
 		}
 
-		// try {
-		// 	const result = await processUpdateOrder(dados)
-		// 	return result
+		try {
+			const result = await processUpdateOrder(dados)
+			return result
 
-		// } catch (error) {
-		// 	logWebhookMarketplace(`Erro ao obter detalhe do pedido ${dados.id}:`, error)
-		// 	return { status: "error", message: "Erro ao obter detalhes do pedido" }
-		// }
-		return { status: "ignored", message: "Pedido ignorado" }
-
+		} catch (error) {
+			logWebhookMarketplace(`Erro ao obter detalhe do pedido ${dados.id}:`, error)
+			return { status: "error", message: "Erro ao obter detalhes do pedido" }
+		}
 	}
 }
 
