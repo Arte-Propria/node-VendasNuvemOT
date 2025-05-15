@@ -184,6 +184,7 @@ export const updateOrderNuvemshop = async (dados) => {
 	const orderDetailsABSTRACT = await getOrderDetails(dados.id)
 	const { id } = await GETtiny.ES("pedidos.pesquisa.php", { 
 		dataInicialOcorrencia: dados.data,
+		idPedidoEcommerce: dados.idPedidoEcommerce,
 		// cliente: dados.cliente.nome,
 		cpf_cnpj: dados.cliente.cpfCnpj
 	})
