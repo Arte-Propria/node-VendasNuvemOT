@@ -5,19 +5,15 @@ import { logEcommerce } from "../utils/logger.js"
 export const GETtinyES = async (endpoint, data) => {
 	const { idPedidoEcommerce, ...dataOrder } = data
 	const pedidos = await tinyApiRequest(endpoint, config.tinyApiTokenArteIntegradaES, dataOrder)
-	const { number: numberOrder } = await GETNuvemOrder(idPedidoEcommerce)
-	const { pedido } = pedidos.find((pedido) => pedido.pedido.numero_ecommerce === numberOrder.toString())
+	const dataPedido = pedidos.find((pedido) => pedido.pedido.numero_ecommerce === idPedidoEcommerce)
 
-	if(!pedido) {
-		logEcommerce(`Erro ao obter detalhes do pedido ${data.idPedidoEcommerce} na API Tiny. Aguardando 60 segundos para tentar novamente.`, data)
-		await new Promise((resolve) => setTimeout(resolve, 60000))
-		const retryPedidos = await tinyApiRequest(endpoint, config.tinyApiTokenArteIntegradaES, data)
-		const { number: numberOrderRetry } = await GETNuvemOrder(idPedidoEcommerce)
-		const { pedido: pedidoRetry } = retryPedidos.find((pedido) => pedido.pedido.numero_ecommerce === numberOrderRetry.toString())
+	if(!dataPedido) {
+		const { number: numberOrder } = await GETNuvemOrder(idPedidoEcommerce)
+		const { pedido: pedidoRetry } = pedidos.find((pedido) => pedido.pedido.numero_ecommerce === numberOrder.toString())
 		return pedidoRetry
 	}
-	
-	return pedido
+
+	return dataPedido.pedido
 }
 
 export const GETtinyABSTRACT = async (endpoint, data) => {

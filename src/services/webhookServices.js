@@ -183,8 +183,6 @@ export const processEcommerceWebhook = async (body) => {
 
 export const updateOrderNuvemshop = async (dados) => {
 	const orderDetailsABSTRACT = await getOrderDetails(dados.id)
-	logEcommerce("Atualizando pedido")
-	console.log(dados)
 	const { id } = await GETtiny.ES("pedidos.pesquisa.php", { 
 		dataInicialOcorrencia: dados.data,
 		idPedidoEcommerce: dados.idPedidoEcommerce,
