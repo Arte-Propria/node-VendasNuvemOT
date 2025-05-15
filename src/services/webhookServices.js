@@ -150,6 +150,7 @@ export const processEcommerceWebhook = async (body) => {
 
 	if(tipo === "atualizacao_pedido" && status === "faturado") {
 		const orderDetails = await getOrderDetailsES(dados.id)
+		console.log(dados)
 		const pedidosExistentes = await GETtiny.ABSTRACT("pedidos.pesquisa.php", { 
 			dataInicialOcorrencia: dados.data,
 			cliente: dados.cliente.nome,
