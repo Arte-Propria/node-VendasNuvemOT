@@ -29,7 +29,7 @@ export const insertRefund = async (refundData, store) => {
     
 	const queryString = `
         INSERT INTO reembolsos_${store} (order_id, category, total, created_at, type)
-        VALUES ($1, $2, $3, NOW())
+        VALUES ($1, $2, $3, NOW(), $4)
         RETURNING *
     `
     
