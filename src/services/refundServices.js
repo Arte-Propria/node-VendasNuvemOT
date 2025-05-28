@@ -25,16 +25,16 @@ export const fetchRefunds = async (params) => {
 
 export const insertRefund = async (refundData, store) => {
 	// eslint-disable-next-line camelcase
-	const { order_id, category, total } = refundData
+	const { order_id, category, total, type } = refundData
     
 	const queryString = `
-        INSERT INTO reembolsos_${store} (order_id, category, total, created_at)
+        INSERT INTO reembolsos_${store} (order_id, category, total, created_at, type)
         VALUES ($1, $2, $3, NOW())
         RETURNING *
     `
     
 	// eslint-disable-next-line camelcase
-	const result = await query(queryString, [order_id, category, total])
+	const result = await query(queryString, [order_id, category, total, type])
 	return result.rows[0]
 }
 
