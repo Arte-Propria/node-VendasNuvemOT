@@ -7,17 +7,20 @@ import { getOrderDetails, getProductDetails, getOrderDetailsES } from "../utils/
 
 const marketplaceNames = [
 	"Shopee",
+	"Magalu Abstract",
 	"Magalu Marketplace",
 	"Magazine Luiza",
 	"Mercado Livre Abstract",
 	"Mercado Livre",
 	"Mercado Livre Integrada",
 	"Mercado Livre Fulfillment",
+	"Mercado Livre Fulfillment Abst",
 	"Amazon FBA Classic",
 	"Amazon FBA Onsite",
 	"Amazon",
 	"MadeiraMadeira",
-	"Shein"
+	"Shein",
+	"TikTok Shop Abstract"
 ]
 
 export const processMarketplaceWebhook = async (body) => {
