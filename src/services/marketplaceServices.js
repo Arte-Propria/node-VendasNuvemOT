@@ -30,7 +30,7 @@ export const fetchOrdersByMarketplace = async (marketplace, createdAtMin, create
 			AND ecommerce->>'nomeEcommerce' = $3
 			AND (
 				situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
-				OR (situacao = 'Cancelado' AND id_nota_fiscal != 0)
+				OR (situacao = 'Cancelado' AND CAST(id_nota_fiscal AS INTEGER) > 0)
 			)
 		`, [startDate, endDate, marketplaceNames[marketplace]])
 
@@ -52,7 +52,7 @@ export const fetchOrdersAllMarketplace = async (createdAtMin, createdAtMax) => {
 			WHERE TO_DATE(data_pedido, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'DD/MM/YYYY') AND TO_DATE($2, 'DD/MM/YYYY') 
 			AND (
 				situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
-				OR (situacao = 'Cancelado' AND id_nota_fiscal != 0)
+				OR (situacao = 'Cancelado' AND CAST(id_nota_fiscal AS INTEGER) > 0)
 			)
 		`, [startDate, endDate])
 
