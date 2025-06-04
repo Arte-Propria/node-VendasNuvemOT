@@ -14,7 +14,10 @@ export const logEcommerce = (message) => {
 	console.log(`WEBHOOK Ecommerce: ${message}`)
 }
 
-
 export const logMarketplace = (message) => {
 	console.log(`Marketplace: ${message}`)
+}
+
+export const logPCP = (message) => {
+	console.log(`PCP: ${message}`)
 }
