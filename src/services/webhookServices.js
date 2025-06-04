@@ -60,7 +60,8 @@ export const processMarketplaceWebhook = async (body) => {
 	}
 
 	if(tipo === "atualizacao_pedido") {
-		const { id, nomeEcommerce } = dados
+		const { id, nomeEcommerce, cliente } = dados
+		const isClientFullEstoque = cliente.nome.toUpperCase().includes("FULL") || cliente.nome.toUpperCase().includes("ESTOQUE")
 		const { marcadores } = await getOrderDetails(id)
 		const isIntegradaES = marcadores.some((marcador) => marcador.marcador.descricao.toLowerCase() === "integradaes")
 
@@ -70,7 +71,8 @@ export const processMarketplaceWebhook = async (body) => {
 		}
 
 		// Verificar se o pedido é de um marketplace configurado
-		if (!marketplaceNames.includes(nomeEcommerce)) {
+		if (!marketplaceNames.includes(nomeEcommerce) && !isClientFullEstoque) {
+			logWebhookMarketplace(`Pedido não pertence aos marketplaces configurados e não é um pedido FULL/ESTOQUE, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}, cliente: ${cliente.nome}`)
 			return {
 				status: "ignored",
 				message: "Pedido não pertence aos marketplaces configurados"
