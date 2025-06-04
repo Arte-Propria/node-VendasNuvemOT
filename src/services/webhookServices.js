@@ -50,13 +50,13 @@ export const processMarketplaceWebhook = async (body) => {
 			return { status: "ignored", message: "Pedido cancelado" }
 		}
 
-		// if (codigoSituacao !== "aprovado") {
-		// 	logWebhookMarketplace(`Pedido não aprovado, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
-		// 	return { status: "ignored", message: "Pedido não aprovado" }
-		// }
+		if(codigoSituacao === "aberto" || codigoSituacao === "aprovado" || codigoSituacao === "faturado") {
+			const result = await processSaveOrder(dados)
+			return result
+		}
 
-		const result = await processSaveOrder(dados)
-		return result
+		logWebhookMarketplace(`Pedido não aprovado ou não faturado ou com dados incompletos, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
+		return { status: "ignored", message: "Pedido não aprovado" }
 	}
 
 	if(tipo === "atualizacao_pedido") {
