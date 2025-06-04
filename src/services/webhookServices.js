@@ -50,10 +50,10 @@ export const processMarketplaceWebhook = async (body) => {
 			return { status: "ignored", message: "Pedido cancelado" }
 		}
 
-		if (codigoSituacao !== "aprovado") {
-			logWebhookMarketplace(`Pedido não aprovado, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
-			return { status: "ignored", message: "Pedido não aprovado" }
-		}
+		// if (codigoSituacao !== "aprovado") {
+		// 	logWebhookMarketplace(`Pedido não aprovado, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
+		// 	return { status: "ignored", message: "Pedido não aprovado" }
+		// }
 
 		const result = await processSaveOrder(dados)
 		return result
