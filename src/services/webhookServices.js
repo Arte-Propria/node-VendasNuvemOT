@@ -23,18 +23,24 @@ const marketplaceNames = [
 	"TikTok Shop Abstract"
 ]
 
+const clientsFullEstoque = [
+	"FULL",
+	"ESTOQUE"
+]
+
 export const processMarketplaceWebhook = async (body) => {
 	const { tipo, dados } = body
 
 	if (tipo === "inclusao_pedido") {
-		const { nomeEcommerce, codigoSituacao } = dados
+		const { nomeEcommerce, codigoSituacao, cliente } = dados
+		const isClientFullEstoque = cliente.nome.toUpperCase().includes("FULL") || cliente.nome.toUpperCase().includes("ESTOQUE")
 
-		// Verificar se o pedido é de um marketplace configurado
-		if (!marketplaceNames.includes(nomeEcommerce)) {
-			logWebhookMarketplace(`Pedido não pertence aos marketplaces configurados, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
+		// Verificar se o pedido é de um marketplace configurado ou se o cliente é FULL/ESTOQUE
+		if (!marketplaceNames.includes(nomeEcommerce) && !isClientFullEstoque) {
+			logWebhookMarketplace(`Pedido não pertence aos marketplaces configurados e não é um pedido FULL/ESTOQUE, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}, cliente: ${cliente.nome}`)
 			return {
 				status: "ignored",
-				message: "Pedido não pertence aos marketplaces configurados"
+				message: "Pedido não pertence aos marketplaces configurados e cliente não é FULL/ESTOQUE"
 			}
 		}
 
