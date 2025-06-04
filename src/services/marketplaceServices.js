@@ -89,7 +89,6 @@ export const fetchOrdersAllMarketplaceOptimized = async (createdAtMin, createdAt
 				url_rastreamento,
 				ecommerce,
 				id_natureza_operacao,
-				id_produto,
 				deposito,
 				itens
 			FROM pedidos_marketplace 
