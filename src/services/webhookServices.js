@@ -23,10 +23,7 @@ const marketplaceNames = [
 	"TikTok Shop Abstract"
 ]
 
-const clientsFullEstoque = [
-	"FULL",
-	"ESTOQUE"
-]
+const statusPermitidos = ["aberto", "aprovado", "faturado", "pronto_envio", "enviado", "entregue", "preparando_envio"]
 
 export const processMarketplaceWebhook = async (body) => {
 	const { tipo, dados } = body
@@ -49,8 +46,8 @@ export const processMarketplaceWebhook = async (body) => {
 			logWebhookMarketplace(`Pedido cancelado, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
 			return { status: "ignored", message: "Pedido cancelado" }
 		}
-
-		if(codigoSituacao === "aberto" || codigoSituacao === "aprovado" || codigoSituacao === "faturado") {
+		
+		if (statusPermitidos.includes(codigoSituacao)) {
 			const result = await processSaveOrder(dados)
 			return result
 		}
