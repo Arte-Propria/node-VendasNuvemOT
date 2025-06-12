@@ -28,6 +28,7 @@ const statusPermitidos = ["aberto", "aprovado", "faturado", "pronto_envio", "env
 export const processMarketplaceWebhook = async (body) => {
 	const { tipo, dados } = body
 
+	console.log("body", body)
 	if (tipo === "inclusao_pedido") {
 		const { nomeEcommerce, codigoSituacao, cliente } = dados
 		const isClientFullEstoque = cliente.nome.toUpperCase().includes("FULL") || cliente.nome.toUpperCase().includes("ESTOQUE")
