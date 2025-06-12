@@ -3,7 +3,10 @@ import { GETNuvemOrder } from "../api/get.js"
 import { GETtiny, POSTtiny, PUTtiny } from "../api/tiny.js"
 import { saveOrder, updateOrderStatus } from "../db/saveOrder.js"
 import { logEcommerce, logWebhookMarketplace } from "../utils/logger.js"
-import { getOrderDetails, getProductDetails, getOrderDetailsES } from "../utils/tiny.js"
+import { getProductDetails } from "../utils/tiny.js"
+import { google } from "googleapis"
+import { JWT } from "google-auth-library"
+import { config } from "../config/env.js"
 
 const marketplaceNames = [
 	"Shopee",
@@ -25,10 +28,137 @@ const marketplaceNames = [
 
 const statusPermitidos = ["aberto", "aprovado", "faturado", "pronto_envio", "enviado", "entregue", "preparando_envio"]
 
-export const processMarketplaceWebhook = async (body) => {
-	const { tipo, dados } = body
+const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-	console.log("body", body)
+const ABA_DESTINOS = {
+	"Entregue": "Pedidos ENTREGUE",
+	"Enviado": "Pedidos ENVIADO",
+	"Cancelado": "Pedidos CANCELADO"
+}
+
+const ABAS_ORIGEM = [
+	"Pedidos",
+	"Pedidos ENVIADO",
+	"Pedidos ENTREGUE",
+	"Pedidos CANCELADO",
+	"Full",
+	"Estoque Produção"
+]
+
+export async function processUpdateOrderGSheets(dados) {
+	const { id: idPedidoTiny, descricaoSituacao, idNotaFiscal = "0" } = dados
+	const novaSituacao = descricaoSituacao
+
+	if (!idPedidoTiny || !novaSituacao) return { status: "error", message: "ID ou situação ausente" }
+
+	const auth = new JWT({
+		email: config.googleClientEmail,
+		key: config.googlePrivateKey.replace(/\\n/g, "\n"),
+		scopes: SCOPES
+	})
+
+	const sheets = google.sheets({ version: "v4", auth })
+	const sheetId = config.googleIdGSheets
+
+	for (const nomeAba of ABAS_ORIGEM) {
+		const res = await sheets.spreadsheets.values.get({
+			spreadsheetId: sheetId,
+			range: `${nomeAba}!A2:AF`
+		})
+
+		const linhas = res.data.values || []
+
+		for (let i = 0; i < linhas.length; i++) {
+			const linha = linhas[i]
+			const idLinha = linha[0]?.trim()
+
+			if (idLinha === String(idPedidoTiny)) {
+				const linhaIndex = i + 2 // +2 por causa do cabeçalho e índice base 1
+
+				// Atualiza as colunas diretamente na aba de origem
+				const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+				const historicoAnterior = linha[31] || ""
+				const novoHistorico = `${historicoAnterior ? historicoAnterior + "\n" : ""}[${agora}] ${novaSituacao}`
+
+				await sheets.spreadsheets.values.update({
+					spreadsheetId: sheetId,
+					range: `${nomeAba}!D${linhaIndex}:D${linhaIndex}`,
+					valueInputOption: "RAW",
+					requestBody: { values: [[novaSituacao]] }
+				})
+
+				await sheets.spreadsheets.values.update({
+					spreadsheetId: sheetId,
+					range: `${nomeAba}!U${linhaIndex}:U${linhaIndex}`,
+					valueInputOption: "RAW",
+					requestBody: { values: [[idNotaFiscal]] }
+				})
+
+				await sheets.spreadsheets.values.update({
+					spreadsheetId: sheetId,
+					range: `${nomeAba}!AF${linhaIndex}:AF${linhaIndex}`,
+					valueInputOption: "RAW",
+					requestBody: { values: [[novoHistorico]] }
+				})
+
+				// Se for um status que deve mover a linha
+				if (ABA_DESTINOS[novaSituacao]) {
+					const destino = ABA_DESTINOS[novaSituacao]
+
+					// Recarrega a linha já atualizada
+					const linhaAtualizada = [...linha]
+					linhaAtualizada[3] = novaSituacao
+					linhaAtualizada[20] = idNotaFiscal
+					linhaAtualizada[31] = novoHistorico
+
+					// Adiciona à aba de destino
+					await sheets.spreadsheets.values.append({
+						spreadsheetId: sheetId,
+						range: `${destino}!A1`,
+						valueInputOption: "RAW",
+						insertDataOption: "INSERT_ROWS",
+						requestBody: { values: [linhaAtualizada] }
+					})
+
+					// Remove a linha da aba de origem
+					await sheets.spreadsheets.batchUpdate({
+						spreadsheetId: sheetId,
+						requestBody: {
+							requests: [
+								{
+									deleteDimension: {
+										range: {
+											sheetId: await getSheetIdByName(sheets, sheetId, nomeAba),
+											dimension: "ROWS",
+											startIndex: linhaIndex - 1,
+											endIndex: linhaIndex
+										}
+									}
+								}
+							]
+						}
+					})
+				}
+
+				return { status: "ok", message: "Atualizado e movido se necessário" }
+			}
+		}
+	}
+
+	return { status: "not_found", message: "Pedido não encontrado" }
+}
+
+// Utilitário para pegar o ID interno da aba pelo nome
+async function getSheetIdByName(sheets, spreadsheetId, sheetName) {
+	const metadata = await sheets.spreadsheets.get({ spreadsheetId })
+	const sheet = metadata.data.sheets.find((s) => s.properties.title === sheetName)
+	return sheet?.properties.sheetId
+}
+
+
+export const processMarketplaceWebhook = async (body) => {
+	const { tipo, dados, pedido } = body
+
 	if (tipo === "inclusao_pedido") {
 		const { nomeEcommerce, codigoSituacao, cliente } = dados
 		const isClientFullEstoque = cliente.nome.toUpperCase().includes("FULL") || cliente.nome.toUpperCase().includes("ESTOQUE")
@@ -49,7 +179,7 @@ export const processMarketplaceWebhook = async (body) => {
 		}
 		
 		if (statusPermitidos.includes(codigoSituacao)) {
-			const result = await processSaveOrder(dados)
+			const result = await processSaveOrder(dados, pedido)
 			return result
 		}
 
@@ -58,13 +188,13 @@ export const processMarketplaceWebhook = async (body) => {
 	}
 
 	if(tipo === "atualizacao_pedido") {
-		const { id, nomeEcommerce, cliente } = dados
+		const { nomeEcommerce, cliente } = dados
 		const isClientFullEstoque = cliente.nome.toUpperCase().includes("FULL") || cliente.nome.toUpperCase().includes("ESTOQUE")
-		const { marcadores } = await getOrderDetails(id)
+		const { marcadores } = pedido
 		const isIntegradaES = marcadores.some((marcador) => marcador.marcador.descricao.toLowerCase() === "integradaes")
 
 		if(isIntegradaES) {
-			const result = await updateOrderNuvemshop(dados)
+			const result = await updateOrderNuvemshop(dados, pedido)
 			return result
 		}
 
@@ -78,7 +208,9 @@ export const processMarketplaceWebhook = async (body) => {
 		}
 
 		try {
-			const result = await processUpdateOrder(dados)
+			const resultGSheets = await processUpdateOrderGSheets(dados)
+			console.log(resultGSheets)
+			const result = await processUpdateOrder(dados, pedido)
 			return result
 
 		} catch (error) {
@@ -88,10 +220,10 @@ export const processMarketplaceWebhook = async (body) => {
 	}
 }
 
-async function processSaveOrder(dados) {
+async function processSaveOrder(dados, pedido) {
 	try {
 		// Obter detalhes do pedido
-		const orderDetails = await getOrderDetails(dados.id)
+		const orderDetails = pedido
 
 		// Recuperar informações dos produtos no pedido
 		const enrichedItems = await Promise.all(orderDetails.itens.map(async ({item}) => {
@@ -120,10 +252,10 @@ async function processSaveOrder(dados) {
 	}
 }	
 
-async function processUpdateOrder(dados) {
+async function processUpdateOrder(dados, pedido) {
 	try {
 		// Obter detalhes do pedido
-		const orderDetails = await getOrderDetails(dados.id)
+		const orderDetails = pedido
 
 		// Atualizar status do pedido
 		const { success } = await updateOrderStatus(orderDetails)
@@ -141,7 +273,7 @@ async function processUpdateOrder(dados) {
 }
 
 export const processEcommerceWebhook = async (body) => {
-	const { tipo, dados } = body
+	const { tipo, dados, pedido } = body
 	const { codigoSituacao: status } = dados
 
 	if(tipo === "inclusao_pedido") {
@@ -159,7 +291,7 @@ export const processEcommerceWebhook = async (body) => {
 	}
 
 	if(tipo === "atualizacao_pedido" && status === "faturado") {
-		const orderDetails = await getOrderDetailsES(dados.id)
+		const orderDetails = pedido
 		const pedidosExistentes = await GETtiny.ABSTRACT("pedidos.pesquisa.php", { 
 			dataInicialOcorrencia: dados.data,
 			cliente: dados.cliente.nome,
@@ -190,8 +322,8 @@ export const processEcommerceWebhook = async (body) => {
 	}
 }
 
-export const updateOrderNuvemshop = async (dados) => {
-	const orderDetailsABSTRACT = await getOrderDetails(dados.id)
+export const updateOrderNuvemshop = async (dados, pedido) => {
+	const orderDetailsABSTRACT = pedido
 	const { id } = await GETtiny.ES("pedidos.pesquisa.php", { 
 		dataInicialOcorrencia: dados.data,
 		idPedidoEcommerce: dados.idPedidoEcommerce,
