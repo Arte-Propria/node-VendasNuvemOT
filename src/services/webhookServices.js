@@ -190,6 +190,7 @@ export async function processUpdateOrderGSheets(dados) {
 
 export const processMarketplaceWebhook = async (body) => {
 	const { tipo, dados, pedido } = body
+	console.log("processMarketplaceWebhook", body)
 
 	if (tipo === "inclusao_pedido") {
 		const { nomeEcommerce, codigoSituacao, cliente } = dados
