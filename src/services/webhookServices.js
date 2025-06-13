@@ -190,7 +190,6 @@ export async function processUpdateOrderGSheets(dados) {
 
 export const processMarketplaceWebhook = async (body) => {
 	const { tipo, dados, pedido } = body
-	console.log("processMarketplaceWebhook", body)
 
 	if (tipo === "inclusao_pedido") {
 		const { nomeEcommerce, codigoSituacao, cliente } = dados
@@ -246,13 +245,10 @@ export const processMarketplaceWebhook = async (body) => {
 		}
 
 		try {
-			console.log("Dados recebidos no webhook:", JSON.stringify(dados, null, 2))
-			console.log("Pedido recebido no webhook:", JSON.stringify(pedido, null, 2))
 			await processUpdateOrderGSheets(dados)
 			const result = await processUpdateOrder(dados, pedido)
 			return result
 		} catch (error) {
-			console.error("Erro detalhado:", error)
 			logWebhookMarketplace(`Erro ao processar webhook: ${error.message}. Pedido ${dados.id}: ${error.stack}`)
 			return { status: "error", message: error.message }
 		}
