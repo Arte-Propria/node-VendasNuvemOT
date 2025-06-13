@@ -23,6 +23,6 @@ export async function getSheetIdByName(sheets, spreadsheetId, sheetName) {
 }
 
 // Função para criar um delay entre as requisições
-export function delay(ms) {
+export async function delay(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms))
 }
