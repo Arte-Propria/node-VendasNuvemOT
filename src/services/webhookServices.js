@@ -76,7 +76,7 @@ export async function processUpdateOrderGSheets(dados) {
 
 	for (const nomeAba of ABAS_ORIGEM) {
 		// Adiciona delay antes de cada nova requisição
-		await delay(30000) // 30 segundos de delay entre requisições
+		await delay(10000) // 30 segundos de delay entre requisições
 
 		const res = await sheets.spreadsheets.values.get({
 			spreadsheetId: sheetId,
