@@ -2,11 +2,16 @@
 import { GETNuvemOrder } from "../api/get.js"
 import { GETtiny, POSTtiny, PUTtiny } from "../api/tiny.js"
 import { saveOrder, updateOrderStatus } from "../db/saveOrder.js"
-import { logEcommerce, logWebhookMarketplace } from "../utils/logger.js"
+import {
+	logEcommerce,
+	logPCP,
+	logWebhookMarketplace
+} from "../utils/logger.js"
 import { getProductDetails } from "../utils/tiny.js"
 import { google } from "googleapis"
 import { JWT } from "google-auth-library"
 import { config } from "../config/env.js"
+import { getSheetIdByName } from "../tools/tools.js"
 
 const marketplaceNames = [
 	"Shopee",
@@ -26,14 +31,22 @@ const marketplaceNames = [
 	"TikTok Shop Abstract"
 ]
 
-const statusPermitidos = ["aberto", "aprovado", "faturado", "pronto_envio", "enviado", "entregue", "preparando_envio"]
+const statusPermitidos = [
+	"aberto",
+	"aprovado",
+	"faturado",
+	"pronto_envio",
+	"enviado",
+	"entregue",
+	"preparando_envio"
+]
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 const ABA_DESTINOS = {
-	"Entregue": "Pedidos ENTREGUE",
-	"Enviado": "Pedidos ENVIADO",
-	"Cancelado": "Pedidos CANCELADO"
+	Entregue: "Pedidos ENTREGUE",
+	Enviado: "Pedidos ENVIADO",
+	Cancelado: "Pedidos CANCELADO"
 }
 
 const ABAS_ORIGEM = [
@@ -49,7 +62,8 @@ export async function processUpdateOrderGSheets(dados) {
 	const { id: idPedidoTiny, descricaoSituacao, idNotaFiscal = "0" } = dados
 	const novaSituacao = descricaoSituacao
 
-	if (!idPedidoTiny || !novaSituacao) return { status: "error", message: "ID ou situação ausente" }
+	if (!idPedidoTiny || !novaSituacao)
+		return { status: "error", message: "ID ou situação ausente" }
 
 	const auth = new JWT({
 		email: config.googleClientEmail,
@@ -66,20 +80,26 @@ export async function processUpdateOrderGSheets(dados) {
 			range: `${nomeAba}!A2:AF`
 		})
 
-		const linhas = res.data.values || []
+		let linhas = res.data.values || []
+		let linhasAtualizadas = []
+		let linhasParaMover = []
 
+		// Primeiro, identifica todas as linhas que precisam ser atualizadas
 		for (let i = 0; i < linhas.length; i++) {
 			const linha = linhas[i]
 			const idLinha = linha[0]?.trim()
 
 			if (idLinha === String(idPedidoTiny)) {
 				const linhaIndex = i + 2 // +2 por causa do cabeçalho e índice base 1
+				const agora = new Date().toLocaleString("pt-BR", {
+					timeZone: "America/Sao_Paulo"
+				})
+				const historicoAnterior = linha[31] || ""
+				const novoHistorico = `[${agora}] ${novaSituacao} ${
+					historicoAnterior ? "\n" + historicoAnterior : ""
+				}`
 
 				// Atualiza as colunas diretamente na aba de origem
-				const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
-				const historicoAnterior = linha[31] || ""
-				const novoHistorico = `${historicoAnterior ? historicoAnterior + "\n" : ""}[${agora}] ${novaSituacao}`
-
 				await sheets.spreadsheets.values.update({
 					spreadsheetId: sheetId,
 					range: `${nomeAba}!D${linhaIndex}:D${linhaIndex}`,
@@ -103,72 +123,87 @@ export async function processUpdateOrderGSheets(dados) {
 
 				// Se for um status que deve mover a linha
 				if (ABA_DESTINOS[novaSituacao]) {
-					const destino = ABA_DESTINOS[novaSituacao]
-
-					// Recarrega a linha já atualizada
 					const linhaAtualizada = [...linha]
 					linhaAtualizada[3] = novaSituacao
 					linhaAtualizada[20] = idNotaFiscal
 					linhaAtualizada[31] = novoHistorico
-
-					// Adiciona à aba de destino
-					await sheets.spreadsheets.values.append({
-						spreadsheetId: sheetId,
-						range: `${destino}!A1`,
-						valueInputOption: "RAW",
-						insertDataOption: "INSERT_ROWS",
-						requestBody: { values: [linhaAtualizada] }
-					})
-
-					// Remove a linha da aba de origem
-					await sheets.spreadsheets.batchUpdate({
-						spreadsheetId: sheetId,
-						requestBody: {
-							requests: [
-								{
-									deleteDimension: {
-										range: {
-											sheetId: await getSheetIdByName(sheets, sheetId, nomeAba),
-											dimension: "ROWS",
-											startIndex: linhaIndex - 1,
-											endIndex: linhaIndex
-										}
-									}
-								}
-							]
-						}
-					})
+					linhasParaMover.push({ linhaIndex, linhaAtualizada })
 				}
 
-				return { status: "ok", message: "Atualizado e movido se necessário" }
+				linhasAtualizadas.push(linhaIndex)
+			}
+		}
+
+		// Se houver linhas para mover e for um status que deve mover
+		if (linhasParaMover.length > 0 && ABA_DESTINOS[novaSituacao]) {
+			const destino = ABA_DESTINOS[novaSituacao]
+
+			// Primeiro, remove todas as linhas da aba de origem (em ordem decrescente para não afetar os índices)
+			const sheetIdByName = await getSheetIdByName(sheets, sheetId, nomeAba)
+			const requests = linhasParaMover
+				.sort((a, b) => b.linhaIndex - a.linhaIndex)
+				.map(({ linhaIndex }) => ({
+					deleteDimension: {
+						range: {
+							sheetId: sheetIdByName,
+							dimension: "ROWS",
+							startIndex: linhaIndex - 1,
+							endIndex: linhaIndex
+						}
+					}
+				}))
+
+			if (requests.length > 0) {
+				await sheets.spreadsheets.batchUpdate({
+					spreadsheetId: sheetId,
+					requestBody: { requests }
+				})
+			}
+
+			// Depois, adiciona todas as linhas à aba de destino
+			for (const { linhaAtualizada } of linhasParaMover) {
+				await sheets.spreadsheets.values.append({
+					spreadsheetId: sheetId,
+					range: `${destino}!A1`,
+					valueInputOption: "RAW",
+					insertDataOption: "INSERT_ROWS",
+					requestBody: { values: [linhaAtualizada] }
+				})
+			}
+		}
+
+		if (linhasAtualizadas.length > 0) {
+			logPCP(`Atualizado ${linhasAtualizadas.length} linha(s) e movido se necessário`)
+			return {
+				status: "success",
+				message: `Atualizado ${linhasAtualizadas.length} linha(s) e movido se necessário`
 			}
 		}
 	}
 
-	return { status: "not_found", message: "Pedido não encontrado" }
+	logPCP("Pedido não encontrado")
+	return {
+		status: "error",
+		message: "Pedido não encontrado"
+	}
 }
-
-// Utilitário para pegar o ID interno da aba pelo nome
-async function getSheetIdByName(sheets, spreadsheetId, sheetName) {
-	const metadata = await sheets.spreadsheets.get({ spreadsheetId })
-	const sheet = metadata.data.sheets.find((s) => s.properties.title === sheetName)
-	return sheet?.properties.sheetId
-}
-
 
 export const processMarketplaceWebhook = async (body) => {
 	const { tipo, dados, pedido } = body
 
 	if (tipo === "inclusao_pedido") {
 		const { nomeEcommerce, codigoSituacao, cliente } = dados
-		const isClientFullEstoque = cliente.nome.toUpperCase().includes("FULL") || cliente.nome.toUpperCase().includes("ESTOQUE")
+		const isClientFullEstoque =
+      cliente.nome.toUpperCase().includes("FULL") ||
+      cliente.nome.toUpperCase().includes("ESTOQUE")
 
 		// Verificar se o pedido é de um marketplace configurado ou se o cliente é FULL/ESTOQUE
 		if (!marketplaceNames.includes(nomeEcommerce) && !isClientFullEstoque) {
 			logWebhookMarketplace(`Pedido não pertence aos marketplaces configurados e não é um pedido FULL/ESTOQUE, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}, cliente: ${cliente.nome}`)
 			return {
 				status: "ignored",
-				message: "Pedido não pertence aos marketplaces configurados e cliente não é FULL/ESTOQUE"
+				message:
+          "Pedido não pertence aos marketplaces configurados e cliente não é FULL/ESTOQUE"
 			}
 		}
 
@@ -177,7 +212,7 @@ export const processMarketplaceWebhook = async (body) => {
 			logWebhookMarketplace(`Pedido cancelado, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}`)
 			return { status: "ignored", message: "Pedido cancelado" }
 		}
-		
+
 		if (statusPermitidos.includes(codigoSituacao)) {
 			const result = await processSaveOrder(dados, pedido)
 			return result
@@ -187,13 +222,15 @@ export const processMarketplaceWebhook = async (body) => {
 		return { status: "ignored", message: "Pedido não aprovado" }
 	}
 
-	if(tipo === "atualizacao_pedido") {
+	if (tipo === "atualizacao_pedido") {
 		const { nomeEcommerce, cliente } = dados
-		const isClientFullEstoque = cliente.nome.toUpperCase().includes("FULL") || cliente.nome.toUpperCase().includes("ESTOQUE")
+		const isClientFullEstoque =
+      cliente.nome.toUpperCase().includes("FULL") ||
+      cliente.nome.toUpperCase().includes("ESTOQUE")
 		const { marcadores } = pedido
 		const isIntegradaES = marcadores.some((marcador) => marcador.marcador.descricao.toLowerCase() === "integradaes")
 
-		if(isIntegradaES) {
+		if (isIntegradaES) {
 			const result = await updateOrderNuvemshop(dados, pedido)
 			return result
 		}
@@ -208,14 +245,12 @@ export const processMarketplaceWebhook = async (body) => {
 		}
 
 		try {
-			const resultGSheets = await processUpdateOrderGSheets(dados)
-			console.log(resultGSheets)
+			await processUpdateOrderGSheets(dados)
 			const result = await processUpdateOrder(dados, pedido)
 			return result
-
 		} catch (error) {
-			logWebhookMarketplace(`Erro ao obter detalhe do pedido ${dados.id}:`, error)
-			return { status: "error", message: "Erro ao obter detalhes do pedido" }
+			logWebhookMarketplace(`${error.message}. Pedido ${dados.id}: `)
+			return { status: "error", message: error.message }
 		}
 	}
 }
@@ -226,12 +261,13 @@ async function processSaveOrder(dados, pedido) {
 		const orderDetails = pedido
 
 		// Recuperar informações dos produtos no pedido
-		const enrichedItems = await Promise.all(orderDetails.itens.map(async ({item}) => {
+		const enrichedItems = await Promise.all(orderDetails.itens.map(async ({ item }) => {
 			try {
 				const productDetails = await getProductDetails(item.id_produto)
 				return { ...item, ...productDetails }
 			} catch (error) {
-				logWebhookMarketplace(`Erro ao obter detalhes do produto ${item.id_produto}:`, error)
+				logWebhookMarketplace(`Erro ao obter detalhes do produto ${item.id_produto}:`,
+					error)
 				return { ...item, productDetails: null }
 			}
 		}))
@@ -250,7 +286,7 @@ async function processSaveOrder(dados, pedido) {
 		logWebhookMarketplace(`Erro ao processar o pedido: ${error}, ${dados}`)
 		return { status: "error", message: "Erro ao processar o pedido" }
 	}
-}	
+}
 
 async function processUpdateOrder(dados, pedido) {
 	try {
@@ -260,8 +296,8 @@ async function processUpdateOrder(dados, pedido) {
 		// Atualizar status do pedido
 		const { success } = await updateOrderStatus(orderDetails)
 
-		if(!success) {
-			const result = await processSaveOrder(dados)
+		if (!success) {
+			const result = await processSaveOrder(dados, pedido)
 			return result
 		}
 
@@ -276,23 +312,23 @@ export const processEcommerceWebhook = async (body) => {
 	const { tipo, dados, pedido } = body
 	const { codigoSituacao: status } = dados
 
-	if(tipo === "inclusao_pedido") {
+	if (tipo === "inclusao_pedido") {
 		return {
 			status: "ignored",
 			message: "Novo pedido criado"
 		}
 	}
 
-	if(tipo === "atualizacao_pedido" && status !== "faturado") {
+	if (tipo === "atualizacao_pedido" && status !== "faturado") {
 		return {
 			status: "ignored",
 			message: "Pedido não faturado"
 		}
 	}
 
-	if(tipo === "atualizacao_pedido" && status === "faturado") {
+	if (tipo === "atualizacao_pedido" && status === "faturado") {
 		const orderDetails = pedido
-		const pedidosExistentes = await GETtiny.ABSTRACT("pedidos.pesquisa.php", { 
+		const pedidosExistentes = await GETtiny.ABSTRACT("pedidos.pesquisa.php", {
 			dataInicialOcorrencia: dados.data,
 			cliente: dados.cliente.nome,
 			cpf_cnpj: dados.cliente.cpfCnpj
@@ -301,9 +337,9 @@ export const processEcommerceWebhook = async (body) => {
 		const { number: numberOrderRetry } = await GETNuvemOrder(dados.idPedidoEcommerce)
 		const isPedidoExistente = pedidosExistentes.some((pedido) => pedido.pedido.numero_ecommerce === numberOrderRetry.toString())
 
-		if(isPedidoExistente) {
+		if (isPedidoExistente) {
 			return {
-				status: "success", 
+				status: "success",
 				message: `Pedido já existe na conta Abstract. Pedido com ID: ${dados.id}`
 			}
 		}
@@ -312,9 +348,12 @@ export const processEcommerceWebhook = async (body) => {
 			id: dados.idNotaFiscal
 		})
 
-		const result = await POSTtiny.ABSTRACT("pedido.incluir.php", {...orderDetails, nota_fiscal})
+		const result = await POSTtiny.ABSTRACT("pedido.incluir.php", {
+			...orderDetails,
+			nota_fiscal
+		})
 		const id = result.retorno.registros.registro.id
-	
+
 		return {
 			status: "success",
 			message: `Pedido salvo na conta Abstract. Pedido com ID: ${id}`
@@ -324,15 +363,18 @@ export const processEcommerceWebhook = async (body) => {
 
 export const updateOrderNuvemshop = async (dados, pedido) => {
 	const orderDetailsABSTRACT = pedido
-	const { id } = await GETtiny.ES("pedidos.pesquisa.php", { 
+	const { id } = await GETtiny.ES("pedidos.pesquisa.php", {
 		dataInicialOcorrencia: dados.data,
 		idPedidoEcommerce: dados.idPedidoEcommerce,
 		// cliente: dados.cliente.nome,
 		cpf_cnpj: dados.cliente.cpfCnpj
 	})
-	if(!id) {
+	if (!id) {
 		logEcommerce(`Não foram encontrados pedidos com o CPF/CNPJ: ${dados.cliente.cpfCnpj}`)
-		return { status: "error", message: `Não foram encontrados pedidos com o CPF/CNPJ: ${dados.cliente.cpfCnpj}` }
+		return {
+			status: "error",
+			message: `Não foram encontrados pedidos com o CPF/CNPJ: ${dados.cliente.cpfCnpj}`
+		}
 	}
 
 	const data = {
