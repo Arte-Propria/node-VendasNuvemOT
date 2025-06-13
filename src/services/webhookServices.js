@@ -2,16 +2,8 @@
 import { GETNuvemOrder } from "../api/get.js"
 import { GETtiny, POSTtiny, PUTtiny } from "../api/tiny.js"
 import { saveOrder, updateOrderStatus } from "../db/saveOrder.js"
-import {
-	logEcommerce,
-	logPCP,
-	logWebhookMarketplace
-} from "../utils/logger.js"
-import { getProductDetails } from "../utils/tiny.js"
-import { google } from "googleapis"
-import { JWT } from "google-auth-library"
-import { config } from "../config/env.js"
-import { getSheetIdByName } from "../tools/tools.js"
+import { logEcommerce, logWebhookMarketplace } from "../utils/logger.js"
+import { getOrderDetails, getProductDetails, getOrderDetailsES } from "../utils/tiny.js"
 
 const marketplaceNames = [
 	"Shopee",
@@ -31,162 +23,7 @@ const marketplaceNames = [
 	"TikTok Shop Abstract"
 ]
 
-const statusPermitidos = [
-	"aberto",
-	"aprovado",
-	"faturado",
-	"pronto_envio",
-	"enviado",
-	"entregue",
-	"preparando_envio"
-]
-
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-
-const ABA_DESTINOS = {
-	Entregue: "Pedidos ENTREGUE",
-	Enviado: "Pedidos ENVIADO",
-	Cancelado: "Pedidos CANCELADO"
-}
-
-const ABAS_ORIGEM = [
-	"Pedidos",
-	"Pedidos ENVIADO",
-	"Pedidos ENTREGUE",
-	"Pedidos CANCELADO",
-	"Full",
-	"Estoque Produção"
-]
-
-export async function processUpdateOrderGSheets(dados) {
-	const { id: idPedidoTiny, descricaoSituacao, idNotaFiscal = "0" } = dados
-	const novaSituacao = descricaoSituacao
-
-	if (!idPedidoTiny || !novaSituacao)
-		return { status: "error", message: "ID ou situação ausente" }
-
-	const auth = new JWT({
-		email: config.googleClientEmail,
-		key: config.googlePrivateKey.replace(/\\n/g, "\n"),
-		scopes: SCOPES
-	})
-
-	const sheets = google.sheets({ version: "v4", auth })
-	const sheetId = config.googleIdGSheets
-
-	for (const nomeAba of ABAS_ORIGEM) {
-		const res = await sheets.spreadsheets.values.get({
-			spreadsheetId: sheetId,
-			range: `${nomeAba}!A2:AF`
-		})
-
-		let linhas = res.data.values || []
-		let linhasAtualizadas = []
-		let linhasParaMover = []
-
-		// Primeiro, identifica todas as linhas que precisam ser atualizadas
-		for (let i = 0; i < linhas.length; i++) {
-			const linha = linhas[i]
-			const idLinha = linha[0]?.trim()
-
-			if (idLinha === String(idPedidoTiny)) {
-				const linhaIndex = i + 2 // +2 por causa do cabeçalho e índice base 1
-				const agora = new Date().toLocaleString("pt-BR", {
-					timeZone: "America/Sao_Paulo"
-				})
-				const historicoAnterior = linha[31] || ""
-				const novoHistorico = `[${agora}] ${novaSituacao} ${
-					historicoAnterior ? "\n" + historicoAnterior : ""
-				}`
-
-				// Atualiza as colunas diretamente na aba de origem
-				await sheets.spreadsheets.values.update({
-					spreadsheetId: sheetId,
-					range: `${nomeAba}!D${linhaIndex}:D${linhaIndex}`,
-					valueInputOption: "RAW",
-					requestBody: { values: [[novaSituacao]] }
-				})
-
-				await sheets.spreadsheets.values.update({
-					spreadsheetId: sheetId,
-					range: `${nomeAba}!U${linhaIndex}:U${linhaIndex}`,
-					valueInputOption: "RAW",
-					requestBody: { values: [[idNotaFiscal]] }
-				})
-
-				await sheets.spreadsheets.values.update({
-					spreadsheetId: sheetId,
-					range: `${nomeAba}!AF${linhaIndex}:AF${linhaIndex}`,
-					valueInputOption: "RAW",
-					requestBody: { values: [[novoHistorico]] }
-				})
-
-				// Se for um status que deve mover a linha
-				if (ABA_DESTINOS[novaSituacao]) {
-					const linhaAtualizada = [...linha]
-					linhaAtualizada[3] = novaSituacao
-					linhaAtualizada[20] = idNotaFiscal
-					linhaAtualizada[31] = novoHistorico
-					linhasParaMover.push({ linhaIndex, linhaAtualizada })
-				}
-
-				linhasAtualizadas.push(linhaIndex)
-			}
-		}
-
-		// Se houver linhas para mover e for um status que deve mover
-		if (linhasParaMover.length > 0 && ABA_DESTINOS[novaSituacao]) {
-			const destino = ABA_DESTINOS[novaSituacao]
-
-			// Primeiro, remove todas as linhas da aba de origem (em ordem decrescente para não afetar os índices)
-			const sheetIdByName = await getSheetIdByName(sheets, sheetId, nomeAba)
-			const requests = linhasParaMover
-				.sort((a, b) => b.linhaIndex - a.linhaIndex)
-				.map(({ linhaIndex }) => ({
-					deleteDimension: {
-						range: {
-							sheetId: sheetIdByName,
-							dimension: "ROWS",
-							startIndex: linhaIndex - 1,
-							endIndex: linhaIndex
-						}
-					}
-				}))
-
-			if (requests.length > 0) {
-				await sheets.spreadsheets.batchUpdate({
-					spreadsheetId: sheetId,
-					requestBody: { requests }
-				})
-			}
-
-			// Depois, adiciona todas as linhas à aba de destino
-			for (const { linhaAtualizada } of linhasParaMover) {
-				await sheets.spreadsheets.values.append({
-					spreadsheetId: sheetId,
-					range: `${destino}!A1`,
-					valueInputOption: "RAW",
-					insertDataOption: "INSERT_ROWS",
-					requestBody: { values: [linhaAtualizada] }
-				})
-			}
-		}
-
-		if (linhasAtualizadas.length > 0) {
-			logPCP(`Atualizado ${linhasAtualizadas.length} linha(s) e movido se necessário`)
-			return {
-				status: "success",
-				message: `Atualizado ${linhasAtualizadas.length} linha(s) e movido se necessário`
-			}
-		}
-	}
-
-	logPCP("Pedido não encontrado")
-	return {
-		status: "error",
-		message: "Pedido não encontrado"
-	}
-}
+const statusPermitidos = ["aberto", "aprovado", "faturado", "pronto_envio", "enviado", "entregue", "preparando_envio"]
 
 export const processMarketplaceWebhook = async (body) => {
 	const { tipo, dados, pedido } = body
@@ -222,16 +59,14 @@ export const processMarketplaceWebhook = async (body) => {
 		return { status: "ignored", message: "Pedido não aprovado" }
 	}
 
-	if (tipo === "atualizacao_pedido") {
-		const { nomeEcommerce, cliente } = dados
-		const isClientFullEstoque =
-      cliente.nome.toUpperCase().includes("FULL") ||
-      cliente.nome.toUpperCase().includes("ESTOQUE")
-		const { marcadores } = pedido
+	if(tipo === "atualizacao_pedido") {
+		const { id, nomeEcommerce, cliente } = dados
+		const isClientFullEstoque = cliente.nome.toUpperCase().includes("FULL") || cliente.nome.toUpperCase().includes("ESTOQUE")
+		const { marcadores } = await getOrderDetails(id)
 		const isIntegradaES = marcadores.some((marcador) => marcador.marcador.descricao.toLowerCase() === "integradaes")
 
-		if (isIntegradaES) {
-			const result = await updateOrderNuvemshop(dados, pedido)
+		if(isIntegradaES) {
+			const result = await updateOrderNuvemshop(dados)
 			return result
 		}
 
@@ -245,8 +80,7 @@ export const processMarketplaceWebhook = async (body) => {
 		}
 
 		try {
-			await processUpdateOrderGSheets(dados)
-			const result = await processUpdateOrder(dados, pedido)
+			const result = await processUpdateOrder(dados)
 			return result
 		} catch (error) {
 			logWebhookMarketplace(`${error.message}. Pedido ${dados.id}: `)
@@ -326,9 +160,9 @@ export const processEcommerceWebhook = async (body) => {
 		}
 	}
 
-	if (tipo === "atualizacao_pedido" && status === "faturado") {
-		const orderDetails = pedido
-		const pedidosExistentes = await GETtiny.ABSTRACT("pedidos.pesquisa.php", {
+	if(tipo === "atualizacao_pedido" && status === "faturado") {
+		const orderDetails = await getOrderDetailsES(dados.id)
+		const pedidosExistentes = await GETtiny.ABSTRACT("pedidos.pesquisa.php", { 
 			dataInicialOcorrencia: dados.data,
 			cliente: dados.cliente.nome,
 			cpf_cnpj: dados.cliente.cpfCnpj
@@ -361,9 +195,9 @@ export const processEcommerceWebhook = async (body) => {
 	}
 }
 
-export const updateOrderNuvemshop = async (dados, pedido) => {
-	const orderDetailsABSTRACT = pedido
-	const { id } = await GETtiny.ES("pedidos.pesquisa.php", {
+export const updateOrderNuvemshop = async (dados) => {
+	const orderDetailsABSTRACT = await getOrderDetails(dados.id)
+	const { id } = await GETtiny.ES("pedidos.pesquisa.php", { 
 		dataInicialOcorrencia: dados.data,
 		idPedidoEcommerce: dados.idPedidoEcommerce,
 		// cliente: dados.cliente.nome,
