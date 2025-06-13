@@ -102,6 +102,9 @@ export async function processUpdateOrderGSheets(dados) {
 					historicoAnterior ? "\n" + historicoAnterior : ""
 				}`
 
+				// Adiciona delay antes de cada atualização
+				await delay(1000)
+
 				// Atualiza as colunas diretamente na aba de origem
 				await sheets.spreadsheets.values.update({
 					spreadsheetId: sheetId,
