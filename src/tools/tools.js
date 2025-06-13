@@ -21,3 +21,8 @@ export async function getSheetIdByName(sheets, spreadsheetId, sheetName) {
 	const sheet = metadata.data.sheets.find((s) => s.properties.title === sheetName)
 	return sheet?.properties.sheetId
 }
+
+// Função para criar um delay entre as requisições
+export function delay(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms))
+}

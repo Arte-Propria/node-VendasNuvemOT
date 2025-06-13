@@ -11,7 +11,7 @@ import { getProductDetails } from "../utils/tiny.js"
 import { google } from "googleapis"
 import { JWT } from "google-auth-library"
 import { config } from "../config/env.js"
-import { getSheetIdByName } from "../tools/tools.js"
+import { delay, getSheetIdByName } from "../tools/tools.js"
 
 const marketplaceNames = [
 	"Shopee",
@@ -75,6 +75,9 @@ export async function processUpdateOrderGSheets(dados) {
 	const sheetId = config.googleIdGSheets
 
 	for (const nomeAba of ABAS_ORIGEM) {
+		// Adiciona delay antes de cada nova requisição
+		await delay(1000) // 1 segundo de delay entre requisições
+
 		const res = await sheets.spreadsheets.values.get({
 			spreadsheetId: sheetId,
 			range: `${nomeAba}!A2:AF`
@@ -107,12 +110,16 @@ export async function processUpdateOrderGSheets(dados) {
 					requestBody: { values: [[novaSituacao]] }
 				})
 
+				await delay(500)
+
 				await sheets.spreadsheets.values.update({
 					spreadsheetId: sheetId,
 					range: `${nomeAba}!U${linhaIndex}:U${linhaIndex}`,
 					valueInputOption: "RAW",
 					requestBody: { values: [[idNotaFiscal]] }
 				})
+
+				await delay(500)
 
 				await sheets.spreadsheets.values.update({
 					spreadsheetId: sheetId,
@@ -138,6 +145,8 @@ export async function processUpdateOrderGSheets(dados) {
 		if (linhasParaMover.length > 0 && ABA_DESTINOS[novaSituacao]) {
 			const destino = ABA_DESTINOS[novaSituacao]
 
+			await delay(500)
+
 			// Primeiro, remove todas as linhas da aba de origem (em ordem decrescente para não afetar os índices)
 			const sheetIdByName = await getSheetIdByName(sheets, sheetId, nomeAba)
 			const requests = linhasParaMover
@@ -162,6 +171,7 @@ export async function processUpdateOrderGSheets(dados) {
 
 			// Depois, adiciona todas as linhas à aba de destino
 			for (const { linhaAtualizada } of linhasParaMover) {
+				await delay(500)
 				await sheets.spreadsheets.values.append({
 					spreadsheetId: sheetId,
 					range: `${destino}!A1`,
