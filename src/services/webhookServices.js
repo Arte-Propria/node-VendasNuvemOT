@@ -113,7 +113,7 @@ export async function processUpdateOrderGSheets(dados) {
 					requestBody: { values: [[novaSituacao]] }
 				})
 
-				await delay(500)
+				await delay(1000)
 
 				await sheets.spreadsheets.values.update({
 					spreadsheetId: sheetId,
@@ -122,7 +122,7 @@ export async function processUpdateOrderGSheets(dados) {
 					requestBody: { values: [[idNotaFiscal]] }
 				})
 
-				await delay(500)
+				await delay(1000)
 
 				await sheets.spreadsheets.values.update({
 					spreadsheetId: sheetId,
@@ -148,7 +148,7 @@ export async function processUpdateOrderGSheets(dados) {
 		if (linhasParaMover.length > 0 && ABA_DESTINOS[novaSituacao]) {
 			const destino = ABA_DESTINOS[novaSituacao]
 
-			await delay(500)
+			await delay(1000)
 
 			// Primeiro, remove todas as linhas da aba de origem (em ordem decrescente para não afetar os índices)
 			const sheetIdByName = await getSheetIdByName(sheets, sheetId, nomeAba)
@@ -174,7 +174,7 @@ export async function processUpdateOrderGSheets(dados) {
 
 			// Depois, adiciona todas as linhas à aba de destino
 			for (const { linhaAtualizada } of linhasParaMover) {
-				await delay(500)
+				await delay(1000)
 				await sheets.spreadsheets.values.append({
 					spreadsheetId: sheetId,
 					range: `${destino}!A1`,
