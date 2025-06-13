@@ -200,7 +200,7 @@ export const processMarketplaceWebhook = async (body) => {
 
 		// Verificar se o pedido é de um marketplace configurado ou se o cliente é FULL/ESTOQUE
 		if (!marketplaceNames.includes(nomeEcommerce) && !isClientFullEstoque) {
-			logWebhookMarketplace(`Pedido não pertence aos marketplaces configurados e não é um pedido FULL/ESTOQUE, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}, cliente: ${cliente.nome}`)
+			logWebhookMarketplace(`Pedido não pertence aos marketplaces configurados e cliente não é FULL/ESTOQUE, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}, cliente: ${cliente.nome}`)
 			return {
 				status: "ignored",
 				message:
@@ -246,11 +246,14 @@ export const processMarketplaceWebhook = async (body) => {
 		}
 
 		try {
+			console.log("Dados recebidos no webhook:", JSON.stringify(dados, null, 2))
+			console.log("Pedido recebido no webhook:", JSON.stringify(pedido, null, 2))
 			await processUpdateOrderGSheets(dados)
 			const result = await processUpdateOrder(dados, pedido)
 			return result
 		} catch (error) {
-			logWebhookMarketplace(`${error.message}. Pedido ${dados.id}: `)
+			console.error("Erro detalhado:", error)
+			logWebhookMarketplace(`Erro ao processar webhook: ${error.message}. Pedido ${dados.id}: ${error.stack}`)
 			return { status: "error", message: error.message }
 		}
 	}
