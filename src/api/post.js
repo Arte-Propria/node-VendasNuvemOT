@@ -132,11 +132,11 @@ export const POSTwebhook = async (webhookUrl, body) => {
 		})
 			
 		if (!response.ok) {
-			throw new Error(`Erro ao enviar webhook para AppsScripts ${response.statusText}`)
+			throw new Error(`Erro ao enviar webhook para AppsScripts. Pedido: ${body.dados.id} ${response.statusText}`)
 		}
 			
-		logPCP("Webhook enviado com sucesso para AppsScripts")
+		logPCP(`Webhook enviado com sucesso para AppsScripts. Pedido: ${body.dados.id}`)
 	} catch (error) {
-		logPCP(`Erro ao enviar webhook para AppsScripts: ${error.message}`)
+		logPCP(`Erro ao enviar webhook para AppsScripts. Pedido: ${body.dados.id} ${error.message}`)
 	}
 }
