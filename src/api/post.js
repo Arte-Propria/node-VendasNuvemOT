@@ -122,9 +122,9 @@ export const POSTtinyABSTRACT = async (endpoint, data) => {
 }
 
 export const POSTwebhook = async (webhookUrls, body) => {
-	await Promise.all(webhookUrls.map(async (url) => {
+	await Promise.all(webhookUrls.map(async (webhook) => {
 		try {
-			const response = await fetch(url, {
+			const response = await fetch(webhook.url, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json"
@@ -133,12 +133,12 @@ export const POSTwebhook = async (webhookUrls, body) => {
 			})
 			
 			if (!response.ok) {
-				throw new Error(`Erro ao enviar para ${url}: ${response.statusText}`)
+				throw new Error(`Erro ao enviar para ${webhook.url}: ${response.statusText}`)
 			}
 			
-			logPCP(`Webhook enviado com sucesso para ${url}`)
+			logPCP(`Webhook enviado com sucesso para ${webhook.conta}`)
 		} catch (error) {
-			logPCP(`Erro ao enviar webhook para ${url}: ${error.message}`)
+			logPCP(`Erro ao enviar webhook para ${webhook.url}: ${error.message}`)
 		}
 	}))
 }

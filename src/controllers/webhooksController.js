@@ -2,7 +2,7 @@
 import { POSTwebhook } from "../api/post.js"
 import { fetchOrder, insertOrderWebhook } from "../services/orderServicesNuvem.js"
 import { processEcommerceWebhook, processMarketplaceWebhook } from "../services/webhookServices.js"
-import { logEcommerce, logWebhook } from "../utils/logger.js"
+import { logEcommerce } from "../utils/logger.js"
 
 export const createdOrderWebhook = async  (req, res) => {
 	try {
@@ -39,9 +39,18 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		const result = await processMarketplaceWebhook(body)
 
 		const webhookUrls = [
-			"https://script.google.com/macros/s/AKfycbwWNxCO5x4jvaBgD-EdPdPuE8Q9XwaVmc_3_j-yXpI5yrYHyHslfvRRlNC7j7bJ8fZC/exec",
-			"https://script.google.com/macros/s/AKfycbxeTkb1R3AbfLNK_bmXFhKCeRgohpqLmzj3xsCTD1dw7TyFQsyVaqQNMC5d7sfuWzvN/exec",
-			"https://script.google.com/macros/s/AKfycbwstQhSuHCXXQ2_M5K6elVaDlkAwA6pfFuPk69SdCTqN5BVG9T6LSuqzpSLJi25r9-2/exec"
+			{
+				url: "https://script.google.com/macros/s/AKfycbwWNxCO5x4jvaBgD-EdPdPuE8Q9XwaVmc_3_j-yXpI5yrYHyHslfvRRlNC7j7bJ8fZC/exec",
+				conta: "Abstract"
+			},
+			{
+				url: "https://script.google.com/macros/s/AKfycbxeTkb1R3AbfLNK_bmXFhKCeRgohpqLmzj3xsCTD1dw7TyFQsyVaqQNMC5d7sfuWzvN/exec",
+				conta: "Integrada"
+			},
+			{
+				url: "https://script.google.com/macros/s/AKfycbwstQhSuHCXXQ2_M5K6elVaDlkAwA6pfFuPk69SdCTqN5BVG9T6LSuqzpSLJi25r9-2/exec",
+				conta: "Basel"
+			}
 		]
 
 		if(body.tipo === "atualizacao_pedido") {
