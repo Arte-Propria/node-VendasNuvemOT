@@ -7,7 +7,7 @@ import {
 	logPCP,
 	logWebhookMarketplace
 } from "../utils/logger.js"
-import { getProductDetails } from "../utils/tiny.js"
+import { getOrderDetailsES, getProductDetails } from "../utils/tiny.js"
 import { google } from "googleapis"
 import { JWT } from "google-auth-library"
 import { config } from "../config/env.js"
@@ -322,7 +322,7 @@ async function processUpdateOrder(dados, pedido) {
 }
 
 export const processEcommerceWebhook = async (body) => {
-	const { tipo, dados, pedido: pedidoRequest } = body
+	const { tipo, dados } = body
 	const { codigoSituacao: status } = dados
 
 	if (tipo === "inclusao_pedido") {
@@ -340,14 +340,12 @@ export const processEcommerceWebhook = async (body) => {
 	}
 
 	if (tipo === "atualizacao_pedido" && status === "faturado") {
-		const orderDetails = pedidoRequest
+		const orderDetails = await getOrderDetailsES(dados.id)
 		const pedidosExistentes = await GETtiny.ABSTRACT("pedidos.pesquisa.php", {
 			dataInicialOcorrencia: dados.data,
 			cliente: dados.cliente.nome,
 			cpf_cnpj: dados.cliente.cpfCnpj
 		})
-
-		console.log("pedidoRequest", pedidoRequest)
 
 		const { number: numberOrderRetry } = await GETNuvemOrder(dados.idPedidoEcommerce)
 		const isPedidoExistente = pedidosExistentes.some((pedido) => pedido.pedido.numero_ecommerce === numberOrderRetry.toString())
