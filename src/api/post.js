@@ -121,24 +121,22 @@ export const POSTtinyABSTRACT = async (endpoint, data) => {
 	}
 }
 
-export const POSTwebhook = async (webhookUrls, body) => {
-	await Promise.all(webhookUrls.map(async (webhook) => {
-		try {
-			const response = await fetch(webhook.url, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json"
-				},
-				body: JSON.stringify(body)
-			})
+export const POSTwebhook = async (webhookUrl, body) => {
+	try {
+		const response = await fetch(webhookUrl, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json"
+			},
+			body: JSON.stringify(body)
+		})
 			
-			if (!response.ok) {
-				throw new Error(`Erro ao enviar para ${webhook.url}: ${response.statusText}`)
-			}
-			
-			logPCP(`Webhook enviado com sucesso para ${webhook.conta}`)
-		} catch (error) {
-			logPCP(`Erro ao enviar webhook para ${webhook.url}: ${error.message}`)
+		if (!response.ok) {
+			throw new Error(`Erro ao enviar webhook para AppsScripts ${response.statusText}`)
 		}
-	}))
+			
+		logPCP("Webhook enviado com sucesso para AppsScripts")
+	} catch (error) {
+		logPCP(`Erro ao enviar webhook para AppsScripts: ${error.message}`)
+	}
 }
