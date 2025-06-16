@@ -38,6 +38,16 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
 
+		const webhookUrls = [
+			"https://script.google.com/macros/s/AKfycbwWNxCO5x4jvaBgD-EdPdPuE8Q9XwaVmc_3_j-yXpI5yrYHyHslfvRRlNC7j7bJ8fZC/exec",
+			"https://script.google.com/macros/s/AKfycbxeTkb1R3AbfLNK_bmXFhKCeRgohpqLmzj3xsCTD1dw7TyFQsyVaqQNMC5d7sfuWzvN/exec",
+			"https://script.google.com/macros/s/AKfycbwstQhSuHCXXQ2_M5K6elVaDlkAwA6pfFuPk69SdCTqN5BVG9T6LSuqzpSLJi25r9-2/exec"
+		]
+
+		if(body.tipo === "atualizacao_pedido") {
+			await POSTwebhook(webhookUrls, body)
+		}
+
 		res.status(200).send(result)
 	} catch (error) {
 		// logWebhook(`Erro ao processar o webhook: ${error}`)
@@ -51,16 +61,6 @@ export const createOrderEcommerceWebhook = async (req, res) => {
 
 		const { message } = await processEcommerceWebhook(body)
 
-		const webhookUrls = [
-			"https://script.google.com/macros/s/AKfycbwWNxCO5x4jvaBgD-EdPdPuE8Q9XwaVmc_3_j-yXpI5yrYHyHslfvRRlNC7j7bJ8fZC/exec",
-			"https://script.google.com/macros/s/AKfycbxeTkb1R3AbfLNK_bmXFhKCeRgohpqLmzj3xsCTD1dw7TyFQsyVaqQNMC5d7sfuWzvN/exec",
-			"https://script.google.com/macros/s/AKfycbwstQhSuHCXXQ2_M5K6elVaDlkAwA6pfFuPk69SdCTqN5BVG9T6LSuqzpSLJi25r9-2/exec"
-		]
-
-		if(body.tipo === "atualizacao_pedido") {
-			await POSTwebhook(webhookUrls, body)
-		}
-		
 		logEcommerce(message)
 		res.sendStatus(200)
 	} catch (error) {
