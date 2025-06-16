@@ -102,9 +102,6 @@ export async function processUpdateOrderGSheets(dados) {
 					historicoAnterior ? "\n" + historicoAnterior : ""
 				}`
 
-				// Adiciona delay antes de cada atualização
-				await delay(1000)
-
 				// Atualiza as colunas diretamente na aba de origem
 				await sheets.spreadsheets.values.update({
 					spreadsheetId: sheetId,
@@ -113,7 +110,6 @@ export async function processUpdateOrderGSheets(dados) {
 					requestBody: { values: [[novaSituacao]] }
 				})
 
-				await delay(1000)
 
 				await sheets.spreadsheets.values.update({
 					spreadsheetId: sheetId,
@@ -121,8 +117,6 @@ export async function processUpdateOrderGSheets(dados) {
 					valueInputOption: "RAW",
 					requestBody: { values: [[idNotaFiscal]] }
 				})
-
-				await delay(1000)
 
 				await sheets.spreadsheets.values.update({
 					spreadsheetId: sheetId,
@@ -148,8 +142,6 @@ export async function processUpdateOrderGSheets(dados) {
 		if (linhasParaMover.length > 0 && ABA_DESTINOS[novaSituacao]) {
 			const destino = ABA_DESTINOS[novaSituacao]
 
-			await delay(1000)
-
 			// Primeiro, remove todas as linhas da aba de origem (em ordem decrescente para não afetar os índices)
 			const sheetIdByName = await getSheetIdByName(sheets, sheetId, nomeAba)
 			const requests = linhasParaMover
@@ -174,7 +166,6 @@ export async function processUpdateOrderGSheets(dados) {
 
 			// Depois, adiciona todas as linhas à aba de destino
 			for (const { linhaAtualizada } of linhasParaMover) {
-				await delay(1000)
 				await sheets.spreadsheets.values.append({
 					spreadsheetId: sheetId,
 					range: `${destino}!A1`,
@@ -258,7 +249,7 @@ export const processMarketplaceWebhook = async (body) => {
 		}
 
 		try {
-			await processUpdateOrderGSheets(dados)
+			// await processUpdateOrderGSheets(dados)
 			const result = await processUpdateOrder(dados, pedido)
 			return result
 		} catch (error) {
