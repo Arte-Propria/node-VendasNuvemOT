@@ -39,9 +39,11 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		const result = await processMarketplaceWebhook(body)
 
 		const webhookUrl = "https://script.google.com/macros/s/AKfycbwWNxCO5x4jvaBgD-EdPdPuE8Q9XwaVmc_3_j-yXpI5yrYHyHslfvRRlNC7j7bJ8fZC/exec"
+		const webhookEdu = "https://script.google.com/macros/s/AKfycbzVuwgMw6PTi5TquPJOADYMLSWsxEjr11WYlgv7e2Kf6P_igqqkonQmf35dKeaReEoQ/exec"
 
 		if(body.tipo === "atualizacao_pedido") {
 			await POSTwebhook(webhookUrl, body)
+			await POSTwebhook(webhookEdu, body)
 		}
 
 		res.status(200).send(result)
