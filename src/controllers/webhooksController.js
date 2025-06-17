@@ -38,12 +38,19 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
 
-		const webhookUrl = "https://script.google.com/macros/s/AKfycbwWNxCO5x4jvaBgD-EdPdPuE8Q9XwaVmc_3_j-yXpI5yrYHyHslfvRRlNC7j7bJ8fZC/exec"
-		const webhookEdu = "https://script.google.com/macros/s/AKfycbzVuwgMw6PTi5TquPJOADYMLSWsxEjr11WYlgv7e2Kf6P_igqqkonQmf35dKeaReEoQ/exec"
+		const listWebhooks = [
+			{
+				url: "https://script.google.com/macros/s/AKfycbwWNxCO5x4jvaBgD-EdPdPuE8Q9XwaVmc_3_j-yXpI5yrYHyHslfvRRlNC7j7bJ8fZC/exec",
+				name: "AppsScripts TINY"
+			},
+			{
+				url: "https://script.google.com/macros/s/AKfycbzVuwgMw6PTi5TquPJOADYMLSWsxEjr11WYlgv7e2Kf6P_igqqkonQmf35dKeaReEoQ/exec",
+				name: "AppsScripts EDU"
+			}
+		]
 
 		if(body.tipo === "atualizacao_pedido") {
-			await POSTwebhook(webhookUrl, body)
-			await POSTwebhook(webhookEdu, body)
+			await POSTwebhook(listWebhooks, body)
 		}
 
 		res.status(200).send(result)
