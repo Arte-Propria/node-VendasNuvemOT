@@ -3,7 +3,7 @@ import dotenv from "dotenv"
 
 dotenv.config()
 
-const token = process.env.TINY_API_TOKEN
+const token = process.env.TINY_API_TOKEN_ARTEINTEGRADAES
 const tokenAbstract = process.env.TINY_API_TOKEN_ABSTRACT
 const baseUrl = process.env.TINY_API_URL
 

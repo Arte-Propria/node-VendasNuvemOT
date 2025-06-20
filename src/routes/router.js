@@ -63,6 +63,9 @@ router.get("/creatives/tiktok/:store/:createdAtMin/:createdAtMax", getTikTokCrea
 router.get("/shopee/auth", getShopeeAuth)
 router.get("/shopee/auth/callback", handleShopeeCallback)
 
+// Autenticação Shein
+// router.get("/shein/auth/callback", getSheinAuth)
+
 // Rota para criar pedidos
 router.post("/order/:store", createOrder) // Adicione a rota para criar um novo pedido
 
