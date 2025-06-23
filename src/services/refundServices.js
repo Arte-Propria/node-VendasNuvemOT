@@ -1,7 +1,7 @@
 import { query } from '../db/db.js';
 
 export const fetchRefunds = async (params) => {
-  const { store, createdAtMin, createdAtMax } = params;
+  const { store, createdAtMin, createdAtMax, refundType } = params;
 
   let queryString = `SELECT * FROM reembolsos_${store} WHERE deleted = false`;
 
@@ -15,6 +15,12 @@ export const fetchRefunds = async (params) => {
   if (createdAtMax) {
     queryString += ` AND DATE(created_at) <= $${queryParams.length + 1}`;
     queryParams.push(new Date(createdAtMax).toISOString().split('T')[0]);
+  }
+
+  // Filtro por tipo de reembolso
+  if (refundType) {
+    queryString += ` AND type = $${queryParams.length + 1}`;
+    queryParams.push(refundType);
   }
 
   queryString += ' ORDER BY created_at DESC';
@@ -39,7 +45,7 @@ export const insertRefund = async (refundData, store) => {
     category,
     total,
     created_at,
-    type,
+    type
   ]);
   return result.rows[0];
 };

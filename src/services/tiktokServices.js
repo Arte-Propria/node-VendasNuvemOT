@@ -94,7 +94,6 @@ const splitDateRange = (startDate, endDate) => {
 
 // 3. Main function to fetch TikTok ads data
 export const fetchTiktokAds = async (store, createdAtMin, createdAtMax) => {
-  
 	try {
 		// Split date range into 30-day chunks if needed
 		const dateRanges = splitDateRange(createdAtMin, createdAtMax)

@@ -74,7 +74,7 @@ router.get("/tiny/order/:id/:cpf", getOrderTiny)
 router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
 
 // Rotas de reembolsos
-router.get("/refunds/:store/:createdAtMin/:createdAtMax", getRefunds)
+router.get("/refunds/:store/:refundType/:createdAtMin/:createdAtMax", getRefunds)
 router.post("/refunds/:store", createRefund)
 router.delete("/refunds/:store/:id", deleteRefund)
 
