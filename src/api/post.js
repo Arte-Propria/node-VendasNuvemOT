@@ -3,7 +3,7 @@
 
 import axios from "axios"
 import { config } from "../config/env.js"
-import { logEcommerce } from "../utils/logger.js"
+import { logEcommerce, logPCP } from "../utils/logger.js"
 
 export const POSTtinyES = async (endpoint, data) => {
 	const { id, numero, numero_ecommerce, cliente, ecommerce, id_nota_fiscal, ...dataPedido } = data
@@ -118,5 +118,29 @@ export const POSTtinyABSTRACT = async (endpoint, data) => {
 		console.error("Stacktrace:", error.stack)
 		console.error("Error:", error)
 		throw new Error(`Erro na requisição à API Tiny: ${error.message}`)
+	}
+}
+
+export const POSTwebhook = async (webhookUrls, body) => {
+	try {
+		await Promise.all(webhookUrls.map(async ({url, name}) => {
+			const response = await fetch(url, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json"
+				},
+				body: JSON.stringify(body)
+			})
+			
+			if (!response.ok) {
+				logPCP(`Erro ao enviar webhook para ${name}. Pedido: ${body.dados.id}`)
+				throw new Error(`Falha no webhook ${name}`)
+			}
+			
+			logPCP(`Webhook enviado com sucesso para ${name}. Pedido: ${body.dados.id}`)
+		}))
+	} catch (error) {
+		logPCP(`Erro ao processar webhooks. Pedido: ${body.dados.id}`)
+		throw error
 	}
 }

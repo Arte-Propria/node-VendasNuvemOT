@@ -1,7 +1,8 @@
 /* eslint-disable camelcase */
+import { POSTwebhook } from "../api/post.js"
 import { fetchOrder, insertOrderWebhook } from "../services/orderServicesNuvem.js"
 import { processEcommerceWebhook, processMarketplaceWebhook } from "../services/webhookServices.js"
-import { logEcommerce, logWebhook } from "../utils/logger.js"
+import { logEcommerce } from "../utils/logger.js"
 
 export const createdOrderWebhook = async  (req, res) => {
 	try {
@@ -37,6 +38,21 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
 
+		const listWebhooks = [
+			{
+				url: "https://script.google.com/macros/s/AKfycbwWNxCO5x4jvaBgD-EdPdPuE8Q9XwaVmc_3_j-yXpI5yrYHyHslfvRRlNC7j7bJ8fZC/exec",
+				name: "AppsScripts TINY"
+			},
+			{
+				url: "https://script.google.com/macros/s/AKfycbzVuwgMw6PTi5TquPJOADYMLSWsxEjr11WYlgv7e2Kf6P_igqqkonQmf35dKeaReEoQ/exec",
+				name: "AppsScripts EDU"
+			}
+		]
+
+		if(body.tipo === "atualizacao_pedido") {
+			await POSTwebhook(listWebhooks, body)
+		}
+
 		res.status(200).send(result)
 	} catch (error) {
 		// logWebhook(`Erro ao processar o webhook: ${error}`)
@@ -49,6 +65,7 @@ export const createOrderEcommerceWebhook = async (req, res) => {
 		const { body } = req
 
 		const { message } = await processEcommerceWebhook(body)
+
 		logEcommerce(message)
 		res.sendStatus(200)
 	} catch (error) {

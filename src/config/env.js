@@ -13,5 +13,11 @@ export const config = {
 	accessTokenOutlet: process.env.ACCESS_TOKEN_OUTLET,
 	accessTokenArtePropria: process.env.ACCESS_TOKEN_ARTEPROPRIA,
 	storeIdOutlet: process.env.STORE_ID_OUTLET,
-	storeIdArtePropria: process.env.STORE_ID_ARTEPROPRIA
+	storeIdArtePropria: process.env.STORE_ID_ARTEPROPRIA,
+	googleClientEmail: process.env.GOOGLE_CLIENT_EMAIL_GSHEETS,
+	googlePrivateKey: process.env.GOOGLE_PRIVATE_KEY_GSHEETS,
+	googleIdGSheets: process.env.GOOGLE_ID_GSHEETS,
+	shopeePartnerId: process.env.SHOPEE_PARTNER_ID,
+	shopeePartnerKey: process.env.SHOPEE_PARTNER_KEY,
+	shopeeRedirectUri: process.env.SHOPEE_REDIRECT_URI
 }

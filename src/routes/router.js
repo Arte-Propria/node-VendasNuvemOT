@@ -15,6 +15,7 @@ import { getNoteOrderTiny, getOrderTiny } from "../controllers/orderTinyControll
 import { getRefunds, createRefund, deleteRefund } from "../controllers/refundsControllers.js"
 import { getTikTokAuth, getTikTokAds, getTikTokCreatives } from "../controllers/tiktokControllers.js"
 import { getOrdersAllMarketplace, getOrdersAllMarketplaceOptimized, getOrdersByMarketplace } from "../controllers/marketplaceControllers.js"
+import { getShopeeAuth, handleShopeeCallback } from "../controllers/shopeeControllers.js"
 
 const router = express.Router()
 
@@ -57,6 +58,13 @@ router.get("/analytics/:store/:createdAtMin/:createdAtMax", getAnalytics)
 router.get("/tiktok/auth", getTikTokAuth)
 router.get("/ads/tiktok/:store/:createdAtMin/:createdAtMax", getTikTokAds)
 router.get("/creatives/tiktok/:store/:createdAtMin/:createdAtMax", getTikTokCreatives)
+
+// Autenticação Shopee
+router.get("/shopee/auth", getShopeeAuth)
+router.get("/shopee/auth/callback", handleShopeeCallback)
+
+// Autenticação Shein
+// router.get("/shein/auth/callback", getSheinAuth)
 
 // Rota para criar pedidos
 router.post("/order/:store", createOrder) // Adicione a rota para criar um novo pedido
