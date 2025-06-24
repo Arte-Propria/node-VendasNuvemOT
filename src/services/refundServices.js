@@ -45,7 +45,7 @@ export const insertRefund = async (refundData, store) => {
     category,
     total,
     created_at,
-    type,
+    type
   ]);
   return result.rows[0];
 };
