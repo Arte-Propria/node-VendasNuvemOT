@@ -19,5 +19,8 @@ export const config = {
 	googleIdGSheets: process.env.GOOGLE_ID_GSHEETS,
 	shopeePartnerId: process.env.SHOPEE_PARTNER_ID,
 	shopeePartnerKey: process.env.SHOPEE_PARTNER_KEY,
-	shopeeRedirectUri: process.env.SHOPEE_REDIRECT_URI
+	shopeeRedirectUri: process.env.SHOPEE_REDIRECT_URI,
+	sheinClientId: process.env.SHEIN_APP_ID,
+	sheinClientSecret: process.env.SHEIN_SECRET_KEY,
+	sheinRedirectUri: process.env.SHEIN_REDIRECT_URI
 }
