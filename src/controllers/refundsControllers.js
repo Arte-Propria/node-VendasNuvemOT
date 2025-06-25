@@ -2,8 +2,8 @@ import { fetchRefunds, insertRefund, deleteRefundById } from "../services/refund
 
 export const getRefunds = async (req, res) => {
 	try {
-		const { store, createdAtMin, createdAtMax } = req.params
-		const refunds = await fetchRefunds({ store, createdAtMin, createdAtMax })
+		const { store, createdAtMin, createdAtMax, refundType } = req.params
+		const refunds = await fetchRefunds({ store, createdAtMin, createdAtMax, refundType })
 		res.json(refunds)
 	} catch (error) {
 		res.status(500).json({ message: "Erro ao buscar reembolsos", error: error.message })
