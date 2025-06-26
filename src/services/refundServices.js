@@ -1,7 +1,7 @@
-import { query } from '../db/db.js'
+import { query } from '../db/db.js';
 
 export const fetchRefunds = async (params) => {
-  const { store, createdAtMin, createdAtMax, refundType } = params
+  const { store, createdAtMin, createdAtMax, refundType } = params;
 
   let queryString = `SELECT * FROM reembolsos_${store} WHERE deleted = false`;
 
@@ -31,7 +31,8 @@ export const fetchRefunds = async (params) => {
 
 export const insertRefund = async (refundData, store) => {
   // eslint-disable-next-line camelcase
-  const { order_id, category, total, created_at, type } = refundData;
+  const { order_id, category, total, created_at, type, type_refund } =
+    refundData;
 
   const queryString = `
         INSERT INTO reembolsos_${store} (order_id, category, total, created_at, type, type_refund)
@@ -45,7 +46,8 @@ export const insertRefund = async (refundData, store) => {
     category,
     total,
     created_at,
-    type
+    type,
+    type_refund,
   ]);
   return result.rows[0];
 };
