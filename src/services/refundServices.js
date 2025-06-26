@@ -31,11 +31,12 @@ export const fetchRefunds = async (params) => {
 
 export const insertRefund = async (refundData, store) => {
   // eslint-disable-next-line camelcase
-  const { order_id, category, total, created_at, type } = refundData;
+  const { order_id, category, total, created_at, type, type_refund } =
+    refundData;
 
   const queryString = `
-        INSERT INTO reembolsos_${store} (order_id, category, total, created_at, type)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO reembolsos_${store} (order_id, category, total, created_at, type, type_refund)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
     `;
 
@@ -45,7 +46,8 @@ export const insertRefund = async (refundData, store) => {
     category,
     total,
     created_at,
-    type
+    type,
+    type_refund,
   ]);
   return result.rows[0];
 };
