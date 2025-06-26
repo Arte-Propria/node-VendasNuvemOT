@@ -16,7 +16,15 @@ import { getRefunds, createRefund, deleteRefund } from "../controllers/refundsCo
 import { getTikTokAuth, getTikTokAds, getTikTokCreatives } from "../controllers/tiktokControllers.js"
 import { getOrdersAllMarketplace, getOrdersAllMarketplaceOptimized, getOrdersByMarketplace } from "../controllers/marketplaceControllers.js"
 import { getShopeeAuth, handleShopeeCallback } from "../controllers/shopeeControllers.js"
-import { getSheinAuth, handleSheinCallback } from "../controllers/sheinControllers.js"
+import { 
+	getSheinAuth, 
+	handleSheinCallback,
+	getSheinProductsController,
+	getSheinProductController,
+	getSheinOrdersController,
+	getSheinOrderController,
+	updateSheinOrderStatusController
+} from "../controllers/sheinControllers.js"
 
 const router = express.Router()
 
@@ -67,6 +75,13 @@ router.get("/shopee/auth/callback", handleShopeeCallback)
 // Autenticação Shein
 router.get("/shein/auth", getSheinAuth)
 router.get("/shein/auth/callback", handleSheinCallback)
+
+// Rotas da API da SHEIN
+router.get("/shein/products", getSheinProductsController)
+router.get("/shein/product/:productId", getSheinProductController)
+router.get("/shein/orders", getSheinOrdersController)
+router.get("/shein/order/:orderId", getSheinOrderController)
+router.put("/shein/order/:orderId/status", updateSheinOrderStatusController)
 
 // Rota para criar pedidos
 router.post("/order/:store", createOrder) // Adicione a rota para criar um novo pedido

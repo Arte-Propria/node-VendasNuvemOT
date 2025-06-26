@@ -123,5 +123,27 @@ const createTableRefund = async () => {
 		console.error("Erro ao criar tabela", err)
 	}
 }
-  
-createTableRefund().then(() => process.exit())
+
+const createTableSheinTokens = async () => {
+	const queryText = `
+		CREATE TABLE shein_tokens (
+			id SERIAL PRIMARY KEY,
+			access_token TEXT NOT NULL,
+			refresh_token TEXT NOT NULL,
+			expires_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+			scope TEXT,
+			created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		);
+	`
+	
+	try {
+		await query(queryText)
+		console.log("Tabela shein_tokens criada com sucesso")
+	} catch (err) {
+		console.error("Erro ao criar tabela shein_tokens", err)
+	}
+}
+
+// createTableRefund().then(() => process.exit())
+createTableSheinTokens().then(() => process.exit())
