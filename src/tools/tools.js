@@ -26,3 +26,44 @@ export async function getSheetIdByName(sheets, spreadsheetId, sheetName) {
 export async function delay(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms))
 }
+
+// Função para gerar estado aleatório para segurança
+export function generateRandomState() {
+	return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+}
+
+// Função para gerar datas em intervalos de 5 dias
+export function generateDateRanges(daysBack) {
+	const ranges = []
+	const endDate = new Date()
+	const startDate = new Date()
+	startDate.setDate(startDate.getDate() - daysBack)
+	
+	let currentStart = new Date(startDate)
+	
+	while (currentStart < endDate) {
+		const currentEnd = new Date(currentStart)
+		currentEnd.setDate(currentEnd.getDate() + 3) // 3 dias (incluindo o dia inicial)
+		
+		if (currentEnd > endDate) {
+			currentEnd.setTime(endDate.getTime())
+		}
+		
+		// Formata as datas para dd/mm/yyyy
+		const formatDate = (date) => {
+			const day = date.getDate().toString().padStart(2, "0")
+			const month = (date.getMonth() + 1).toString().padStart(2, "0")
+			const year = date.getFullYear()
+			return `${day}/${month}/${year}`
+		}
+		
+		ranges.push({
+			dataInicial: formatDate(currentStart),
+			dataFinal: formatDate(currentEnd)
+		})
+		
+		currentStart.setDate(currentStart.getDate() + 5)
+	}
+	
+	return ranges
+}

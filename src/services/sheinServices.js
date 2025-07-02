@@ -1,6 +1,8 @@
 import axios from "axios"
 import { config } from "../config/env.js"
 import { query } from "../db/db.js"
+import { generateRandomState } from "../tools/tools.js"
+import CryptoJS from "crypto-js"
 
 // Função para gerar a URL de autorização inicial da SHEIN
 export const generateSheinAuthUrl = () => {
@@ -11,12 +13,35 @@ export const generateSheinAuthUrl = () => {
 	const appid = config.sheinClientId // AppID da aplicação no portal SHEIN
 	
 	// Parâmetro opcional - state personalizado para validação
-	const state = `AUTH-SHEIN-${Date.now()}` // Formato seguindo a documentação
+	
+	const state = `AUTH-SHEIN-${generateRandomState()}` // Formato seguindo a documentação
 	
 	// Montagem da URL seguindo exatamente o padrão da documentação
 	const url = `${baseUrl}?appid=${appid}&redirectUrl=${redirectUrl}&state=${state}`
 	
 	return url
+}
+
+
+function generateSheinSignature(
+	appid, secretKey, path, timestamp, randomKey
+) {
+	// Etapa 1: Montar dados da assinatura VALUE
+	const value = appid + "&" + timestamp + "&" + path
+    
+	// Etapa 2: Montar chave de assinatura KEY
+	const key = secretKey + randomKey
+    
+	// Etapa 3: Cálculo HMAC-SHA256 e conversão para hexadecimal
+	const hexSignature = CryptoJS.HmacSHA256(value, key).toString()
+    
+	// Etapa 4: Codificação Base64
+	const base64Signature = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(hexSignature))
+    
+	// Etapa 5: Anexar RandomKey
+	const finalSignature = randomKey + base64Signature
+    
+	return finalSignature
 }
 
 // Função para trocar o código por token de acesso
