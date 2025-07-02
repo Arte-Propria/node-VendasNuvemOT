@@ -21,3 +21,7 @@ export const logMarketplace = (message) => {
 export const logPCP = (message) => {
 	console.log(`PCP: ${message}`)
 }
+
+export const logDB = (message) => {
+	console.log(`DB: ${message}`)
+}

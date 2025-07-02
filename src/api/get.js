@@ -16,6 +16,18 @@ export const GETtinyES = async (endpoint, data) => {
 	return dataPedido.pedido
 }
 
+export const GETOrdersTinyINTEGRADA = async (endpoint, data) => {
+	const { pedidos } = await tinyApiRequestPaginated(endpoint, config.tinyApiTokenArteIntegrada, data)
+
+	return pedidos
+}
+
+export const GETOrdersTinyABSTRACT = async (endpoint, data) => {
+	const { pedidos } = await tinyApiRequestPaginated(endpoint, config.tinyApiToken, data)
+
+	return pedidos
+}
+
 export const GETtinyABSTRACT = async (endpoint, data) => {
 	const pedidos = await tinyApiRequest(endpoint, config.tinyApiToken, data)
 
@@ -27,6 +39,34 @@ export const GETtinyABSTRACT = async (endpoint, data) => {
 	}
 	
 	return pedidos
+}
+
+const tinyApiRequestPaginated = async (endpoint, token, data) => {
+	const url = `${config.tinyApiBaseUrl}/${endpoint}`
+	const baseParams = { token, formato: "json", ...data }
+	
+	const response = await axios.get(url, {
+		headers: { "Content-Type": "application/json" },
+		params: baseParams
+	})
+
+	const { numero_paginas, pedidos } = response.data.retorno
+	let pedidosAll = [...pedidos]
+
+	if(numero_paginas > 1) {
+		const paginasAdicionais = await Promise.all(Array.from({ length: numero_paginas - 1 }, (_, i) => i + 2)
+			.map((pagina) => 
+				axios.get(url, {
+					headers: { "Content-Type": "application/json" },
+					params: { ...baseParams, pagina }
+				})))
+		
+		paginasAdicionais.forEach((response) => {
+			pedidosAll.push(...response.data.retorno.pedidos)
+		})
+	}
+	
+	return { pedidos: pedidosAll }
 }
 
 const tinyApiRequest = async (endpoint, token, data) => {

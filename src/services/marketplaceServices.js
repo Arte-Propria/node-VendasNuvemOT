@@ -1,4 +1,7 @@
+import { GETOrdersTinyABSTRACT, GETOrdersTinyINTEGRADA } from "../api/get.js"
 import { query } from "../db/db.js"
+import { generateDateRanges } from "../tools/tools.js"
+import { logDB } from "../utils/logger.js"
 
 const marketplaceNames = {
 	"shopee": "Shopee",
@@ -114,5 +117,98 @@ export const fetchOrdersAllMarketplaceOptimized = async (createdAtMin, createdAt
 	}
 }
 
+export const fetchUpdateOrdersMarketplace = async (days) => {
+	try {
+		const dateRanges = generateDateRanges(days)
+		const endpoint = "pedidos.pesquisa.php"		
+		let orders = []
+		
+		// Processa cada intervalo de datas
+		for (const dateRange of dateRanges) {
+			logDB(`Processando intervalo: ${dateRange.dataInicial} até ${dateRange.dataFinal}`)
+			const data = {
+				...dateRange
+			}
+			const ordersIntegrada = await GETOrdersTinyINTEGRADA(endpoint, data)
+			const ordersAbstract = await GETOrdersTinyABSTRACT(endpoint, data)
+			const orders = [...ordersIntegrada, ...ordersAbstract]
+			logDB(`Encontrados ${orders.length} pedidos para atualização.`)
 
+			// Processa os pedidos de forma síncrona para evitar sobrecarga
+			for (const order of orders) {
+				const id = parseInt(order.pedido.id)
+				const orderDB = await query(`
+					SELECT id, situacao FROM pedidos_marketplace WHERE id = $1
+				`, [id])
 
+				if(orderDB.rows.length > 0) {
+					if(orderDB.rows[0].situacao !== order.pedido.situacao) {
+						await query(`
+							UPDATE pedidos_marketplace SET situacao = $1 WHERE id = $2
+						`, [order.pedido.situacao, id])
+						logDB(`Pedido ${order.pedido.id} atualizado com sucesso.`)
+					} else {
+						logDB(`Pedido ${order.pedido.id} já está atualizado.`)
+					}
+				} else {
+					logDB(`Pedido ${order.pedido.id} não encontrado no banco de dados.`)
+				}
+			}
+
+			orders.push(...orders)
+			
+			logDB(`Processado intervalo: ${dateRange.dataInicial} até ${dateRange.dataFinal}`)
+		}
+
+		return orders
+
+	} catch (error) {
+		console.error("Erro ao buscar pedidos para atualização:", error)
+		throw error
+	}
+}
+
+export const fetchUpdateOrdersMarketplaceByDate = async (createdAtMin, createdAtMax) => {
+	try {
+		const endpoint = "pedidos.pesquisa.php"		
+		const data = {
+			dataInicial: createdAtMin,
+			dataFinal: createdAtMax
+		}
+		
+		logDB(`Processando intervalo: ${createdAtMin} até ${createdAtMax}`)
+
+		const ordersIntegrada = await GETOrdersTinyINTEGRADA(endpoint, data)
+		const ordersAbstract = await GETOrdersTinyABSTRACT(endpoint, data)
+		const orders = [...ordersIntegrada, ...ordersAbstract]
+		logDB(`Encontrados ${orders.length} pedidos para atualização.`)
+
+		// Processa os pedidos de forma síncrona para evitar sobrecarga
+		for (const order of orders) {
+			const id = parseInt(order.pedido.id)
+			const orderDB = await query(`
+				SELECT id, situacao FROM pedidos_marketplace WHERE id = $1
+			`, [id])
+
+			if(orderDB.rows.length > 0) {
+				if(orderDB.rows[0].situacao !== order.pedido.situacao) {
+					await query(`
+						UPDATE pedidos_marketplace SET situacao = $1 WHERE id = $2
+					`, [order.pedido.situacao, id])
+					logDB(`Pedido ${order.pedido.id} atualizado com sucesso.`)
+				} else {
+					logDB(`Pedido ${order.pedido.id} já está atualizado.`)
+				}
+			} else {
+				logDB(`Pedido ${order.pedido.id} não encontrado no banco de dados.`)
+			}
+		}
+		
+		logDB(`Processado intervalo: ${createdAtMin} até ${createdAtMax}`)
+		return orders
+
+	} catch (error) {
+		console.error("Erro ao buscar pedidos para atualização:", error)
+		throw error
+	}
+}

@@ -14,7 +14,7 @@ import { createdOrderWebhook, createOrderEcommerceWebhook, createOrderMarketplac
 import { getNoteOrderTiny, getOrderTiny } from "../controllers/orderTinyController.js"
 import { getRefunds, createRefund, deleteRefund } from "../controllers/refundsControllers.js"
 import { getTikTokAuth, getTikTokAds, getTikTokCreatives } from "../controllers/tiktokControllers.js"
-import { getOrdersAllMarketplace, getOrdersAllMarketplaceOptimized, getOrdersByMarketplace } from "../controllers/marketplaceControllers.js"
+import { getOrdersAllMarketplace, getOrdersAllMarketplaceOptimized, getOrdersByMarketplace, updateOrdersMarketplace, updateOrdersMarketplaceByDate } from "../controllers/marketplaceControllers.js"
 import { getShopeeAuth, handleShopeeCallback } from "../controllers/shopeeControllers.js"
 import { 
 	getSheinAuth, 
@@ -97,6 +97,10 @@ router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
 // Rotas TINY
 router.get("/tiny/order/:id/:cpf", getOrderTiny)
 router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
+
+// Rota de atualização de pedidos de marketplaceno banco de dados
+router.get("/update-orders/marketplace", updateOrdersMarketplace)
+router.get("/update-orders/marketplace/:createdAtMin/:createdAtMax", updateOrdersMarketplaceByDate)
 
 // Rotas de reembolsos
 router.get("/refunds/:store/:refundType/:createdAtMin/:createdAtMax", getRefunds)
