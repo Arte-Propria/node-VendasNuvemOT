@@ -40,10 +40,6 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 
 		const listWebhooks = [
 			{
-				url: "https://script.google.com/macros/s/AKfycbwWNxCO5x4jvaBgD-EdPdPuE8Q9XwaVmc_3_j-yXpI5yrYHyHslfvRRlNC7j7bJ8fZC/exec",
-				name: "AppsScripts TINY"
-			},
-			{
 				url: "https://script.google.com/macros/s/AKfycbzVuwgMw6PTi5TquPJOADYMLSWsxEjr11WYlgv7e2Kf6P_igqqkonQmf35dKeaReEoQ/exec",
 				name: "AppsScripts EDU"
 			}
