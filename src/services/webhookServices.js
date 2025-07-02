@@ -383,7 +383,7 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 		}
 	}
 
-	console.log(order)
+	logEcommerce(`teste order nuvemshop: ${order}`)
 
 	const data = {
 		id,
