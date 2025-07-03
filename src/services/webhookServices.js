@@ -1,5 +1,5 @@
 /* eslint-disable camelcase */
-import { GETNuvemOrder } from "../api/get.js"
+import { GETNuvemOrder, GETNuvemOrderByNumberOrder } from "../api/get.js"
 import { GETtiny, POSTtiny, PUTtiny } from "../api/tiny.js"
 import { saveOrder, updateOrderStatus } from "../db/saveOrder.js"
 import {
@@ -12,6 +12,7 @@ import { google } from "googleapis"
 import { JWT } from "google-auth-library"
 import { config } from "../config/env.js"
 import { delay, getSheetIdByName } from "../tools/tools.js"
+import { PUTOrderNuvemshop } from "../api/put.js"
 
 const marketplaceNames = [
 	"Shopee",
@@ -383,6 +384,23 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 		}
 	}
 
+	const isUpdateOrderNuvemshop = orderDetailsABSTRACT.situacao === "Enviado" && orderDetailsABSTRACT.codigo_rastreamento
+
+	// Atualiza codigo de rastreamento e status diretamente na Nuvemshop se o pedido for Enviado com codigo de rastreamento
+	if(isUpdateOrderNuvemshop) {
+		const { numero_ecommerce, codigo_rastreamento, url_rastreamento, marcadores } = orderDetailsABSTRACT
+
+		const dataOrderNuvemshop = {
+			numberOrder: numero_ecommerce,
+			tracking_number: codigo_rastreamento,
+			tracking_url: url_rastreamento,
+			marcadores 
+		}
+
+		// await updateStatusShippingNuvemshop(dataOrderNuvemshop)
+	
+	}
+
 	const data = {
 		id,
 		situacao: orderDetailsABSTRACT.situacao,
@@ -397,4 +415,41 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 		status: "success",
 		message: `Pedido atualizado no Tiny Integrada ES. Pedido com ID: ${id}`
 	}
+}
+
+async function updateStatusShippingNuvemshop(dataOrderNuvemshop) {
+	const { numberOrder, tracking_number, tracking_url, marcadores } = dataOrderNuvemshop
+
+	const marcadorNuvemshop = marcadores[1].marcador.descricao.toUpperCase()
+
+	const { id } = await GETNuvemOrderByNumberOrder(numberOrder, marcadorNuvemshop)
+
+	if(!id) {
+		logEcommerce(`Não foi encontrado o pedido ${numberOrder} na Nuvemshop`)
+		return {
+			status: "error",
+			message: `Não foi encontrado o pedido ${numberOrder} na Nuvemshop`
+		}
+	}
+
+	const dataUpdateOrderNuvemshop = {
+		shipping_tracking_number: tracking_number,
+		shipping_tracking_url: tracking_url,
+		shipping_status: "shipped"
+	}
+
+	const result = await PUTOrderNuvemshop(id, dataUpdateOrderNuvemshop, marcadorNuvemshop)
+
+	if(result.status === "success") {
+		logEcommerce(`Pedido ${numberOrder} atualizado na Nuvemshop`)
+		return {
+			status: "success",
+			message: `Pedido ${numberOrder} atualizado na Nuvemshop`
+		}
+	} else {
+		logEcommerce(`Erro ao atualizar pedido ${numberOrder} na Nuvemshop: ${result.message}`)
+		return result
+	}
+
+
 }

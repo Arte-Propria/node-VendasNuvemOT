@@ -73,3 +73,39 @@ export const PUTtinyABSTRACT = async (data) => {
 	return response.json()
 }
 
+export const PUTOrderNuvemshop = async (id, data, store) => {
+	let storeId
+	let code
+	
+	if (store === "OUTLETDOSQUADROS") {
+		code = config.accessTokenOutlet
+		storeId = config.storeIdOutlet
+	} else if (store === "ARTEPROPRIA") {
+		code = config.accessTokenArtePropria
+		storeId = config.storeIdArtePropria
+	}
+	
+	const url = `${config.nuvemshopApiBaseUrl}/${storeId}/orders/${id}`
+	try {
+		await axios.put(url, data,{
+			headers: {
+				"Authentication": `bearer ${code}`,
+				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+				"Content-Type": "application/json"
+			}
+		})
+
+		return {
+			status: "success",
+			message: `Pedido ${id} atualizado na Nuvemshop`
+		}
+  
+	} catch (error) {
+		logEcommerce(`Erro ao atualizar pedido ${id} na Nuvemshop: ${error.message}`)
+		return {
+			status: "error",
+			message: `Erro ao atualizar pedido ${id} na Nuvemshop: ${error.message}`
+		}
+	}  
+}
+

@@ -139,4 +139,43 @@ export const GETNuvemOrder = async (id) => {
 	}
 }
 
+export const GETNuvemOrderByNumberOrder = async (numberOrder, store) => {
+	let code
+	let storeId
+
+	if (store === "OUTLETDOSQUADROS") {
+		code = config.accessTokenOutlet
+		storeId = config.storeIdOutlet
+	} else if (store === "ARTEPROPRIA") {
+		code = config.accessTokenArtePropria
+		storeId = config.storeIdArtePropria
+	}
+
+	let url = `${config.nuvemshopApiBaseUrl}/${storeId}/orders`
+	logEcommerce(`Recuperando dados do pedido ${numberOrder} na Nuvemshop...`)
+
+	try {
+		const response = await axios.get(url, {
+			headers: {
+				"Authentication": `bearer ${code}`,
+				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+				"Content-Type": "application/json"
+			},
+			params: {
+				"per_page": 156,
+				"q": numberOrder
+			}
+		})
+
+		return response.data[0]
+	} catch (error) {
+		logEcommerce(`Erro ao recuperar pedido ${numberOrder} na Nuvemshop: ${error.message}`)
+
+		return {
+			status: "error",
+			message: `Erro ao recuperar pedido ${numberOrder} na Nuvemshop: ${error.message}`
+		}
+	}
+}
+
 
