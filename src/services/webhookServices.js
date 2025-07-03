@@ -383,8 +383,6 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 		}
 	}
 
-	logEcommerce(`teste order nuvemshop: ${JSON.stringify(orderIntegradaES, null, 2)}. orderDetailsABSTRACT: ${JSON.stringify(orderDetailsABSTRACT, null, 2)}`)
-
 	const data = {
 		id,
 		situacao: orderDetailsABSTRACT.situacao,
