@@ -367,13 +367,13 @@ export const processEcommerceWebhook = async (body) => {
 
 export const updateOrderNuvemshop = async (dados, pedido) => {
 	const orderDetailsABSTRACT = pedido
-	const order = await GETtiny.ES("pedidos.pesquisa.php", {
+	const orderIntegradaES = await GETtiny.ES("pedidos.pesquisa.php", {
 		dataInicialOcorrencia: dados.data,
 		idPedidoEcommerce: dados.idPedidoEcommerce,
 		// cliente: dados.cliente.nome,
 		cpf_cnpj: dados.cliente.cpfCnpj
 	})
-	const id = order.id
+	const id = orderIntegradaES.id
 
 	if (!id) {
 		logEcommerce(`Não foram encontrados pedidos com o CPF/CNPJ: ${dados.cliente.cpfCnpj}`)
@@ -383,7 +383,7 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 		}
 	}
 
-	logEcommerce(`teste order nuvemshop: ${JSON.stringify(order, null, 2)}`)
+	logEcommerce(`teste order nuvemshop: ${JSON.stringify(orderIntegradaES, null, 2)}. orderDetailsABSTRACT: ${JSON.stringify(orderDetailsABSTRACT, null, 2)}`)
 
 	const data = {
 		id,
