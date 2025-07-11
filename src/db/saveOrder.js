@@ -1,6 +1,6 @@
 /* eslint-disable camelcase */
 import { query } from "./db.js"
-import { logWebhookMarketplace } from "../utils/logger.js"
+import { logDB, logWebhookMarketplace } from "../utils/logger.js"
 
 export const saveOrder = async (order) => {
 	// Validação básica dos parâmetros
@@ -141,8 +141,15 @@ export const saveOrder = async (order) => {
 	const values = Object.values(formattedOrder)
 	const result = await query(queryText, values)
 
-	logWebhookMarketplace(`Pedido ${order.id} salvo com sucesso na tabela ${tableName}`)
+	logDB(`Pedido ${order.id} salvo com sucesso na tabela ${tableName}`)
 	return result.rows[0]
+}
+
+export const updateOrder = async (situacaoOrder, id) => {
+	await query(`
+    UPDATE pedidos_marketplace SET situacao = $1 WHERE id = $2
+  `, [situacaoOrder, id])
+	logDB(`Pedido ${id} atualizado com sucesso.`)
 }
 
 export const updateOrderStatus = async (order) => {

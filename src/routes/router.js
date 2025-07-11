@@ -98,9 +98,9 @@ router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
 router.get("/tiny/order/:id/:cpf", getOrderTiny)
 router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
 
-// Rota de atualização de pedidos de marketplaceno banco de dados
+// Rota de atualização de pedidos de marketplace no banco de dados
 router.get("/update-orders/marketplace", updateOrdersMarketplace)
-router.get("/update-orders/marketplace/:createdAtMin/:createdAtMax", updateOrdersMarketplaceByDate)
+router.get("/update-orders-by-date/marketplace", updateOrdersMarketplaceByDate)
 
 // Rotas de reembolsos
 router.get("/refunds/:store/:refundType/:createdAtMin/:createdAtMax", getRefunds)

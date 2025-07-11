@@ -22,6 +22,12 @@ export const GETOrdersTinyINTEGRADA = async (endpoint, data) => {
 	return pedidos
 }
 
+export const GETOrdersTinyBASEL = async (endpoint, data) => {
+	const { pedidos } = await tinyApiRequestPaginated(endpoint, config.tinyApiTokenBasel, data)
+
+	return pedidos
+}
+
 export const GETOrdersTinyABSTRACT = async (endpoint, data) => {
 	const { pedidos } = await tinyApiRequestPaginated(endpoint, config.tinyApiToken, data)
 
@@ -50,6 +56,10 @@ const tinyApiRequestPaginated = async (endpoint, token, data) => {
 		params: baseParams
 	})
 
+	if(!response.data.retorno.pedidos || response.data.retorno.pedidos.length === 0) {
+		return { pedidos: [] }
+	}
+	
 	const { numero_paginas, pedidos } = response.data.retorno
 	let pedidosAll = [...pedidos]
 

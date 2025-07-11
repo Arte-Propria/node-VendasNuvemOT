@@ -1,5 +1,5 @@
 import { fetchOrdersAllMarketplace, fetchOrdersAllMarketplaceOptimized, fetchOrdersByMarketplace, fetchUpdateOrdersMarketplace, fetchUpdateOrdersMarketplaceByDate } from "../services/marketplaceServices.js"
-import { logMarketplace, logPCP } from "../utils/logger.js"
+import { logDB, logMarketplace, logPCP } from "../utils/logger.js"
 
 export const getOrdersByMarketplace = async (req, res) => {
 	const { marketplace, createdAtMin, createdAtMax } = req.params
@@ -43,16 +43,16 @@ export const updateOrdersMarketplace = async (req, res) => {
 	const { days } = req.query
 	try {
 		const orders = await fetchUpdateOrdersMarketplace(days)
-		logMarketplace(`Pedidos do marketplace atualizados com sucesso. ${orders.length} pedidos.`)
-		res.status(200).json({ orders: orders.length, message: "Pedidos do marketplace atualizados com sucesso." })
+		logDB(`Banco de dados atualizado com sucesso. ${orders.length} pedidos.`)
+		res.status(200).json({ orders, message: "Banco de dados atualizado com sucesso." })
 	} catch (error) {
-		logMarketplace(`Erro ao atualizar pedidos do marketplace: ${error}`)
-		res.status(500).json({ error: "Erro ao atualizar pedidos do marketplace" })
+		logDB(`Erro ao atualizar banco de dados: ${error}`)
+		res.status(500).json({ error: "Erro ao atualizar banco de dados" })
 	}
 }
 
 export const updateOrdersMarketplaceByDate = async (req, res) => {
-	const { createdAtMin, createdAtMax } = req.params
+	const { createdAtMin, createdAtMax } = req.query
 	try {
 		const orders = await fetchUpdateOrdersMarketplaceByDate(createdAtMin, createdAtMax)
 		logMarketplace(`Pedidos do marketplace atualizados com sucesso. ${orders.length} pedidos.`)
@@ -62,4 +62,3 @@ export const updateOrdersMarketplaceByDate = async (req, res) => {
 		res.status(500).json({ error: "Erro ao atualizar pedidos do marketplace" })
 	}
 }
-

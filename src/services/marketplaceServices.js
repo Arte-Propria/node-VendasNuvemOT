@@ -1,7 +1,10 @@
-import { GETOrdersTinyABSTRACT, GETOrdersTinyINTEGRADA } from "../api/get.js"
+import { GETOrdersTinyABSTRACT, GETOrdersTinyBASEL, GETOrdersTinyINTEGRADA } from "../api/get.js"
+import { config } from "../config/env.js"
 import { query } from "../db/db.js"
+import { saveOrder, updateOrder } from "../db/saveOrder.js"
 import { generateDateRanges } from "../tools/tools.js"
 import { logDB } from "../utils/logger.js"
+import { getOrderDetails } from "../utils/tiny.js"
 
 const marketplaceNames = {
 	"shopee": "Shopee",
@@ -14,8 +17,27 @@ const marketplaceNames = {
 	"amazon_fba_onsite": "Amazon FBA Onsite",
 	"amazon": "Amazon",
 	"madeiramadeira": "MadeiraMadeira",
-	"shein": "Shein"
+	"shein": "Shein",
+	"tiktok_shop_abstract": "TikTok Shop Abstract"
 }
+
+const marketplaceNamesList = [
+	"Shopee",
+	"Magalu Abstract",
+	"Magalu Marketplace",
+	"Magazine Luiza",
+	"Mercado Livre Abstract",
+	"Mercado Livre",
+	"Mercado Livre Integrada",
+	"Mercado Livre Fulfillment",
+	"Mercado Livre Fulfillment Abst",
+	"Amazon FBA Classic",
+	"Amazon FBA Onsite",
+	"Amazon",
+	"MadeiraMadeira",
+	"Shein",
+	"TikTok Shop Abstract"
+]
 
 export const fetchOrdersByMarketplace = async (marketplace, createdAtMin, createdAtMax) => {
 	try {
@@ -36,8 +58,8 @@ export const fetchOrdersByMarketplace = async (marketplace, createdAtMin, create
 			WHERE TO_DATE(data_pedido, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'DD/MM/YYYY') AND TO_DATE($2, 'DD/MM/YYYY')
 			AND ecommerce->>'nomeEcommerce' = $3
 			AND (
-				situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
-				OR (situacao = 'Cancelado' AND CAST(id_nota_fiscal AS INTEGER) > 0)
+				(situacao = 'Cancelado' AND CAST(id_nota_fiscal AS INTEGER) > 0)
+				OR situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
 			)
 		`, [startDate, endDate, marketplaceNames[marketplace]])
 
@@ -63,8 +85,8 @@ export const fetchOrdersAllMarketplace = async (createdAtMin, createdAtMax) => {
 			WHERE TO_DATE(data_pedido, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'DD/MM/YYYY') AND TO_DATE($2, 'DD/MM/YYYY') 
 			AND (
 				(
-					situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
-					OR (situacao = 'Cancelado' AND CAST(id_nota_fiscal AS INTEGER) > 0)
+					(situacao = 'Cancelado' AND CAST(id_nota_fiscal AS INTEGER) > 0)
+					OR situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
 				)
 				AND ecommerce IS NOT NULL
 			)
@@ -124,7 +146,7 @@ export const fetchUpdateOrdersMarketplace = async (days) => {
 	try {
 		const dateRanges = generateDateRanges(days)
 		const endpoint = "pedidos.pesquisa.php"		
-		let orders = []
+		let ordersUpdated = []
 		
 		// Processa cada intervalo de datas
 		for (const dateRange of dateRanges) {
@@ -133,8 +155,9 @@ export const fetchUpdateOrdersMarketplace = async (days) => {
 				...dateRange
 			}
 			const ordersIntegrada = await GETOrdersTinyINTEGRADA(endpoint, data)
+			const ordersBasel = await GETOrdersTinyBASEL(endpoint, data)
 			const ordersAbstract = await GETOrdersTinyABSTRACT(endpoint, data)
-			const orders = [...ordersIntegrada, ...ordersAbstract]
+			const orders = [...ordersIntegrada, ...ordersBasel, ...ordersAbstract]
 			logDB(`Encontrados ${orders.length} pedidos para atualização.`)
 
 			// Processa os pedidos de forma síncrona para evitar sobrecarga
@@ -143,27 +166,32 @@ export const fetchUpdateOrdersMarketplace = async (days) => {
 				const orderDB = await query(`
 					SELECT id, situacao FROM pedidos_marketplace WHERE id = $1
 				`, [id])
-
-				if(orderDB.rows.length > 0) {
+	
+				const orderExists = orderDB.rows.length > 0
+				
+				if(!orderExists) {
+					const isMarketplace = order.pedido.numero_ecommerce
+					if(isMarketplace) {
+						const orderDetails = await getOrderDetails(id, config.tinyApiToken)
+						const isMarketplaceList = marketplaceNamesList.includes(orderDetails.ecommerce.nomeEcommerce)
+						if(isMarketplaceList) {
+							await saveOrder(orderDetails)
+							ordersUpdated.push(order)
+						}
+					}
+				} else {
 					if(orderDB.rows[0].situacao !== order.pedido.situacao) {
-						await query(`
-							UPDATE pedidos_marketplace SET situacao = $1 WHERE id = $2
-						`, [order.pedido.situacao, id])
-						logDB(`Pedido ${order.pedido.id} atualizado com sucesso.`)
+						await updateOrder(order.pedido.situacao, id)
 					} else {
 						logDB(`Pedido ${order.pedido.id} já está atualizado.`)
 					}
-				} else {
-					logDB(`Pedido ${order.pedido.id} não encontrado no banco de dados.`)
 				}
 			}
-
-			orders.push(...orders)
 			
 			logDB(`Processado intervalo: ${dateRange.dataInicial} até ${dateRange.dataFinal}`)
 		}
 
-		return orders
+		return ordersUpdated
 
 	} catch (error) {
 		console.error("Erro ao buscar pedidos para atualização:", error)
@@ -173,42 +201,51 @@ export const fetchUpdateOrdersMarketplace = async (days) => {
 
 export const fetchUpdateOrdersMarketplaceByDate = async (createdAtMin, createdAtMax) => {
 	try {
-		const endpoint = "pedidos.pesquisa.php"		
 		const data = {
 			dataInicial: createdAtMin,
 			dataFinal: createdAtMax
 		}
+		const endpoint = "pedidos.pesquisa.php"
+		let ordersUpdated = []
 		
 		logDB(`Processando intervalo: ${createdAtMin} até ${createdAtMax}`)
 
 		const ordersIntegrada = await GETOrdersTinyINTEGRADA(endpoint, data)
+		const ordersBasel = await GETOrdersTinyBASEL(endpoint, data)
 		const ordersAbstract = await GETOrdersTinyABSTRACT(endpoint, data)
-		const orders = [...ordersIntegrada, ...ordersAbstract]
+		const orders = [...ordersIntegrada, ...ordersBasel, ...ordersAbstract]
 		logDB(`Encontrados ${orders.length} pedidos para atualização.`)
 
 		// Processa os pedidos de forma síncrona para evitar sobrecarga
 		for (const order of orders) {
 			const id = parseInt(order.pedido.id)
 			const orderDB = await query(`
-				SELECT id, situacao FROM pedidos_marketplace WHERE id = $1
-			`, [id])
-
-			if(orderDB.rows.length > 0) {
+					SELECT id, situacao FROM pedidos_marketplace WHERE id = $1
+				`, [id])
+	
+			const orderExists = orderDB.rows.length > 0
+				
+			if(!orderExists) {
+				const isMarketplace = order.pedido.numero_ecommerce
+				if(isMarketplace) {
+					const orderDetails = await getOrderDetails(id, config.tinyApiToken)
+					const isMarketplaceList = marketplaceNamesList.includes(orderDetails.ecommerce.nomeEcommerce)
+					if(isMarketplaceList) {
+						await saveOrder(orderDetails)
+						ordersUpdated.push(order)
+					}
+				}
+			} else {
 				if(orderDB.rows[0].situacao !== order.pedido.situacao) {
-					await query(`
-						UPDATE pedidos_marketplace SET situacao = $1 WHERE id = $2
-					`, [order.pedido.situacao, id])
-					logDB(`Pedido ${order.pedido.id} atualizado com sucesso.`)
+					await updateOrder(order.pedido.situacao, id)
 				} else {
 					logDB(`Pedido ${order.pedido.id} já está atualizado.`)
 				}
-			} else {
-				logDB(`Pedido ${order.pedido.id} não encontrado no banco de dados.`)
 			}
 		}
-		
+			
 		logDB(`Processado intervalo: ${createdAtMin} até ${createdAtMax}`)
-		return orders
+		return ordersUpdated
 
 	} catch (error) {
 		console.error("Erro ao buscar pedidos para atualização:", error)
