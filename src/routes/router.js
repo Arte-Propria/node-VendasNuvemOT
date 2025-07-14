@@ -25,6 +25,7 @@ import {
 	getSheinOrderController,
 	updateSheinOrderStatusController
 } from "../controllers/sheinControllers.js"
+import { getOrdersChatFunnel } from "../controllers/chatfunnelControllers.js"
 
 const router = express.Router()
 
@@ -113,5 +114,8 @@ router.get("/marketplace/orders/:createdAtMin/:createdAtMax", getOrdersAllMarket
 
 // Rotas PCP
 router.get("/pcp/orders/:createdAtMin/:createdAtMax", getOrdersAllMarketplaceOptimized)
+
+// Rotas ChatFunnel
+router.get("/chatfunnel/:store/orders/:client", getOrdersChatFunnel)
 
 export default router

@@ -25,3 +25,7 @@ export const logPCP = (message) => {
 export const logDB = (message) => {
 	console.log(`DB: ${message}`)
 }
+
+export const logChatFunnel = (message) => {
+	console.log(`ChatFunnel: ${message}`)
+}
