@@ -8,6 +8,7 @@ import { getOrderDetails } from "../utils/tiny.js"
 
 const marketplaceNames = {
 	"shopee": "Shopee",
+	"shopee_abstract": "Shopee Abstract",
 	"magalu_marketplace": "Magalu Marketplace", 
 	"magazine_luiza": "Magazine Luiza",
 	"mercado_livre_abstract": "Mercado Livre Abstract",
@@ -23,6 +24,7 @@ const marketplaceNames = {
 
 const marketplaceNamesList = [
 	"Shopee",
+	"Shopee Abstract",
 	"Magalu Abstract",
 	"Magalu Marketplace",
 	"Magazine Luiza",
