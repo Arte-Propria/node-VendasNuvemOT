@@ -16,6 +16,7 @@ import { PUTOrderNuvemshop } from "../api/put.js"
 
 const marketplaceNames = [
 	"Shopee",
+	"Shopee Abstract",
 	"Magalu Abstract",
 	"Magalu Marketplace",
 	"Magazine Luiza",
