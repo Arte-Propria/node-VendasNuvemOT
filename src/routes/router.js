@@ -16,16 +16,8 @@ import { getRefunds, createRefund, deleteRefund } from "../controllers/refundsCo
 import { getTikTokAuth, getTikTokAds, getTikTokCreatives } from "../controllers/tiktokControllers.js"
 import { getOrdersAllMarketplace, getOrdersAllMarketplaceOptimized, getOrdersByMarketplace, updateOrdersMarketplace, updateOrdersMarketplaceByDate } from "../controllers/marketplaceControllers.js"
 import { getShopeeAuth, handleShopeeCallback } from "../controllers/shopeeControllers.js"
-import { 
-	getSheinAuth, 
-	handleSheinCallback,
-	getSheinProductsController,
-	getSheinProductController,
-	getSheinOrdersController,
-	getSheinOrderController,
-	updateSheinOrderStatusController
-} from "../controllers/sheinControllers.js"
-import { getCategoriesChatFunnel, getOrdersChatFunnel, getProductsChatFunnel } from "../controllers/chatfunnelControllers.js"
+import { getSheinAuth, handleSheinCallback, getSheinProductsController, getSheinProductController, getSheinOrdersController, getSheinOrderController, updateSheinOrderStatusController } from "../controllers/sheinControllers.js"
+import { compararPedidos } from '../controllers/comparacaoController.js'
 
 const router = express.Router()
 
@@ -99,9 +91,8 @@ router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
 router.get("/tiny/order/:id/:cpf", getOrderTiny)
 router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
 
-// Rota de atualização de pedidos de marketplace no banco de dados
-router.get("/update-orders/marketplace", updateOrdersMarketplace)
-router.get("/update-orders-by-date/marketplace", updateOrdersMarketplaceByDate)
+// -- Conferencia de sku
+router.get("/comparar/:store/:dataInicial/:dataFinal", compararPedidos);
 
 // Rotas de reembolsos
 router.get("/refunds/:store/:refundType/:createdAtMin/:createdAtMax", getRefunds)
@@ -116,8 +107,8 @@ router.get("/marketplace/orders/:createdAtMin/:createdAtMax", getOrdersAllMarket
 router.get("/pcp/orders/:createdAtMin/:createdAtMax", getOrdersAllMarketplaceOptimized)
 
 // Rotas ChatFunnel
-router.get("/chatfunnel/:store/orders/:client", getOrdersChatFunnel)
-router.get("/chatfunnel/:store/products", getProductsChatFunnel)
-router.get("/chatfunnel/:store/categories", getCategoriesChatFunnel)
+//router.get("/chatfunnel/:store/orders/:client", getOrdersChatFunnel)
+//router.get("/chatfunnel/:store/products", getProductsChatFunnel)
+//router.get("/chatfunnel/:store/categories", getCategoriesChatFunnel)
 
 export default router

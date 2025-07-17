@@ -107,3 +107,29 @@ export const updateAllOrdersFromDateRange = async (req, res) => {
 		res.status(500).send("Erro ao buscar e salvar pedidos.")
 	}
 }
+
+export const formatDbOrders = (orders) => {
+  return orders.map(order => {
+    // Extrair SKUs dos produtos
+    const produtos = [];
+    
+    // Verifica se existem produtos e se é um array
+    if (order.products && Array.isArray(order.products)) {
+      order.products.forEach(product => {
+        // Adiciona apenas produtos com SKU válido
+        if (product.sku) {
+          produtos.push({
+            sku: product.sku
+          });
+        }
+      });
+    }
+    
+    // Retornar estrutura simplificada
+    return {
+      id: order.id,
+      pedido: order.number, // Usando o número do pedido
+      produtos
+    };
+  });
+};
