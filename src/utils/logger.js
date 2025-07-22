@@ -29,3 +29,7 @@ export const logDB = (message) => {
 export const logChatFunnel = (message) => {
 	console.log(`ChatFunnel: ${message}`)
 }
+
+export const logAdsMarketplace = (message) => {
+	console.log(`AdsMarketplace: ${message}`)
+}
