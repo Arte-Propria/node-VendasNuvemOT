@@ -108,6 +108,7 @@ export const updateAllOrdersFromDateRange = async (req, res) => {
 	}
 }
 
+<<<<<<< HEAD
 export const updateOrdersTinyIntegradaES = async (req, res) => {
 	const { store, createdAtMin, createdAtMax } = req.params
 
@@ -120,3 +121,30 @@ export const updateOrdersTinyIntegradaES = async (req, res) => {
 		res.status(404).send("Erro ao buscar pedidos")
 	}
 }
+=======
+export const formatDbOrders = (orders) => {
+  return orders.map(order => {
+    // Extrair SKUs dos produtos
+    const produtos = [];
+    
+    // Verifica se existem produtos e se é um array
+    if (order.products && Array.isArray(order.products)) {
+      order.products.forEach(product => {
+        // Adiciona apenas produtos com SKU válido
+        if (product.sku) {
+          produtos.push({
+            sku: product.sku
+          });
+        }
+      });
+    }
+    
+    // Retornar estrutura simplificada
+    return {
+      id: order.id,
+      pedido: order.number, // Usando o número do pedido
+      produtos
+    };
+  });
+};
+>>>>>>> 7ca728d1bd7311b5a32f3c255c9d76fcd60fdb0f
