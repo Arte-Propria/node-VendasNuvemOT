@@ -24,7 +24,7 @@ export const fetchCustomers = async (params = {}) => {
 
   if (!code || !storeId) {
     throw new Error(
-      'API credentials are not properly set in the environment variables',
+      'API credentials are not properly set in the environment variables'
     );
   }
 
@@ -58,12 +58,12 @@ export const fetchCustomers = async (params = {}) => {
       headers: {
         Authentication: `bearer ${code}`,
         'User-Agent': 'API-NuvemShop (lucasecom@artepropria.com)',
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       params: {
         created_at_min: createdAtMinISO,
         created_at_max: createdAtMaxISO,
-        per_page: 156,
+        per_page: 156
       },
     });
 

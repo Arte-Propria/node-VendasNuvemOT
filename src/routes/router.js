@@ -27,6 +27,7 @@ import {
 } from "../controllers/sheinControllers.js"
 import { getCategoriesChatFunnel, getOrdersChatFunnel, getProductsChatFunnel } from "../controllers/chatfunnelControllers.js"
 import { createAdsMarketplace } from "../controllers/adsMarketplaceControllers.js"
+import { compararPedidos } from "../controllers/comparacaoController.js";
 
 const router = express.Router()
 
@@ -101,7 +102,7 @@ router.get("/tiny/order/:id/:cpf", getOrderTiny)
 router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
 
 // -- Conferencia de sku
-// router.get("/comparar/:store/:dataInicial/:dataFinal", compararPedidos)
+router.get("/comparar/:store/:dataInicial/:dataFinal", compararPedidos)
 
 // Rotas de reembolsos
 router.get("/refunds/:store/:refundType/:createdAtMin/:createdAtMax", getRefunds)
@@ -117,8 +118,8 @@ router.get("/pcp/orders/:createdAtMin/:createdAtMax", getOrdersAllMarketplaceOpt
 router.post("/pcp/ads/marketplace", createAdsMarketplace)
 
 // Rotas ChatFunnel
-//router.get("/chatfunnel/:store/orders/:client", getOrdersChatFunnel)
-//router.get("/chatfunnel/:store/products", getProductsChatFunnel)
-//router.get("/chatfunnel/:store/categories", getCategoriesChatFunnel)
+router.get("/chatfunnel/:store/orders/:client", getOrdersChatFunnel)
+router.get("/chatfunnel/:store/products", getProductsChatFunnel)
+router.get("/chatfunnel/:store/categories", getCategoriesChatFunnel)
 
 export default router
