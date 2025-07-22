@@ -174,6 +174,7 @@ export const fetchUpdateOrdersMarketplace = async (days) => {
 				if(!orderExists) {
 					const isMarketplace = order.pedido.numero_ecommerce
 					if(isMarketplace) {
+						await new Promise((resolve) => setTimeout(resolve, 1000)) // Atraso de 1 segundo para evitar sobrecarga na API
 						const orderDetails = await getOrderDetails(id, config.tinyApiToken)
 						const isMarketplaceList = marketplaceNamesList.includes(orderDetails.ecommerce.nomeEcommerce)
 						if(isMarketplaceList) {

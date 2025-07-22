@@ -107,3 +107,16 @@ export const updateAllOrdersFromDateRange = async (req, res) => {
 		res.status(500).send("Erro ao buscar e salvar pedidos.")
 	}
 }
+
+export const updateOrdersTinyIntegradaES = async (req, res) => {
+	const { store, createdAtMin, createdAtMax } = req.params
+
+	try {
+		const orders = await fetchOrders({ store, createdAtMin, createdAtMax })
+		console.log(orders)
+		res.status(200).json(orders)
+	} catch (error) {
+		console.error(error)
+		res.status(404).send("Erro ao buscar pedidos")
+	}
+}

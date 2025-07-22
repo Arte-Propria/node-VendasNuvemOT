@@ -72,7 +72,9 @@ const tinyApiRequestPaginated = async (endpoint, token, data) => {
 				})))
 		
 		paginasAdicionais.forEach((response) => {
-			pedidosAll.push(...response.data.retorno.pedidos)
+			if(response.data.retorno.pedidos) {	
+				pedidosAll.push(...response.data.retorno.pedidos)
+			}
 		})
 	}
 	

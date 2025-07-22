@@ -141,7 +141,7 @@ export const saveOrder = async (order) => {
 	const values = Object.values(formattedOrder)
 	const result = await query(queryText, values)
 
-	logDB(`Pedido ${order.id} salvo com sucesso na tabela ${tableName}`)
+	logDB(`Pedido ${order.id} salvo com sucesso na tabela ${tableName} | ${order.data_pedido}`)
 	return result.rows[0]
 }
 
