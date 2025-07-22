@@ -15,7 +15,7 @@ export const processAdsMarketplace = async (body) => {
 		}
 
 		const ads = await saveAdsMarketplace(body)
-		logAdsMarketplace(`Anúncio marketplace salvo: ${ads.ad_id}, usuário: ${ads.user}`)
+		logAdsMarketplace(`Anúncio marketplace salvo: ${ads.ad_id}, usuário: ${body.user}`)
 		return {
 			message: "Anúncio marketplace salvo com sucesso",
 			success: true,
