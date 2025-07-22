@@ -16,7 +16,6 @@ import { getRefunds, createRefund, deleteRefund } from "../controllers/refundsCo
 import { getTikTokAuth, getTikTokAds, getTikTokCreatives } from "../controllers/tiktokControllers.js"
 import { getOrdersAllMarketplace, getOrdersAllMarketplaceOptimized, getOrdersByMarketplace, updateOrdersMarketplace, updateOrdersMarketplaceByDate } from "../controllers/marketplaceControllers.js"
 import { getShopeeAuth, handleShopeeCallback } from "../controllers/shopeeControllers.js"
-<<<<<<< HEAD
 import { 
 	getSheinAuth, 
 	handleSheinCallback,
@@ -28,10 +27,6 @@ import {
 } from "../controllers/sheinControllers.js"
 import { getCategoriesChatFunnel, getOrdersChatFunnel, getProductsChatFunnel } from "../controllers/chatfunnelControllers.js"
 import { createAdsMarketplace } from "../controllers/adsMarketplaceControllers.js"
-=======
-import { getSheinAuth, handleSheinCallback, getSheinProductsController, getSheinProductController, getSheinOrdersController, getSheinOrderController, updateSheinOrderStatusController } from "../controllers/sheinControllers.js"
-import { compararPedidos } from '../controllers/comparacaoController.js'
->>>>>>> 7ca728d1bd7311b5a32f3c255c9d76fcd60fdb0f
 
 const router = express.Router()
 
@@ -106,7 +101,7 @@ router.get("/tiny/order/:id/:cpf", getOrderTiny)
 router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
 
 // -- Conferencia de sku
-router.get("/comparar/:store/:dataInicial/:dataFinal", compararPedidos);
+// router.get("/comparar/:store/:dataInicial/:dataFinal", compararPedidos)
 
 // Rotas de reembolsos
 router.get("/refunds/:store/:refundType/:createdAtMin/:createdAtMax", getRefunds)
