@@ -6,7 +6,7 @@ export const getCustomers = async (req, res) => {
 		const customers = await fetchCustomers(params)
 		res.json(customers)
 	} catch (error) {
-		// console.error(error)
+		console.error(error)
 		res.status(404).send("Erro ao buscar clientes")
 	}
 }

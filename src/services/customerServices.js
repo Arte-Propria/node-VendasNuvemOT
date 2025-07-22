@@ -24,7 +24,7 @@ export const fetchCustomers = async (params = {}) => {
 
   if (!code || !storeId) {
     throw new Error(
-      'API credentials are not properly set in the environment variables'
+      'API credentials are not properly set in the environment variables',
     );
   }
 
@@ -51,42 +51,61 @@ export const fetchCustomers = async (params = {}) => {
   console.log('Recuperando dados dos clientes...');
 
   // Loop para lidar com a paginação da API
-  while (url) {
-    const response = await axios({
-      method: 'get',
-      url: url,
-      headers: {
-        Authentication: `bearer ${code}`,
-        'User-Agent': 'API-NuvemShop (lucasecom@artepropria.com)',
-        'Content-Type': 'application/json'
-      },
-      params: {
-        created_at_min: createdAtMinISO,
-        created_at_max: createdAtMaxISO,
-        per_page: 156
-      },
-    });
 
-    const data = response.data;
+  try {
+    // Loop para lidar com a paginação da API
+    while (url) {
+      const response = await axios({
+        method: 'get',
+        url: url,
+        headers: {
+          Authentication: `bearer ${code}`,
+          'User-Agent': 'API-NuvemShop (lucasecom@artepropria.com)',
+          'Content-Type': 'application/json'
+        },
+        params: {
+          created_at_min: createdAtMinISO,
+          created_at_max: createdAtMaxISO,
+          per_page: 156
+        },
+        validateStatus: (status) => status === 200 || status === 404, // Aceita 200 e 404 como status válidos
+      });
 
-    const customers = data.map(customer => ({
-      id: customer.id,
-      name: customer.name,
-      createdAt: customer.created_at,
-      buy: customer.last_order_id,
-    }));
+      // Tratamento para resposta 404 (dados não encontrados)
+      if (response.status === 404) {
+        console.log('Nenhum cliente encontrado para o período selecionado');
+        break; // Sai do loop
+      }
 
-    allCustomers = allCustomers.concat(customers);
+      const data = response.data;
 
-    // Verifica o cabeçalho "Link" para a próxima página
-    const linkHeader = response.headers.link;
-    const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader);
+      // Verificação reforçada de dados
+      const customers =
+        Array.isArray(data) && data.length > 0
+          ? data.map((customer) => ({
+              id: customer.id,
+              name: customer.name,
+              createdAt: customer.created_at,
+              buy: customer.last_order_id
+            }))
+          : [];
 
-    if (nextLinkMatch) {
-      url = nextLinkMatch[1];
-    } else {
-      url = null; // Não há mais páginas
+      allCustomers = [...allCustomers, ...customers];
+
+      // Verifica o cabeçalho "Link" para a próxima página
+      const linkHeader = response.headers.link;
+      const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader || '');
+
+      if (nextLinkMatch) {
+        url = nextLinkMatch[1];
+      } else {
+        url = null; // Não há mais páginas
+      }
     }
+  } catch (error) {
+    console.error('Erro na requisição:', error.message);
+    // Retorna array vazio em caso de erro
+    return [];
   }
 
   return allCustomers;
