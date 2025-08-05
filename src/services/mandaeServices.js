@@ -1,44 +1,30 @@
 /* eslint-disable camelcase */
 import axios from "axios"
 import dotenv from "dotenv"
+import { query } from "../db/db.js"
 
 dotenv.config()
 
-const advertiserId = process.env.TEST_ADVERTISER_ID
-const appToken = process.env.TEST_ACCESS_TOKEN
-
 // 1. Função para realizar o fetch básico (≤30 dias)
-const fetchTestRequest = async (store, startDate, endDate) => {
-	const accessToken = appToken
+export const fetchTestRequest = async (store, startDate, endDate) => {
 	let allDeliveries = []
 
 	try {
-		const response = await axios.get("https://test_request/api/response/get/",
-			{
-				headers: {
-					"Access-Token": accessToken,
-					"Content-Type": "application/json"
-				},
-				params: {
-					advertiser_id: advertiserId// Max page size to minimize requests
-				}
-			})
-			
-		const result =  response.data.data?.list
+		const response = await query(`SELECT * FROM info_mandae`)
 
-		const deliveries = result.map((delivery) => ({
-			id: delivery.id,
-			order_id: delivery.order_id,
-			name_client: delivery.name_client,
-			lastDate: delivery.lastDate,
-			rastreio: delivery.rastreio,
-			total: delivery.total,
-			status: delivery.status
+		const result =  response.rows.map((delivery) => ({
+			id: delivery.id_ped,
+			order_id: delivery.cod_ped,
+			name_client: delivery.nome_cli,
+			lastDate: delivery.dt_pag,
+			rastreio: delivery.cod_rastreio,
+			total: delivery.valor,
+			status: delivery.situacao
 		}))
-		//console.log(response.data.data?.list || [])
-		allDeliveries = allDeliveries.concat(deliveries)
+		allDeliveries = allDeliveries.concat(result)
 
 		return allDeliveries || []
+
 	} catch (error) {
 		console.error(`Error fetching Deliveries data from Mandae`,error.message)
 		return []
