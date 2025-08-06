@@ -1,18 +1,46 @@
 import { query } from "../db/db.js"
-import {fetchTestRequest} from '../services/mandaeServices.js'
+import { fetchTestRequest, filterMandaeData } from '../services/mandaeServices.js'
 
 // Buscar pedidos por data
-export const getMandaeInfo = async (req, res) => {
-  const { store } = req.params
+export const getMandaeInfoByDate = async (req, res) => {
+  const { store, createdAtMin, createdAtMax } = req.params;
+  
+    // Log para conferencia dos parametros recebidos
+  console.log('Parâmetros recebidos:', {
+    store,
+    createdAtMin,
+    createdAtMax
+  });
 
   try {
-    const result = await fetchTestRequest()
-    res.json(result)
+    // 1. Buscar todos os dados formatados
+    const formattedData = await fetchTestRequest();
+    
+    // 2. Filtrar os dados conforme parâmetros
+    const filteredData = filterMandaeData(formattedData, {
+      store,
+      startDate: createdAtMin,
+      endDate: createdAtMax
+    });
+    
+    // 3. Retornar resultados filtrados
+    res.json(filteredData);
+    
   } catch (err) {
-    console.error("Erro ao buscar pedidos:", err)
-    res.status(500).json({ error: "Erro ao buscar pedidos" })
+    console.error("Erro ao processar pedidos:", err.message);
+    
+    const statusCode = err.message.includes('inválida') ? 400 : 500;
+    res.status(statusCode).json({ 
+      error: err.message || "Erro interno no servidor" ,
+      details: {
+        receivedDates: {
+          startDate: createdAtMin,
+          endDate: createdAtMax
+        }
+      }
+    });
   }
-}
+};
 
 export const getOMandaeInfoByStore = async (req, res) => {
   const { store } = req.params

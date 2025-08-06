@@ -28,7 +28,7 @@ import {
 import { getCategoriesChatFunnel, getOrdersChatFunnel, getProductsChatFunnel } from "../controllers/chatfunnelControllers.js"
 import { createAdsMarketplace } from "../controllers/adsMarketplaceControllers.js"
 import { compararPedidos } from "../controllers/comparacaoController.js"
-import { getMandaeInfo } from "../controllers/mandaeControllers.js"
+import { getOMandaeInfoByStore, getMandaeInfoByDate } from "../controllers/mandaeControllers.js"
 
 const router = express.Router()
 
@@ -106,8 +106,8 @@ router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
 router.get("/comparar/:store/:dataInicial/:dataFinal", compararPedidos)
 
 // Rotas Mandae
-router.get('/mandae',getMandaeInfo)
-//router.get('/mandae/:store/:dataInicial/:dataFinal',getMandaeInfo)
+router.get('/mandae',getOMandaeInfoByStore)
+router.get('/mandae/:store/:createdAtMin/:createdAtMax',getMandaeInfoByDate)
 
 // Rotas de reembolsos
 router.get("/refunds/:store/:refundType/:createdAtMin/:createdAtMax", getRefunds)
