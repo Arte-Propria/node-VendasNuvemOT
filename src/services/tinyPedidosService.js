@@ -75,6 +75,9 @@ export const fetchTinyOrdersWithDetails = async (store, createdAtMin, createdAtM
       return `${day}/${month}/${year}`
     };
 
+    console.log('Start:',startDate);
+    console.log('End:',endDate);
+
     // Busca lista de pedidos  
   const listParams = {  
     token,  
@@ -120,7 +123,7 @@ export const fetchTinyOrdersWithDetails = async (store, createdAtMin, createdAtM
       // Aguarda 10 segundos se não for o último lote
       if (i < batches.length - 1) {
         console.log(`Aguardando 10 segundos antes do próximo lote...`);
-        await wait(10000); // 10 segundos
+        await wait(11000); // 11 segundos
       }
     }
 

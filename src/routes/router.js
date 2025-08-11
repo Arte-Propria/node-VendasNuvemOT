@@ -27,7 +27,7 @@ import {
 } from "../controllers/sheinControllers.js"
 import { getCategoriesChatFunnel, getOrdersChatFunnel, getProductsChatFunnel } from "../controllers/chatfunnelControllers.js"
 import { createAdsMarketplace } from "../controllers/adsMarketplaceControllers.js"
-import { compararPedidos } from "../controllers/comparacaoController.js"
+import { compararPedidos, compararPedidoNuvem, compararPedidosTiny } from "../controllers/comparacaoController.js"
 import { getOMandaeInfoByStore, getMandaeInfoByDate } from "../controllers/mandaeControllers.js"
 
 const router = express.Router()
@@ -104,6 +104,9 @@ router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
 
 // -- Conferencia de sku
 router.get("/comparar/:store/:dataInicial/:dataFinal", compararPedidos)
+router.get("/comparar_tiny/:store/:dataInicial/:dataFinal", compararPedidosTiny)
+router.get("/comparar_nuvem/:store/:dataInicial/:dataFinal", compararPedidoNuvem)
+
 
 // Rotas Mandae
 router.get('/mandae',getOMandaeInfoByStore)

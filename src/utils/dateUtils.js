@@ -14,31 +14,41 @@ export const parseDate = (dateInput) => {
     
     // Tentar formato brasileiro (Tiny)
     if (dateInput.includes('/')) {
-      const [day, month, year] = dateInput.split('/');
-      const formatted = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-      const parsed = new Date(formatted);
-      if (!isNaN(parsed)) return parsed;
+      const parts = dateInput.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        // Formatar como ISO: YYYY-MM-DD
+        const isoFormatted = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        const parsed = new Date(isoFormatted);
+        if (!isNaN(parsed)) return parsed;
+      }
     }
+    
+    // Tentar formato ISO sem timezone
+    const simpleDate = new Date(dateInput.split('T')[0]);
+    if (!isNaN(simpleDate)) return simpleDate;
   }
   
-  // Caso 3: É um número (timestamp)
-  if (typeof dateInput === 'number') {
-    const date = new Date(dateInput);
-    if (!isNaN(date)) return date;
-  }
-  
-  // Caso 4: Valor inválido
+  // Caso 3: Valor inválido
   console.warn('Formato de data não suportado:', dateInput);
-  return new Date(); // Fallback para data atual
+  return null;
 };
 
 export const isDateInRange = (date, start, end) => {
   if (!date || isNaN(date)) return false;
   
-  // Converter para timestamps para comparação precisa
-  const startDate = new Date(start).setHours(0, 0, 0, 0);
-  const endDate = new Date(end).setHours(23, 59, 59, 999);
-  const checkDate = date.getTime();
+  // Converter para objetos Date
+  const startDate = new Date(start);
+  const endDate = new Date(end);
   
-  return checkDate >= startDate && checkDate <= endDate;
+  // Ajustar para cobrir o dia inteiro
+  startDate.setUTCHours(0, 0, 0, 0);
+  endDate.setUTCHours(23, 59, 59, 999);
+  
+  // Converter para timestamps para comparação
+  const startTime = startDate.getTime();
+  const endTime = endDate.getTime();
+  const checkTime = date.getTime();
+  
+  return checkTime >= startTime && checkTime <= endTime;
 };
