@@ -133,7 +133,7 @@ export const fetchOrdersAllMarketplaceOptimized = async (createdAtMin, createdAt
 			WHERE TO_DATE(data_pedido, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'DD/MM/YYYY') AND TO_DATE($2, 'DD/MM/YYYY') 
 			AND (
 				situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
-				OR (situacao = 'Cancelado' AND CAST(id_nota_fiscal AS INTEGER) > 0)
+				OR (situacao = 'Cancelado' AND CAST(id_nota_fiscal AS INTEGER) > 0) AND ecommerce IS NOT NULL
 			)
 		`, [startDate, endDate])
 
