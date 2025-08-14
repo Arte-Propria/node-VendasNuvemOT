@@ -43,9 +43,9 @@ const marketplaceNamesList = [
 
 export const fetchOrdersByMarketplace = async (marketplace, createdAtMin, createdAtMax) => {
 	try {
-		// Converte as datas para o formato DD/MM/YYYY
-		const startDate = createdAtMin.split("T")[0].split("-").reverse().join("/")
-		const endDate = createdAtMax.split("T")[0].split("-").reverse().join("/")
+		// Converte para Date e depois para string no formato YYYY-MM-DD
+		const startDate = new Date(createdAtMin).toISOString().split("T")[0]
+		const endDate = new Date(createdAtMax).toISOString().split("T")[0]
 		
 		if (!marketplaceNames[marketplace]) {
 			throw new Error("Marketplace não encontrado")
@@ -57,7 +57,7 @@ export const fetchOrdersByMarketplace = async (marketplace, createdAtMin, create
 				total_pedido,
 				produtos
 			FROM pedidos_marketplace 
-			WHERE TO_DATE(data_pedido, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'DD/MM/YYYY') AND TO_DATE($2, 'DD/MM/YYYY')
+			WHERE data_pedido BETWEEN $1::date AND $2::date
 			AND ecommerce->>'nomeEcommerce' = $3
 			AND (
 				(situacao = 'Cancelado' AND CAST(id_nota_fiscal AS INTEGER) > 0)
@@ -74,9 +74,9 @@ export const fetchOrdersByMarketplace = async (marketplace, createdAtMin, create
 
 export const fetchOrdersAllMarketplace = async (createdAtMin, createdAtMax) => {
 	try {
-		// Converte as datas para o formato DD/MM/YYYY
-		const startDate = createdAtMin.split("T")[0].split("-").reverse().join("/")
-		const endDate = createdAtMax.split("T")[0].split("-").reverse().join("/")
+		// Converte para Date e depois para string no formato YYYY-MM-DD
+		const startDate = new Date(createdAtMin).toISOString().split("T")[0]
+		const endDate = new Date(createdAtMax).toISOString().split("T")[0]
 		
 		const result = await query(`
 			SELECT
@@ -84,7 +84,7 @@ export const fetchOrdersAllMarketplace = async (createdAtMin, createdAtMax) => {
 				total_pedido,
 				produtos
 			FROM pedidos_marketplace 
-			WHERE TO_DATE(data_pedido, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'DD/MM/YYYY') AND TO_DATE($2, 'DD/MM/YYYY') 
+			WHERE data_pedido BETWEEN $1::date AND $2::date
 			AND (
 				(
 					(situacao = 'Cancelado' AND CAST(id_nota_fiscal AS INTEGER) > 0)
