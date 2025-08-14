@@ -96,6 +96,7 @@ router.delete("/order/:store/:ownerNote", deleteOrderByOwnerNote) // Adicione a 
 // WEBHOOKS
 router.post("/webhooks/order-created", createdOrderWebhook)
 router.post("/webhooks/order-marketplace", createOrderMarketplaceWebhook)
+// TINY ESINTEGRADA
 router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
 
 // Rotas TINY

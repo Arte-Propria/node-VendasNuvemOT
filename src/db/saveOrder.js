@@ -94,13 +94,13 @@ export const saveOrder = async (order) => {
         produtos
       ) 
       VALUES (
-        $1, $2, $3, TO_DATE($4, 'DD/MM/YYYY'), $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
         $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38
       )
       ON CONFLICT (id) DO UPDATE SET
         numero = $2,
         numero_ecommerce = $3,
-        data_pedido = TO_DATE($4, 'DD/MM/YYYY'),
+        data_pedido = $4,
         data_prevista = $5,
         data_faturamento = $6,
         data_envio = $7,
