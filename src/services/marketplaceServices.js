@@ -104,8 +104,10 @@ export const fetchOrdersAllMarketplace = async (createdAtMin, createdAtMax) => {
 export const fetchOrdersAllMarketplaceOptimized = async (createdAtMin, createdAtMax) => {
 	try {
 		// Converte as datas para o formato DD/MM/YYYY
-		const startDate = createdAtMin.split("T")[0].split("-").reverse().join("/")
-		const endDate = createdAtMax.split("T")[0].split("-").reverse().join("/")
+		// const startDate = createdAtMin.split("T")[0].split("-").reverse().join("/")
+		// const endDate = createdAtMax.split("T")[0].split("-").reverse().join("/")
+		const startDate = createdAtMin.split("T")[0]
+		const endDate = createdAtMax.split("T")[0]
 		
 		const result = await query(`
 			SELECT 
@@ -130,7 +132,7 @@ export const fetchOrdersAllMarketplaceOptimized = async (createdAtMin, createdAt
 				deposito,
 				itens
 			FROM pedidos_marketplace 
-			WHERE TO_DATE(data_pedido, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'DD/MM/YYYY') AND TO_DATE($2, 'DD/MM/YYYY') 
+			WHERE data_pedido BETWEEN $1 AND $2
 			AND (
 				situacao NOT IN ('Cancelado', 'Reprovado', 'Não Entregue', 'Dados incompletos')
 				OR (situacao = 'Cancelado' AND CAST(id_nota_fiscal AS INTEGER) > 0) AND ecommerce IS NOT NULL
