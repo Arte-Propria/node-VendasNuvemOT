@@ -43,8 +43,8 @@ const saveAdsMarketplace = async (body) => {
 	// Ajusta para o fuso horário de São Paulo (UTC-3)
 	const offsetMs = -3 * 60 * 60 * 1000
 	const saoPauloDate = new Date(now.getTime() + offsetMs)
-	const createdAt = saoPauloDate.toISOString().slice(0, 19).replace("T", " ")
-	const updatedAt = saoPauloDate.toISOString().slice(0, 19).replace("T", " ")
+	const createdAt = saoPauloDate
+	const updatedAt = saoPauloDate
   
 	const tableName = "anuncios_marketplace"
   
@@ -92,4 +92,20 @@ const saveAdsMarketplace = async (body) => {
 
 	const result = await query(queryString, values)
 	return result.rows[0]
+}
+
+export const fetchAdsMarketplace = async (createdAtMin, createdAtMax, marketplace) => {
+	const queryString = `
+		SELECT order_at, ad_id, product_name, product_sku, quantity, total FROM anuncios_marketplace WHERE order_at >= $1 AND order_at <= $2 AND marketplace = $3
+	`
+	const values = [createdAtMin, createdAtMax, marketplace]
+	const result = await query(queryString, values)
+	const total = result.rowCount
+	
+	logAdsMarketplace(`Anúncios marketplace encontrados: ${total}, marketplace: ${marketplace}, createdAtMin: ${createdAtMin}, createdAtMax: ${createdAtMax}`)
+	return {
+		message: "Anúncios marketplace encontrados com sucesso",
+		success: true,
+		ads: result.rows
+	}
 }

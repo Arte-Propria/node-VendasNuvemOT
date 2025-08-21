@@ -26,7 +26,7 @@ import {
 	updateSheinOrderStatusController
 } from "../controllers/sheinControllers.js"
 import { getCategoriesChatFunnel, getOrdersChatFunnel, getProductsChatFunnel } from "../controllers/chatfunnelControllers.js"
-import { createAdsMarketplace } from "../controllers/adsMarketplaceControllers.js"
+import { createAdsMarketplace, getAdsMarketplace } from "../controllers/adsMarketplaceControllers.js"
 import { compararPedidos, compararPedidoNuvem, compararPedidosTiny } from "../controllers/comparacaoController.js"
 import { getOMandaeInfoByStore, getMandaeInfoByDate } from "../controllers/mandaeControllers.js"
 
@@ -96,6 +96,7 @@ router.delete("/order/:store/:ownerNote", deleteOrderByOwnerNote) // Adicione a 
 // WEBHOOKS
 router.post("/webhooks/order-created", createdOrderWebhook)
 router.post("/webhooks/order-marketplace", createOrderMarketplaceWebhook)
+// TINY ESINTEGRADA
 router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
 
 // Rotas TINY
@@ -107,9 +108,8 @@ router.get("/comparar/:store/:dataInicial/:dataFinal", compararPedidos)
 router.get("/comparar_tiny/:store/:dataInicial/:dataFinal", compararPedidosTiny)
 router.get("/comparar_nuvem/:store/:dataInicial/:dataFinal", compararPedidoNuvem)
 
-
 // Rotas Mandae
-router.get('/mandae/:store',getOMandaeInfoByStore)
+router.get('/mandae',getOMandaeInfoByStore)
 router.get('/mandae/:store/:createdAtMin/:createdAtMax',getMandaeInfoByDate)
 
 // Rotas de reembolsos
@@ -124,6 +124,7 @@ router.get("/marketplace/orders/:createdAtMin/:createdAtMax", getOrdersAllMarket
 // Rotas PCP
 router.get("/pcp/orders/:createdAtMin/:createdAtMax", getOrdersAllMarketplaceOptimized)
 router.post("/pcp/ads/marketplace", createAdsMarketplace)
+router.get("/pcp/ads/marketplace", getAdsMarketplace)
 
 // Rotas ChatFunnel
 router.get("/chatfunnel/:store/orders/:client", getOrdersChatFunnel)

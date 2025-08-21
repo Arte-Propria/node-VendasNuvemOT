@@ -38,17 +38,6 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
 
-		const listWebhooks = [
-			{
-				url: "https://script.google.com/macros/s/AKfycbzVuwgMw6PTi5TquPJOADYMLSWsxEjr11WYlgv7e2Kf6P_igqqkonQmf35dKeaReEoQ/exec",
-				name: "AppsScripts EDU"
-			}
-		]
-
-		if(body.tipo === "atualizacao_pedido") {
-			await POSTwebhook(listWebhooks, body)
-		}
-
 		res.status(200).send(result)
 	} catch (error) {
 		// logWebhook(`Erro ao processar o webhook: ${error}`)
