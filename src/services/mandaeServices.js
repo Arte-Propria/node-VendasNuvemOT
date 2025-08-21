@@ -33,7 +33,7 @@ export const fetchTestRequest = async () => {
   }
 };
 
-// Função para filtrar os dados formatados
+// Função para filtrar os dados formatados por data
 export const filterMandaeData = (data, { store, startDate, endDate }) => {
   try {
 		// Normalizar o nome da loja para comparação case-insensitive
@@ -57,6 +57,26 @@ export const filterMandaeData = (data, { store, startDate, endDate }) => {
       
       // Verificar se está dentro do intervalo
       return itemDate >= start && itemDate <= end;
+    });
+    
+  } catch (error) {
+    console.error('Error filtering data:', error.message);
+    throw new Error('Erro ao filtrar dados');
+  }
+};
+
+// Função para filtrar os dados formatados
+export const filterMandaeStore = (data, { store }) => {
+  try {
+		// Normalizar o nome da loja para comparação case-insensitive
+    const normalizedStore = store.toUpperCase();
+
+    
+    return data.filter(item => {
+      // Verificar correspondência da loja (case-insensitive)
+      if (normalizedStore && item.store.toUpperCase() !== normalizedStore) return false;
+      
+      return item
     });
     
   } catch (error) {
