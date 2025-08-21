@@ -109,7 +109,7 @@ router.get("/comparar_tiny/:store/:dataInicial/:dataFinal", compararPedidosTiny)
 router.get("/comparar_nuvem/:store/:dataInicial/:dataFinal", compararPedidoNuvem)
 
 // Rotas Mandae
-router.get('/mandae',getOMandaeInfoByStore)
+router.get('/mandae/:store',getOMandaeInfoByStore)
 router.get('/mandae/:store/:createdAtMin/:createdAtMax',getMandaeInfoByDate)
 
 // Rotas de reembolsos
