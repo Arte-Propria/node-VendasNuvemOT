@@ -41,10 +41,8 @@ export const getMandaeInfoByDate = async (req, res) => {
     });
   }
 };
-/*
-export const getOMandaeInfoByStore = async (req, res) => {
-  const { store } = req.params
 
+export const getOMandaeInfo = async (req, res) => {
   try {
     const result = await query(`SELECT * FROM info_mandae`)
     res.status(200).json(result.rows)
@@ -52,7 +50,7 @@ export const getOMandaeInfoByStore = async (req, res) => {
     console.error("Erro ao buscar pedidos:", err)
     res.status(500).json({ error: "Erro ao buscar pedidos" })
   }
-}*/
+}
 
 export const getOMandaeInfoByStore = async (req, res) => {
   const { store } = req.params;

@@ -5,12 +5,22 @@ import { query } from '../db/db.js';
 
 dotenv.config();
 
+export async function queryMandae() {
+  try {
+    const response = await query(`SELECT * FROM info_mandae`);
+    return response
+  } catch (error) {
+    console.error(`Error fetching Deliveries data from Mandae`, error.message);
+    return [];
+  }
+}
+
 // 1. Função para realizar o fetch
 export const fetchTestRequest = async () => {
   let allDeliveries = [];
 
   try {
-    const response = await query(`SELECT * FROM info_mandae`);
+    const response = await queryMandae();
 
     const result = response.rows.map((delivery) => ({
       id: delivery.id_ped,
@@ -82,5 +92,43 @@ export const filterMandaeStore = (data, { store }) => {
   } catch (error) {
     console.error('Error filtering data:', error.message);
     throw new Error('Erro ao filtrar dados');
+  }
+};
+
+// Função para atualizar a tabela info_mandae
+export const updateMandaeInfo = async (order, store) => {
+  try {
+    // 1. Buscar o pedido na tabela info_mandae pelo id_ped
+    const findOrderQuery = `SELECT * FROM info_mandae WHERE id_ped = $1`;
+    const orderResult = await query(findOrderQuery, [order.id]);
+    
+    if (orderResult.rows.length === 0) {
+      console.log(`Pedido ${order.id} não encontrado na tabela info_mandae`);
+      return;
+    }
+    
+    const mandaeOrder = orderResult.rows[0];
+    
+    // 2. Verificar se o shipping_status é 'delivered' e atualizar a situacao
+    let newSituacao = mandaeOrder.situacao;
+    if (order.shipping_status === 'delivered' && mandaeOrder.situacao === 'NOK') {
+      newSituacao = 'OK';
+    }
+    
+    // 3. Atualizar a data da última modificação
+    const currentDate = new Date().toISOString();
+    
+    // 4. Query de atualização
+    const updateQuery = `
+      UPDATE info_mandae 
+      SET situacao = $1, ultima_att = $2
+      WHERE id_ped = $3
+    `;
+    
+    await query(updateQuery, [newSituacao, currentDate, order.id]);
+    console.log(`Mandae - Pedido ${order.id} atualizado: situacao = ${newSituacao}, ultima_att = ${currentDate}`);
+    
+  } catch (err) {
+    console.error("Erro ao atualizar pedido na info_mandae:", err);
   }
 };
