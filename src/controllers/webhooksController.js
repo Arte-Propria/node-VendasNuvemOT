@@ -28,7 +28,7 @@ export const createdOrderWebhook = async  (req, res) => {
 		console.log(`Pedido ID: ${id} atualizado`)
 		
     // Atualizar a tabela info_mandae
-    await updateMandaeInfo(order, stores[store_id]);
+    //await updateMandaeInfo(order, stores[store_id]);
 
 		// Confirmação de recebimento do webhook
 		res.sendStatus(200) // Nuvemshop espera um status 2XX para considerar o webhook processado
