@@ -6,13 +6,21 @@ import { config } from "../config/env.js"
 import { logEcommerce, logPCP } from "../utils/logger.js"
 
 export const POSTtinyES = async (endpoint, data) => {
-	const { id, numero, numero_ecommerce, cliente, ecommerce, id_nota_fiscal, ...dataPedido } = data
+	const {
+		id,
+		numero,
+		numero_ecommerce,
+		cliente,
+		ecommerce,
+		id_nota_fiscal,
+		...dataPedido
+	} = data
 	const { codigo, ...dataCliente } = cliente
 	try {
 		const pedido = {
-			cliente: { ...dataCliente	},
-			itens: data.itens.map(({item}) => ({
-				item: { 
+			cliente: { ...dataCliente },
+			itens: data.itens.map(({ item }) => ({
+				item: {
 					descricao: item.descricao,
 					quantidade: item.quantidade,
 					valor_unitario: item.valor_unitario,
@@ -39,10 +47,9 @@ export const POSTtinyES = async (endpoint, data) => {
 			},
 			body: payload.toString()
 		})
-		
+
 		const responseData = await response.json()
 		return responseData
-
 	} catch (error) {
 		console.error("Erro! Não foi possível salvar o pedido na base.")
 		console.error("Stacktrace:", error.stack)
@@ -52,19 +59,32 @@ export const POSTtinyES = async (endpoint, data) => {
 }
 
 export const POSTtinyABSTRACT = async (endpoint, data) => {
-	const { id, numero, numero_ecommerce, cliente, ecommerce, situacao, obs, id_nota_fiscal, marcadores, id_natureza_operacao, nota_fiscal, ...dataPedido } = data
+	const {
+		id,
+		numero,
+		numero_ecommerce,
+		cliente,
+		ecommerce,
+		situacao,
+		obs,
+		id_nota_fiscal,
+		marcadores,
+		id_natureza_operacao,
+		nota_fiscal,
+		...dataPedido
+	} = data
 
 	const ecommerceName = ecommerce?.nomeEcommerce || "Nuvemshop"
 
 	const marcadoresINTEGRADAES = [
 		{
-			"marcador": {
-				"descricao": "INTEGRADAES"
+			marcador: {
+				descricao: "INTEGRADAES"
 			}
 		},
 		{
-			"marcador": {
-				"descricao": ecommerceName
+			marcador: {
+				descricao: ecommerceName
 			}
 		}
 	]
@@ -76,17 +96,18 @@ export const POSTtinyABSTRACT = async (endpoint, data) => {
 	try {
 		const pedido = {
 			cliente: { ...dataCliente },
-			itens: data.itens.map(({item}) => ({
-				item: { 
+			itens: data.itens.map(({ item }) => ({
+				item: {
 					descricao: item.descricao,
 					quantidade: item.quantidade,
 					valor_unitario: item.valor_unitario,
 					unidade: item.unidade
 				}
 			})),
-			situacao: "aprovado",
+			situacao: "aberto",
 			obs: observacao,
-			numero_pedido_ecommerce: data.numero_ecommerce || data.numero_ordem_compra,
+			numero_pedido_ecommerce:
+        data.numero_ecommerce || data.numero_ordem_compra,
 			ecommerce: ecommerceName,
 			marcadores: marcadoresINTEGRADAES,
 			id_natureza_operacao: "798952072",
@@ -109,10 +130,9 @@ export const POSTtinyABSTRACT = async (endpoint, data) => {
 			},
 			body: payload.toString()
 		})
-		
+
 		const responseData = await response.json()
 		return responseData
-
 	} catch (error) {
 		console.error("Erro! Não foi possível salvar o pedido na base.")
 		console.error("Stacktrace:", error.stack)
@@ -123,7 +143,7 @@ export const POSTtinyABSTRACT = async (endpoint, data) => {
 
 export const POSTwebhook = async (webhookUrls, body) => {
 	try {
-		await Promise.all(webhookUrls.map(async ({url, name}) => {
+		await Promise.all(webhookUrls.map(async ({ url, name }) => {
 			const response = await fetch(url, {
 				method: "POST",
 				headers: {
@@ -131,12 +151,12 @@ export const POSTwebhook = async (webhookUrls, body) => {
 				},
 				body: JSON.stringify(body)
 			})
-			
+
 			if (!response.ok) {
 				logPCP(`Erro ao enviar webhook para ${name}. Pedido: ${body.dados.id}`)
 				throw new Error(`Falha no webhook ${name}`)
 			}
-			
+
 			logPCP(`Webhook enviado com sucesso para ${name}. Pedido: ${body.dados.id}`)
 		}))
 	} catch (error) {

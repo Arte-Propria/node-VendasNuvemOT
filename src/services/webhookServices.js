@@ -409,6 +409,28 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 		urlRastreamento: encodeURI(orderDetailsABSTRACT.url_rastreamento)
 	}
 
+	const statusPermitidos = [
+		"Pronto para envio",
+		"Enviado",
+		"Cancelado",
+		"Entregue",
+		"Preparando envio",
+		"pronto_envio",
+		"cancelado",
+		"entregue",
+		"preparando_envio"
+	]
+
+	const isUpdateOrder = statusPermitidos.includes(orderDetailsABSTRACT.situacao)
+
+	if(!isUpdateOrder) {
+		logEcommerce(`Pedido ${id} não pode ser atualizado. Situacao: ${orderDetailsABSTRACT.situacao}`)
+		return {
+			status: "error",
+			message: `Pedido ${id} não pode ser atualizado. Situacao: ${orderDetailsABSTRACT.situacao}`
+		}
+	}
+
 	await PUTtiny.ES(data)
 	logEcommerce(`Pedido atualizado no Tiny Integrada ES. Pedido com ID: ${id}`)
 
