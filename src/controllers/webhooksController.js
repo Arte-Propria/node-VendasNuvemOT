@@ -3,7 +3,7 @@ import { POSTwebhook } from "../api/post.js"
 import { fetchOrder, insertOrderWebhook } from "../services/orderServicesNuvem.js"
 import { processEcommerceWebhook, processMarketplaceWebhook } from "../services/webhookServices.js"
 import { logEcommerce } from "../utils/logger.js"
-import { updateMandaeInfo } from '../services/mandaeServices.js'
+import { updateMandaeInfo, webhookMandaeInfo } from '../services/mandaeServices.js'
 
 export const createdOrderWebhook = async  (req, res) => {
 	try {
@@ -64,3 +64,34 @@ export const createOrderEcommerceWebhook = async (req, res) => {
 		res.sendStatus(200)
 	}
 }
+
+export const mandaeWebhook = async (req, res) => {
+  try {
+    const { id_ped, status_mandae } = req.body;
+
+    // Validar dados recebidos
+    if (!id_ped || !status_mandae) {
+      return res.status(400).json({ 
+        error: "id_ped e status_mandae são obrigatórios" 
+      });
+    }
+
+    // Chamar o service para atualizar a informação
+    const result = await webhookMandaeInfo(id_ped, status_mandae);
+    
+    console.log(result.message, result.details);
+    
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("Erro no webhook da Mandae:", err);
+    
+    if (err.message.includes('não encontrado')) {
+      return res.status(404).json({ error: err.message });
+    }
+    
+    res.status(500).json({ 
+      error: "Erro interno do servidor",
+      details: err.message 
+    });
+  }
+};

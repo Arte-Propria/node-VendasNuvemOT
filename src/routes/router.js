@@ -10,7 +10,7 @@ import { createOrder } from "../controllers/createOrderController.js"
 import { postProduct } from "../controllers/createProductController.js"
 import { getCategories } from "../controllers/categoriesControllers.js"
 import { deleteOrderByOwnerNote } from "../controllers/deleteOrderController.js"
-import { createdOrderWebhook, createOrderEcommerceWebhook, createOrderMarketplaceWebhook } from "../controllers/webhooksController.js"
+import { createdOrderWebhook, createOrderEcommerceWebhook, createOrderMarketplaceWebhook, mandaeWebhook } from "../controllers/webhooksController.js"
 import { getNoteOrderTiny, getOrderTiny } from "../controllers/orderTinyController.js"
 import { getRefunds, createRefund, deleteRefund } from "../controllers/refundsControllers.js"
 import { getTikTokAuth, getTikTokAds, getTikTokCreatives } from "../controllers/tiktokControllers.js"
@@ -96,6 +96,8 @@ router.delete("/order/:store/:ownerNote", deleteOrderByOwnerNote) // Adicione a 
 // WEBHOOKS
 router.post("/webhooks/order-created", createdOrderWebhook)
 router.post("/webhooks/order-marketplace", createOrderMarketplaceWebhook)
+router.post('/webhook/mandae', mandaeWebhook) // Webhook para atualizações da Mandae
+
 // TINY ESINTEGRADA
 router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
 
