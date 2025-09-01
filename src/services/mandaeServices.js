@@ -220,12 +220,13 @@ export const webhookMandaeInfo = async (id_ped, status_mandae) => {
     // 3. Adicionar novo status ao array
     currentStatusArray.push(status_mandae);
     
-    // 4. Atualizar ultima_att com a data do último evento
-    const ultima_att = new Date(status_mandae.timestamp || status_mandae.date);
+    // 4. Atualizar ultima_att_mandae com a data do último evento
+    const ultima_att_mandae = new Date(status_mandae.timestamp || status_mandae.date);
     
     // 5. Calcular diferença de dias para determinar a situacao
     const today = new Date();
-    const diffTime = Math.abs(today - ultima_att);
+    const currentDate = today.toISOString();
+    const diffTime = Math.abs(today - ultima_att_mandae);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     let situacao = mandaeOrder.situacao;
@@ -240,15 +241,17 @@ export const webhookMandaeInfo = async (id_ped, status_mandae) => {
       UPDATE info_mandae 
       SET 
         status_mandae = $1,
-        ultima_att = $2,
-        situacao = $3
-      WHERE id_ped = $4
+        ultima_att_mandae = $2,
+        situacao = $3,
+        dt_atualizacao = $4
+      WHERE id_ped = $5
     `;
     
     await query(updateQuery, [
       JSON.stringify(currentStatusArray),
-      ultima_att.toISOString(),
+      ultima_att_mandae.toISOString(),
       situacao,
+      currentDate,
       id_ped
     ]);
     
@@ -256,7 +259,8 @@ export const webhookMandaeInfo = async (id_ped, status_mandae) => {
       message: `Pedido ${id_ped} atualizado via webhook Mandae`,
       details: {
         new_event: status_mandae.name,
-        ultima_att: ultima_att.toISOString(),
+        ultima_att_mandae: ultima_att_mandae.toISOString(),
+        dt_atualizacao: currentDate,
         situacao
       }
     };

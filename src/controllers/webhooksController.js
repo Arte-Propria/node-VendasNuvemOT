@@ -83,15 +83,18 @@ export const mandaeWebhook = async (req, res) => {
     
     res.sendStatus(200);
   } catch (err) {
-    console.error("Erro no webhook da Mandae:", err);
+    //console.error("Erro no webhook da Mandae:", err);
     
     if (err.message.includes('não encontrado')) {
       return res.status(404).json({ error: err.message });
     }
-    
+		logEcommerce(`Erro ao processar o webhook Mandae: ${err}`)
+    res.sendStatus(200);
+		/*
     res.status(500).json({ 
       error: "Erro interno do servidor",
       details: err.message 
     });
+		*/
   }
 };
