@@ -28,7 +28,7 @@ export const createdOrderWebhook = async  (req, res) => {
 		console.log(`Pedido ID: ${id} atualizado`)
 		
     // Atualizar a tabela info_mandae
-    //await updateMandaeInfo(order, stores[store_id]);
+    await updateMandaeInfo(order, stores[store_id]);
 
 		// Confirmação de recebimento do webhook
 		res.sendStatus(200) // Nuvemshop espera um status 2XX para considerar o webhook processado
@@ -71,7 +71,7 @@ export const mandaeWebhook = async (req, res) => {
 
     // Validar dados recebidos
     if (!id_ped || !status_mandae) {
-      return res.status(400).json({ 
+      return res.status(200).json({ 
         error: "id_ped e status_mandae são obrigatórios" 
       });
     }
@@ -85,12 +85,13 @@ export const mandaeWebhook = async (req, res) => {
   } catch (err) {
     //console.error("Erro no webhook da Mandae:", err);
     
-    if (err.message.includes('não encontrado')) {
-      return res.status(404).json({ error: err.message });
-    }
 		logEcommerce(`Erro ao processar o webhook Mandae: ${err}`)
     res.sendStatus(200);
+
 		/*
+		if (err.message.includes('não encontrado')) {
+      return res.status(404).json({ error: err.message });
+    }
     res.status(500).json({ 
       error: "Erro interno do servidor",
       details: err.message 

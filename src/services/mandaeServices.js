@@ -2,6 +2,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { query } from '../db/db.js';
+import { logEcommerce } from '../utils/logger.js';
 
 dotenv.config();
 
@@ -177,7 +178,7 @@ export const updateMandaeInfo = async (order, store) => {
       order.id
     ]);
 
-    console.log(`Pedido ${order.id} atualizado na info_mandae:
+    logEcommerce(`Pedido ${order.id} atualizado na info_mandae:
       - situacao: ${newSituacao}
       - status_ped: ${newStatusPed}
       - cod_rastreio: ${newCodRastreio}
