@@ -122,7 +122,8 @@ export const updateMandaeInfo = async (order, store) => {
     // Verificar se o shipping_status é 'delivered' e atualizar a situacao
     else if (
       order.shipping_status === 'delivered' &&
-      mandaeOrder.situacao === 'NOK'
+      mandaeOrder.situacao === 'NOK' || order.shipping_status === 'delivered' &&
+      mandaeOrder.situacao === '-' 
     ) {
       newSituacao = 'OK';
     }
