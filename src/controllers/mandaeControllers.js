@@ -1,5 +1,6 @@
 import { query } from "../db/db.js"
 import { fetchTestRequest, filterMandaeData, filterMandaeStore } from '../services/mandaeServices.js'
+import { logEcommerce } from "../utils/logger.js";
 
 // Buscar pedidos por data
 export const getMandaeInfoByDate = async (req, res) => {
@@ -56,7 +57,7 @@ export const getOMandaeInfoByStore = async (req, res) => {
   const { store } = req.params;
   
     // Log para conferencia dos parametros recebidos
-  console.log('Parâmetros recebidos:', {
+  logEcommerce('Parâmetros recebidos:', {
     store
   });
 

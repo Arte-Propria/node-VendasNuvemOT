@@ -14,6 +14,10 @@ export const logEcommerce = (message) => {
 	console.log(`WEBHOOK Ecommerce: ${message}`)
 }
 
+export const logMandae = (message) => {
+	console.log(`WEBHOOK Mandae: ${message}`)
+}
+
 export const logMarketplace = (message) => {
 	console.log(`Marketplace: ${message}`)
 }

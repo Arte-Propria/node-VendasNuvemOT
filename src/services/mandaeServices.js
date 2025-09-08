@@ -2,7 +2,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { query } from '../db/db.js';
-import { logEcommerce } from '../utils/logger.js';
+import { logEcommerce, logMandae } from '../utils/logger.js';
 
 dotenv.config();
 
@@ -121,9 +121,9 @@ export const updateMandaeInfo = async (order, store) => {
     }
     // Verificar se o shipping_status é 'delivered' e atualizar a situacao
     else if (
-      order.shipping_status === 'delivered' &&
-      mandaeOrder.situacao === 'NOK' || order.shipping_status === 'delivered' &&
-      mandaeOrder.situacao === '-' 
+      (order.shipping_status === 'delivered' &&
+        mandaeOrder.situacao === 'NOK') ||
+      (order.shipping_status === 'delivered' && mandaeOrder.situacao === '-')
     ) {
       newSituacao = 'OK';
     }
@@ -192,52 +192,125 @@ export const updateMandaeInfo = async (order, store) => {
 };
 
 // Webhook para atualizar info_mandae com dados da Mandae
-export const webhookMandaeInfo = async (id_ped, status_mandae) => {
+export const webhookMandaeInfo = async (mandaeData) => {
   try {
+    const { trackingCode, events } = mandaeData;
+
     // 1. Buscar o pedido na tabela info_mandae
-    const findOrderQuery = `SELECT * FROM info_mandae WHERE id_ped = $1`;
-    const orderResult = await query(findOrderQuery, [id_ped]);
-    
+    const findOrderQuery = `SELECT * FROM info_mandae WHERE cod_rastreio = $1`;
+    const orderResult = await query(findOrderQuery, [trackingCode]);
+
     if (orderResult.rows.length === 0) {
-      throw new Error(`Pedido ${id_ped} não encontrado na tabela info_mandae`);
+      throw new Error(
+        `Pedido com código de rastreio ${trackingCode} não encontrado na tabela info_mandae`
+      );
     }
-    
+
     const mandaeOrder = orderResult.rows[0];
-    
+    const id_ped = mandaeOrder.id_ped; // Extrair id_ped para uso nos logs
+
     // 2. Preparar o array de status_mandae
     let currentStatusArray = [];
-    
+    let hasInvalidData = false;
+
     try {
-      // Converter status_mandae de string JSON para array, se necessário
-      if (typeof mandaeOrder.status_mandae === 'string') {
-        currentStatusArray = JSON.parse(mandaeOrder.status_mandae);
-      } else if (Array.isArray(mandaeOrder.status_mandae)) {
+      // Verificar se o valor é "nan" ou outro valor inválido
+      if (
+        mandaeOrder.status_mandae === 'nan' ||
+        mandaeOrder.status_mandae === 'NaN' ||
+        mandaeOrder.status_mandae === 'null' ||
+        mandaeOrder.status_mandae === null ||
+        mandaeOrder.status_mandae === undefined
+      ) {
+        hasInvalidData = true;
+        currentStatusArray = [];
+      }
+      // Tentar converter de string JSON para array
+      else if (typeof mandaeOrder.status_mandae === 'string') {
+        try {
+          currentStatusArray = JSON.parse(mandaeOrder.status_mandae);
+          if (!Array.isArray(currentStatusArray)) {
+            hasInvalidData = true;
+            currentStatusArray = [];
+          }
+        } catch (parseError) {
+          hasInvalidData = true;
+          currentStatusArray = [];
+          logMandae(
+            `Pedido ${id_ped} com valor inválido em status_mandae: ${mandaeOrder.status_mandae}. Substituindo por array vazio.`
+          );
+        }
+      }
+      // Se já for array, usar diretamente
+      else if (Array.isArray(mandaeOrder.status_mandae)) {
         currentStatusArray = mandaeOrder.status_mandae;
       }
+      // Qualquer outro caso, considerar inválido
+      else {
+        hasInvalidData = true;
+        currentStatusArray = [];
+      }
     } catch (err) {
-      console.error("Erro ao processar status_mandae:", err);
+      console.error(
+        `[Pedido: ${id_ped}] Erro ao processar status_mandae:`,
+        err
+      );
+      hasInvalidData = true;
       currentStatusArray = [];
     }
-    
-    // 3. Adicionar novo status ao array
-    currentStatusArray.push(status_mandae);
-    
-    // 4. Atualizar ultima_att_mandae com a data do último evento
-    const ultima_att_mandae = new Date(status_mandae.timestamp || status_mandae.date);
-    
+
+    // 3. Se havia dados inválidos, usar apenas os novos eventos
+    // Caso contrário, mesclar os eventos existentes com os novos
+    let finalStatusArray;
+
+    if (hasInvalidData) {
+      logMandae(
+        ` Substituindo valor inválido no pedido ${id_ped} em status_mandae por novos eventos para trackingCode: ${trackingCode}`
+      );
+      finalStatusArray = [...events]; // Usa apenas os novos eventos
+    } else {
+      // Mesclar eventos existentes com novos, evitando duplicatas
+      finalStatusArray = [...currentStatusArray];
+
+      events.forEach((newEvent) => {
+        const existingEventIndex = finalStatusArray.findIndex(
+          (existingEvent) => existingEvent.id === newEvent.id
+        );
+
+        if (existingEventIndex === -1) {
+          // Evento não existe, adicionar ao array
+          finalStatusArray.push(newEvent);
+        } else {
+          // Evento já existe, atualizar com os novos dados
+          finalStatusArray[existingEventIndex] = newEvent;
+        }
+      });
+    }
+
+    // 4. Ordenar eventos por timestamp (do mais recente para o mais antigo)
+    finalStatusArray.sort((a, b) => {
+      return new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date);
+    });
+
+    // 5. Usar o evento mais recente para atualizar ultima_att
+    const latestEvent = finalStatusArray[0];
+    const ultima_att_mandae = new Date(
+      latestEvent.timestamp || latestEvent.date
+    );
+
     // 5. Calcular diferença de dias para determinar a situacao
     const today = new Date();
     const currentDate = today.toISOString();
     const diffTime = Math.abs(today - ultima_att_mandae);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     let situacao = mandaeOrder.situacao;
     if (diffDays >= 2) {
-      situacao = "NOK"; // Pedido em atraso
+      situacao = 'NOK'; // Pedido em atraso
     } else {
-      situacao = "OK"; // Pedido no prazo
+      situacao = 'OK'; // Pedido no prazo
     }
-    
+
     // 6. Query de atualização
     const updateQuery = `
       UPDATE info_mandae 
@@ -246,29 +319,31 @@ export const webhookMandaeInfo = async (id_ped, status_mandae) => {
         ultima_att_mandae = $2,
         situacao = $3,
         dt_atualizacao = $4
-      WHERE id_ped = $5
+      WHERE cod_rastreio  = $5
     `;
-    
+
     await query(updateQuery, [
-      JSON.stringify(currentStatusArray),
+      JSON.stringify(finalStatusArray),
       ultima_att_mandae.toISOString(),
       situacao,
       currentDate,
-      id_ped
+      trackingCode
     ]);
-    
+
     return {
-      message: `Pedido ${id_ped} atualizado via webhook Mandae`,
+      message: `Pedido ${id_ped} com código de rastreio ${trackingCode} atualizado via webhook Mandae`,
       details: {
-        new_event: status_mandae.name,
+        had_invalid_data: hasInvalidData,
+        events_added: events.length,
+        total_events_now: finalStatusArray.length,
+        latest_event: latestEvent.name,
         ultima_att_mandae: ultima_att_mandae.toISOString(),
         dt_atualizacao: currentDate,
         situacao
       }
     };
-    
   } catch (err) {
-    console.error("Erro no service updateMandaeInfo:", err);
+    console.error('Erro no service updateMandaeInfo:', err);
     throw err;
   }
 };

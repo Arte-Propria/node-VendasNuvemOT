@@ -2,7 +2,7 @@
 import { POSTwebhook } from "../api/post.js"
 import { fetchOrder, insertOrderWebhook } from "../services/orderServicesNuvem.js"
 import { processEcommerceWebhook, processMarketplaceWebhook } from "../services/webhookServices.js"
-import { logEcommerce } from "../utils/logger.js"
+import { logEcommerce, logMandae } from "../utils/logger.js"
 import { updateMandaeInfo, webhookMandaeInfo } from '../services/mandaeServices.js'
 
 export const createdOrderWebhook = async  (req, res) => {
@@ -66,36 +66,25 @@ export const createOrderEcommerceWebhook = async (req, res) => {
 }
 
 export const mandaeWebhook = async (req, res) => {
+	const mandaeData = req.body;
   try {
-    const { id_ped, status_mandae } = req.body;
-
     // Validar dados recebidos
-    if (!id_ped || !status_mandae) {
+    if (!mandaeData.trackingCode || !mandaeData.events || !Array.isArray(mandaeData.events)) {
       return res.status(200).json({ 
-        error: "id_ped e status_mandae são obrigatórios" 
+        error: "trackingCode e events (array) são obrigatórios" 
       });
     }
 
     // Chamar o service para atualizar a informação
-    const result = await webhookMandaeInfo(id_ped, status_mandae);
+    const result = await webhookMandaeInfo(mandaeData);
     
-    console.log(result.message, result.details);
+    logMandae(result.message, result.details);
     
     res.sendStatus(200);
   } catch (err) {
-    //console.error("Erro no webhook da Mandae:", err);
     
-		logEcommerce(`Erro ao processar o webhook Mandae: ${err}`)
+		logMandae(`Erro ao processar o webhook Mandae no pedido com código de rastreio ${mandaeData.trackingCode} : ${err}`)
     res.sendStatus(200);
 
-		/*
-		if (err.message.includes('não encontrado')) {
-      return res.status(404).json({ error: err.message });
-    }
-    res.status(500).json({ 
-      error: "Erro interno do servidor",
-      details: err.message 
-    });
-		*/
   }
 };
