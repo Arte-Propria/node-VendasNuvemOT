@@ -38,7 +38,7 @@ const getAdsMarketplace = async (body) => {
 }
 
 const saveAdsMarketplace = async (body) => {
-	const { user, marketplace, order_at, ad_id, product_name, product_sku, quantity, total } = body
+	const { user, marketplace, ecommerce_id, order_at, ad_id, product_name, product_sku, quantity, total } = body
 	const now = new Date()
 	// Ajusta para o fuso horário de São Paulo (UTC-3)
 	const offsetMs = -3 * 60 * 60 * 1000
@@ -53,6 +53,7 @@ const saveAdsMarketplace = async (body) => {
       created_at,
       updated_at,
       marketplace,
+      ecommerce_id,
       created_user,
       updated_user,
       order_at,
@@ -67,6 +68,7 @@ const saveAdsMarketplace = async (body) => {
       $3,
       $4,
       $5,
+      $5,
       $6,
       $7,
       $8,
@@ -80,6 +82,7 @@ const saveAdsMarketplace = async (body) => {
 		createdAt,
 		updatedAt,
 		marketplace,
+		ecommerce_id,
 		user,
 		user,
 		order_at,
