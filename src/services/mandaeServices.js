@@ -103,7 +103,7 @@ export const updateMandaeInfo = async (order, store) => {
     const orderResult = await query(findOrderQuery, [order.id]);
 
     if (orderResult.rows.length === 0) {
-      console.log(`Pedido ${order.id} não encontrado na tabela info_mandae`);
+      logMandae(`Pedido ${order.id} não encontrado na tabela info_mandae`);
       return;
     }
 
@@ -179,7 +179,7 @@ export const updateMandaeInfo = async (order, store) => {
       order.id
     ]);
 
-    logEcommerce(`Pedido ${order.id} atualizado na info_mandae:
+    logMandae(`Pedido ${order.id} atualizado na info_mandae:
       - situacao: ${newSituacao}
       - status_ped: ${newStatusPed}
       - cod_rastreio: ${newCodRastreio}
