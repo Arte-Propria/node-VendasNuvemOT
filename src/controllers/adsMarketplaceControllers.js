@@ -6,7 +6,7 @@ export const createAdsMarketplace = async (req, res) => {
 		const response = await processAdsMarketplace(body)
 		res.status(201).json(response)
 	} catch (error) {
-		console.error(error)
+		console.error(error, body)
 		res.status(500).send("Erro ao salvar anuncios marketplace")
 	}
 }

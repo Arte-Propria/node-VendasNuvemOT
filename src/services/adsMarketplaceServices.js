@@ -39,11 +39,19 @@ const getAdsMarketplace = async (body) => {
 
 const saveAdsMarketplace = async (body) => {
 	const { user, marketplace, ecommerce_id, order_at, ad_id, product_name, product_sku, quantity, total } = body
+	const now = new Date()
+	// Ajusta para o fuso horário de São Paulo (UTC-3)
+	const offsetMs = -3 * 60 * 60 * 1000
+	const saoPauloDate = new Date(now.getTime() + offsetMs)
+	const createdAt = saoPauloDate
+	const updatedAt = saoPauloDate
   
 	const tableName = "anuncios_marketplace"
   
 	const queryString = `
     INSERT INTO ${tableName} (
+      created_at,
+      updated_at,
       marketplace,
       ecommerce_id,
       created_user,
@@ -65,11 +73,15 @@ const saveAdsMarketplace = async (body) => {
       $7,
       $8,
       $9,
-      $10
+      $10,
+      $11,
+			$12
     ) RETURNING *
   `
 
 	const values = [
+		createdAt,
+		updatedAt,
 		marketplace,
 		ecommerce_id,
 		user,
