@@ -48,7 +48,7 @@ export const fetchTestRequest = async () => {
 export const filterMandaeData = (data, { store, startDate, endDate }) => {
   try {
     // Normalizar o nome da loja para comparação case-insensitive
-    const normalizedStore = store.toUpperCase();
+    const normalizedStore = (store === 'artepropria' ? 'ARTE_PROPRIA'  : store.toUpperCase());
 
     // Converter datas para objetos Date
     const start = new Date(startDate + 'T00:00:00.000Z');
@@ -61,7 +61,7 @@ export const filterMandaeData = (data, { store, startDate, endDate }) => {
 
     return data.filter((item) => {
       // Verificar correspondência da loja (case-insensitive)
-      if (normalizedStore && item.store.toUpperCase() !== normalizedStore)
+      if (normalizedStore && (store === 'artepropria' ? 'ARTE_PROPRIA'  : item.store.toUpperCase()) !== normalizedStore)
         return false;
 
       // Converter a data do item
