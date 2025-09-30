@@ -6,7 +6,7 @@ import { logEcommerce } from "../utils/logger.js";
 export const getMandaeInfoByDate = async (req, res) => {
   const { store, createdAtMin, createdAtMax } = req.params;
   
-    // Log para conferencia dos parametros recebidos
+  // Log para conferencia dos parametros recebidos
   console.log('Parâmetros recebidos:', {
     store,
     createdAtMin,
