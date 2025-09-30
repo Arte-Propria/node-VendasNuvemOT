@@ -80,11 +80,11 @@ export const filterMandaeData = (data, { store, startDate, endDate }) => {
 export const filterMandaeStore = (data, { store }) => {
   try {
     // Normalizar o nome da loja para comparação case-insensitive
-    const normalizedStore = store.toUpperCase();
+    const normalizedStore = (store === 'artepropria' ? 'ARTE_PROPRIA'  : store.toUpperCase());
 
     return data.filter((item) => {
       // Verificar correspondência da loja (case-insensitive)
-      if (normalizedStore && item.store.toUpperCase() !== normalizedStore)
+      if (normalizedStore && (item.store === 'artepropria' ? 'ARTE_PROPRIA'  : item.store.toUpperCase()) !== normalizedStore)
         return false;
 
       return item;
