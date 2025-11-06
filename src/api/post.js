@@ -3,7 +3,7 @@
 
 import axios from "axios"
 import { config } from "../config/env.js"
-import { logEcommerce, logPCP } from "../utils/logger.js"
+import { logEcommerce, logGaleria9, logPCP } from "../utils/logger.js"
 
 export const POSTtinyES = async (endpoint, data) => {
 	const {
@@ -161,6 +161,25 @@ export const POSTwebhook = async (webhookUrls, body) => {
 		}))
 	} catch (error) {
 		logPCP(`Erro ao processar webhooks. Pedido: ${body.dados.id}`)
+		throw error
+	}
+}
+
+export const POSTgaleria9 = async (body) => {
+	const url = "https://primary-production-ca0e.up.railway.app/webhook/tiny-g9"
+	try {
+		const response = await fetch(url, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json"
+			},
+			body: JSON.stringify(body)
+		})
+
+		const responseData = await response.json()
+		return responseData
+	} catch (error) {
+		logGaleria9(`Erro ao enviar webhook para Galeria9. Pedido: ${body.pedido.id}, Erro: ${error.message}`)
 		throw error
 	}
 }

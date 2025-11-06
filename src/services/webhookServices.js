@@ -4,6 +4,7 @@ import { GETtiny, POSTtiny, PUTtiny } from "../api/tiny.js"
 import { saveOrder, updateOrderStatus } from "../db/saveOrder.js"
 import {
 	logEcommerce,
+	logGaleria9,
 	logPCP,
 	logWebhookMarketplace
 } from "../utils/logger.js"
@@ -13,6 +14,8 @@ import { JWT } from "google-auth-library"
 import { config } from "../config/env.js"
 import { delay, getSheetIdByName } from "../tools/tools.js"
 import { PUTOrderNuvemshop } from "../api/put.js"
+import axios from "axios"
+import { POSTgaleria9 } from "../api/post.js"
 
 const marketplaceNames = [
 	"Shopee",
@@ -194,6 +197,29 @@ export async function processUpdateOrderGSheets(dados) {
 	}
 }
 
+export const processMarketplaceWebhookGaleria9 = async (body) => {
+	const { pedido } = body
+	const { marcadores } = pedido
+	const isGaleria9 = marcadores.some((marcador) => marcador.marcador.descricao.toLowerCase() === "trianguladogaleria9")
+
+	if(isGaleria9) {
+		try {
+			await POSTgaleria9(body)
+			logGaleria9(`Pedido ${pedido.id} enviado para o Galeria9 com sucesso`)
+			return {
+				status: "success",
+				message: `Pedido ${pedido.id} enviado para o Galeria9 com sucesso`
+			}
+		} catch (error) {
+			logGaleria9(`Erro ao enviar webhook para Galeria9. Pedido: ${pedido.id}, Erro: ${error.message}`)
+			return {
+				status: "error",
+				message: `Erro ao enviar webhook para Galeria9. Pedido: ${pedido.id}, Erro: ${error.message}`
+			}
+		}
+	}
+}
+
 export const processMarketplaceWebhook = async (body) => {
 	const { tipo, dados, pedido } = body
 
@@ -202,6 +228,8 @@ export const processMarketplaceWebhook = async (body) => {
 		const isClientFullEstoque =
       cliente.nome.toUpperCase().includes("FULL") ||
       cliente.nome.toUpperCase().includes("ESTOQUE")
+
+		await processMarketplaceWebhookGaleria9(body)
 
 		// Verificar se o pedido é de um marketplace configurado ou se o cliente é FULL/ESTOQUE
 		if (!marketplaceNames.includes(nomeEcommerce) && !isClientFullEstoque) {
@@ -240,6 +268,8 @@ export const processMarketplaceWebhook = async (body) => {
 			const result = await updateOrderNuvemshop(dados, pedido)
 			return result
 		}
+
+		await processMarketplaceWebhookGaleria9(body)
 
 		// Verificar se o pedido é de um marketplace configurado
 		if (!marketplaceNames.includes(nomeEcommerce) && !isClientFullEstoque) {

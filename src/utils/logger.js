@@ -37,3 +37,7 @@ export const logChatFunnel = (message) => {
 export const logAdsMarketplace = (message) => {
 	console.log(`AdsMarketplace: ${message}`)
 }
+
+export const logGaleria9 = (message) => {
+	console.log(`WEBHOOK Galeria9: ${message}`)
+}
