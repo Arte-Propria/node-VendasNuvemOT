@@ -229,7 +229,10 @@ export const processMarketplaceWebhook = async (body) => {
       cliente.nome.toUpperCase().includes("FULL") ||
       cliente.nome.toUpperCase().includes("ESTOQUE")
 
-		await processMarketplaceWebhookGaleria9(body)
+		const resultGaleria9 = await processMarketplaceWebhookGaleria9(body)
+		if (resultGaleria9) {
+			return resultGaleria9
+		}
 
 		// Verificar se o pedido é de um marketplace configurado ou se o cliente é FULL/ESTOQUE
 		if (!marketplaceNames.includes(nomeEcommerce) && !isClientFullEstoque) {
@@ -269,7 +272,10 @@ export const processMarketplaceWebhook = async (body) => {
 			return result
 		}
 
-		await processMarketplaceWebhookGaleria9(body)
+		const resultGaleria9 = await processMarketplaceWebhookGaleria9(body)
+		if (resultGaleria9) {
+			return resultGaleria9
+		}
 
 		// Verificar se o pedido é de um marketplace configurado
 		if (!marketplaceNames.includes(nomeEcommerce) && !isClientFullEstoque) {
