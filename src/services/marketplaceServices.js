@@ -41,6 +41,26 @@ const marketplaceNamesList = [
 	"TikTok Shop Abstract"
 ]
 
+const statusPermitidos = [
+	"aprovado",
+	"faturado",
+	"pronto_envio",
+	"enviado",
+	"entregue",
+	"preparando_envio",
+	"Pronto para envio",
+	"Aprovado",
+	"Faturado",
+	"Enviado",
+	"Entregue",
+	"Preparando envio"
+]
+
+const clienteNomePermitidos = [
+	"FULL",
+	"ESTOQUE"
+]
+
 export const fetchOrdersByMarketplace = async (marketplace, createdAtMin, createdAtMax) => {
 	try {
 		// Converte para Date e depois para string no formato YYYY-MM-DD
@@ -229,18 +249,23 @@ export const fetchUpdateOrdersMarketplaceByDate = async (createdAtMin, createdAt
 			const orderExists = orderDB.rows.length > 0
 				
 			if(!orderExists) {
-				const isMarketplace = order.pedido.numero_ecommerce
-				if(isMarketplace) {
-					const orderDetails = await getOrderDetails(id, config.tinyApiToken)
-					const isMarketplaceList = marketplaceNamesList.includes(orderDetails.ecommerce.nomeEcommerce)
-					if(isMarketplaceList) {
-						await saveOrder(orderDetails)
-						ordersUpdated.push(order)
-					}
+				const isStatusPermitido = checkStatus(order)
+				if(!isStatusPermitido) {
+					continue
 				}
+
+				const orderDetails = await getOrderDetails(id, config.tinyApiToken)
+				const isContinue = checkOrder(order, orderDetails)
+
+				if(!isContinue) {
+					continue
+				}
+				await saveOrder(orderDetails)
+				ordersUpdated.push(order)
 			} else {
 				if(orderDB.rows[0].situacao !== order.pedido.situacao) {
 					await updateOrder(order.pedido.situacao, id)
+					ordersUpdated.push(order)
 				} else {
 					logDB(`Pedido ${order.pedido.id} já está atualizado.`)
 				}
@@ -254,4 +279,32 @@ export const fetchUpdateOrdersMarketplaceByDate = async (createdAtMin, createdAt
 		console.error("Erro ao buscar pedidos para atualização:", error)
 		throw error
 	}
+}
+
+const checkOrder = (order, orderDetails) => {
+	const isClientFullEstoque = clienteNomePermitidos.includes(orderDetails.cliente.nome.toUpperCase())
+
+	if(isClientFullEstoque) {
+		return true
+	}
+
+	const isMarketplace = marketplaceNamesList.includes(orderDetails.ecommerce?.nomeEcommerce || "")
+
+	if(!isMarketplace) {
+		logDB(`Pedido ${order.pedido.id} não atendeu aos critérios de atualização.`)
+		return false
+	}
+
+	return true
+}
+
+const checkStatus = (order) => {
+	const isStatusPermitido = statusPermitidos.includes(order.pedido.situacao)
+
+	if(!isStatusPermitido) {
+		logDB(`Pedido ${order.pedido.id} não atendeu aos critérios de atualização. Status: ${order.pedido.situacao}`)
+		return false
+	}
+
+	return true
 }

@@ -77,6 +77,7 @@ import {
 	executeBatchUpdate,
 	executeFullBatchUpdate
 } from "../controllers/mandaeControllers.js"
+import { fetchUpdateOrdersMarketplaceByDate } from "../services/marketplaceServices.js"
 
 const router = express.Router()
 
@@ -118,8 +119,7 @@ router.get("/analytics/:store/:createdAtMin/:createdAtMax", getAnalytics)
 // Rotas TikTok
 router.get("/tiktok/auth", getTikTokAuth)
 router.get("/ads/tiktok/:store/:createdAtMin/:createdAtMax", getTikTokAds)
-router.get("/creatives/tiktok/:store/:createdAtMin/:createdAtMax",
-	getTikTokCreatives)
+router.get("/creatives/tiktok/:store/:createdAtMin/:createdAtMax",	getTikTokCreatives)
 
 // Autenticação Shopee
 router.get("/shopee/auth", getShopeeAuth)
@@ -156,10 +156,8 @@ router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
 
 // -- Conferencia de sku
 router.get("/comparar/:store/:dataInicial/:dataFinal", compararPedidos)
-router.get("/comparar_tiny/:store/:dataInicial/:dataFinal",
-	compararPedidosTiny)
-router.get("/comparar_nuvem/:store/:dataInicial/:dataFinal",
-	compararPedidoNuvem)
+router.get("/comparar_tiny/:store/:dataInicial/:dataFinal",	compararPedidosTiny)
+router.get("/comparar_nuvem/:store/:dataInicial/:dataFinal",	compararPedidoNuvem)
 
 // Rotas Mandae
 router.get("/mandae", getOMandaeInfo)
@@ -169,20 +167,16 @@ router.get("/debug/:cod_ped", executeBatchUpdate)
 router.get("/batch-update", executeFullBatchUpdate)
 
 // Rotas de reembolsos
-router.get("/refunds/:store/:refundType/:createdAtMin/:createdAtMax",
-	getRefunds)
+router.get("/refunds/:store/:refundType/:createdAtMin/:createdAtMax",	getRefunds)
 router.post("/refunds/:store", createRefund)
 router.delete("/refunds/:store/:id", deleteRefund)
 
 // Rotas Marketplace
-router.get("/marketplace/orders/:marketplace/:createdAtMin/:createdAtMax",
-	getOrdersByMarketplace)
-router.get("/marketplace/orders/:createdAtMin/:createdAtMax",
-	getOrdersAllMarketplace)
-
+router.get("/marketplace/orders/:marketplace/:createdAtMin/:createdAtMax", getOrdersByMarketplace)
+router.get("/marketplace/orders/:createdAtMin/:createdAtMax",	getOrdersAllMarketplace)
+router.get("/update-orders-by-date/marketplace", updateOrdersMarketplaceByDate) // Atualiza os pedidos do marketplace por data
 // Rotas PCP
-router.get("/pcp/orders/:createdAtMin/:createdAtMax",
-	getOrdersAllMarketplaceOptimized)
+router.get("/pcp/orders/:createdAtMin/:createdAtMax",	getOrdersAllMarketplaceOptimized)
 router.post("/pcp/ads/marketplace", createAdsMarketplace)
 router.get("/pcp/ads/marketplace", getAdsMarketplace)
 
