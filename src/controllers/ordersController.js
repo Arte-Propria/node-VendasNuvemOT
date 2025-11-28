@@ -8,10 +8,10 @@ export const getOrders = async (req, res) => {
 		if(orders.length > 0) {
 			await insertOrders(orders, params.store)
 		}
-		res.status(200).send("Pedidos atualizados")
+		return res.status(200).send("Pedidos atualizados")
 	} catch (error) {
 		console.error(error)
-		res.status(404).send("Erro ao buscar pedidos")
+		return res.status(404).send("Erro ao buscar pedidos")
 	}
 }
 
@@ -20,10 +20,10 @@ export const getOrder = async (req, res) => {
 		const params = req.params
 		const orders = await fetchOrder(params)
 		console.log(orders)
-		res.status(200).json(orders)
+		return res.status(200).json(orders)
 	} catch (error) {
 		console.error(error)
-		res.status(404).send("Erro ao buscar pedido")
+		return res.status(404).send("Erro ao buscar pedido")
 	}
 }
 
@@ -46,10 +46,10 @@ export const getOrdersByDate = async (req, res) => {
 		const endDateSQL = endDate.toISOString().slice(0, 10)
 
 		const result = await query(`SELECT * FROM ${tableName} WHERE DATE(created_at) BETWEEN '${startDateSQL}' AND '${endDateSQL}'`)
-		res.json(result.rows)
+		return res.json(result.rows)
 	} catch (err) {
 		console.error("Erro ao buscar pedidos:", err)
-		res.status(500).json({ error: "Erro ao buscar pedidos" })
+		return res.status(500).json({ error: "Erro ao buscar pedidos" })
 	}
 }
 
@@ -59,10 +59,10 @@ export const getOrdersByStore = async (req, res) => {
 	try {
 		const tableName = store === "outlet" ? "pedidos_outlet" : "pedidos_artepropria"
 		const result = await query(`SELECT * FROM ${tableName}`)
-		res.status(200).json(result.rows)
+		return res.status(200).json(result.rows)
 	} catch (err) {
 		console.error("Erro ao buscar pedidos:", err)
-		res.status(500).json({ error: "Erro ao buscar pedidos" })
+		return res.status(500).json({ error: "Erro ao buscar pedidos" })
 	}
 }
 
@@ -101,10 +101,10 @@ export const updateAllOrdersFromDateRange = async (req, res) => {
 			currentDate = previousMonth
 		}
 
-		res.status(200).send("Todos os pedidos foram recuperados e atualizados com sucesso.")
+		return res.status(200).send("Todos os pedidos foram recuperados e atualizados com sucesso.")
 	} catch (error) {
 		console.error("Erro ao buscar pedidos:", error)
-		res.status(500).send("Erro ao buscar e salvar pedidos.")
+		return res.status(500).send("Erro ao buscar e salvar pedidos.")
 	}
 }
 
@@ -114,9 +114,9 @@ export const updateOrdersTinyIntegradaES = async (req, res) => {
 	try {
 		const orders = await fetchOrders({ store, createdAtMin, createdAtMax })
 		console.log(orders)
-		res.status(200).json(orders)
+		return res.status(200).json(orders)
 	} catch (error) {
 		console.error(error)
-		res.status(404).send("Erro ao buscar pedidos")
+		return res.status(404).send("Erro ao buscar pedidos")
 	}
 }

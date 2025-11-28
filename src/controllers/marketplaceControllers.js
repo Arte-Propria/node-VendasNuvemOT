@@ -7,10 +7,10 @@ export const getOrdersByMarketplace = async (req, res) => {
 		const orders = await fetchOrdersByMarketplace(marketplace, createdAtMin, createdAtMax)
 		logMarketplace(`Pedidos do marketplace ${marketplace} obtidos com sucesso. ${orders.length} pedidos.`)
 
-		res.status(200).json(orders)
+		return res.status(200).json(orders)
 	} catch (error) {
 		logMarketplace(`Erro ao obter pedidos do marketplace ${marketplace}: ${error}`)
-		res.status(500).json({ error: "Erro ao obter pedidos do marketplace" })
+		return res.status(500).json({ error: "Erro ao obter pedidos do marketplace" })
 	}
 
 }
@@ -20,10 +20,10 @@ export const getOrdersAllMarketplace = async (req, res) => {
 	try {
 		const orders = await fetchOrdersAllMarketplace(createdAtMin, createdAtMax)
 		logMarketplace(`Pedidos de todos os marketplaces obtidos com sucesso. ${orders.length} pedidos.`)
-		res.status(200).json(orders)
+		return res.status(200).json(orders)
 	} catch (error) {
 		logMarketplace(`Erro ao obter pedidos de todos os marketplaces: ${error}`)
-		res.status(500).json({ error: "Erro ao obter pedidos de todos os marketplaces" })
+		return res.status(500).json({ error: "Erro ao obter pedidos de todos os marketplaces" })
 	}
 }
 
@@ -32,10 +32,10 @@ export const getOrdersAllMarketplaceOptimized = async (req, res) => {
 	try {
 		const orders = await fetchOrdersAllMarketplaceOptimized(createdAtMin, createdAtMax)
 		logPCP(`Pedidos de todos os marketplaces obtidos com sucesso. ${orders.length} pedidos.`)
-		res.status(200).json(orders)
+		return res.status(200).json(orders)
 	} catch (error) {
 		logPCP(`Erro ao obter pedidos de todos os marketplaces: ${error}`)
-		res.status(500).json({ error: "Erro ao obter pedidos de todos os marketplaces" })
+		return res.status(500).json({ error: "Erro ao obter pedidos de todos os marketplaces" })
 	}
 }
 
@@ -44,10 +44,10 @@ export const updateOrdersMarketplace = async (req, res) => {
 	try {
 		const orders = await fetchUpdateOrdersMarketplace(days)
 		logDB(`Banco de dados atualizado com sucesso. ${orders.length} pedidos.`)
-		res.status(200).json({ orders, message: "Banco de dados atualizado com sucesso." })
+		return res.status(200).json({ orders, message: "Banco de dados atualizado com sucesso." })
 	} catch (error) {
 		logDB(`Erro ao atualizar banco de dados: ${error}`)
-		res.status(500).json({ error: "Erro ao atualizar banco de dados" })
+		return res.status(500).json({ error: "Erro ao atualizar banco de dados" })
 	}
 }
 

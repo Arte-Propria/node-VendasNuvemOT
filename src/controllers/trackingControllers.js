@@ -16,13 +16,13 @@ export async function testarBuscaRastreioIsolada(req, res) {
     const orderData = await fetchTinyOrders(id);
 
     // Retorna os dados com sucesso
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: orderData,
     });
   } catch (error) {
     // Retorna o erro capturado do service
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message || 'Erro interno do servidor.',
     });

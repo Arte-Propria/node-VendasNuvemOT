@@ -5,11 +5,11 @@ export const getOrderTiny = async (req, res) => {
 
 	try {
 		const order = await fetchOrderTiny(id, cpf)
-		res.status(200).json(order)
+		return res.status(200).json(order)
 
 	} catch (err) {
 		console.error("Erro ao buscar pedido:", err)
-		res.status(500).json({ error: "Erro ao buscar pedido" })
+		return res.status(500).json({ error: "Erro ao buscar pedido" })
 	}
 }
 
@@ -19,10 +19,10 @@ export const getNoteOrderTiny = async (req, res) => {
 	try {
 		const note = await fetchNoteOrderTiny(id, cpf)
 		const linkNote = await fetchLinkNote(note.id)
-		res.status(200).json(linkNote)
+		return res.status(200).json(linkNote)
 
 	} catch (err) {
 		console.error("Erro ao buscar nota fiscal:", err)
-		res.status(500).json({ error: "Erro ao nota fiscal" })
+		return res.status(500).json({ error: "Erro ao nota fiscal" })
 	}
 }

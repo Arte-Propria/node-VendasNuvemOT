@@ -31,12 +31,12 @@ export const getMandaeInfoByDate = async (req, res) => {
     });
 
     // 3. Retornar resultados filtrados
-    res.json(filteredData);
+    return res.json(filteredData);
   } catch (err) {
     console.error('Erro ao processar pedidos:', err.message);
 
     const statusCode = err.message.includes('inválida') ? 400 : 500;
-    res.status(statusCode).json({
+    return res.status(statusCode).json({
       error: err.message || 'Erro interno no servidor',
       details: {
         receivedDates: {
@@ -51,10 +51,10 @@ export const getMandaeInfoByDate = async (req, res) => {
 export const getOMandaeInfo = async (req, res) => {
   try {
     const result = await query(`SELECT * FROM info_mandae`);
-    res.status(200).json(result.rows);
+    return res.status(200).json(result.rows);
   } catch (err) {
     console.error('Erro ao buscar pedidos:', err);
-    res.status(500).json({ error: 'Erro ao buscar pedidos' });
+    return res.status(500).json({ error: 'Erro ao buscar pedidos' });
   }
 };
 
@@ -76,12 +76,12 @@ export const getOMandaeInfoByStore = async (req, res) => {
     });
 
     // 3. Retornar resultados filtrados
-    res.json(filteredData);
+    return res.json(filteredData);
   } catch (err) {
     console.error('Erro ao processar pedidos:', err.message);
 
     const statusCode = err.message.includes('inválida') ? 400 : 500;
-    res.status(statusCode).json({
+    return res.status(statusCode).json({
       error: err.message || 'Erro interno no servidor',
     });
   }
@@ -124,13 +124,13 @@ export const executeBatchUpdate = async (req, res) => {
     const resultado = await debugParseStatusMandaeByCodPed(cod_ped);
 
     if (resultado.success) {
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         message: resultado.acao_realizada,
         data: resultado,
       });
     } else {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Erro durante o debug',
         error: resultado.error,
@@ -138,7 +138,7 @@ export const executeBatchUpdate = async (req, res) => {
     }
   } catch (error) {
     console.error('Erro na execução do debug:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Erro interno do servidor',
       error: error.message,
@@ -165,13 +165,13 @@ export const executeFullBatchUpdate = async (req, res) => {
     }
 
     if (resultado.success) {
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         message: resultado.message,
         data: resultado
       });
     } else {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Erro durante a atualização em lote',
         error: resultado.error
@@ -180,7 +180,7 @@ export const executeFullBatchUpdate = async (req, res) => {
 
   } catch (error) {
     console.error('Erro na execução da atualização em lote:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Erro interno do servidor',
       error: error.message

@@ -7,12 +7,12 @@ export const postProduct = async (req, res) => {
     const response = await fetchCreateProduct({ store, body });
     
     // Enviar uma resposta clara para o frontend
-    res.status(response.status).json({
+    return res.status(response.status).json({
       message: response.statusText,
       data: response.data,
     });
   } catch (error) {
     console.error(error);
-    res.status(500).send('Erro ao cadastrar produto');
+    return res.status(500).send('Erro ao cadastrar produto');
   }
 };

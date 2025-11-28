@@ -18,7 +18,7 @@ export const getPedidos = async (req, res) => {
     // Busca todos os pedidos com detalhes
     const pedidos = await fetchTinyOrdersWithDetails(store, dataInicial, dataFinal);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       store,
       count: pedidos.length,
@@ -26,7 +26,7 @@ export const getPedidos = async (req, res) => {
     });
   } catch (error) {
     console.error('Erro no controller:', error.message);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });
@@ -58,7 +58,7 @@ export const getPedidosNuvemshop = async (req, res) => {
     // 2. Formata os pedidos para o modelo simplificado
     const formattedOrders = formatDbOrders(result.rows);
     
-    res.json({
+    return res.json({
       success: true,
       store,
       periodo: `${createdAtMin} - ${createdAtMax}`,
@@ -68,7 +68,7 @@ export const getPedidosNuvemshop = async (req, res) => {
     
   } catch (err) {
     console.error("Erro ao buscar pedidos:", err);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false,
       error: "Erro ao buscar pedidos",
       details: err.message 
@@ -83,7 +83,7 @@ export const getPedidosNuvem = async (req, res) => {
     // Busca todos os pedidos com detalhes
     const pedidos = await fetchNuvemShopOrders(store, dataInicial, dataFinal);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       store,
       count: pedidos.length,
@@ -91,7 +91,7 @@ export const getPedidosNuvem = async (req, res) => {
     });
   } catch (error) {
     console.error('Erro no controller:', error.message);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });

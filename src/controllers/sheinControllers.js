@@ -4,10 +4,10 @@ export const getSheinAuth = async (req, res) => {
 	try {
 		const authUrl = generateSheinAuthUrl()
 		console.log("URL de autorização SHEIN gerada:", authUrl)
-		res.redirect(authUrl)
+		return res.redirect(authUrl)
 	} catch (error) {
 		console.error("Erro ao gerar URL de autorização da SHEIN:", error)
-		res.status(500).json({
+		return res.status(500).json({
 			success: false,
 			message: "Erro ao gerar URL de autorização da SHEIN",
 			error: error.message

@@ -12,9 +12,9 @@ export const createOrder = async (req, res) => {
 		console.log("Cadastrando pedido", order[0])
 		await insertOrder(order[0], store) // Chama a função para inserir os pedidos no banco de dados
 
-		res.status(201).json({ message: "Pedido cadastrado!" })
+		return res.status(201).json({ message: "Pedido cadastrado!" })
 	} catch (error) {
 		console.error("Erro ao criar pedido:", error)
-		res.status(500).json({ error: "Erro ao criar pedido" })
+		return res.status(500).json({ error: "Erro ao criar pedido" })
 	}
 }

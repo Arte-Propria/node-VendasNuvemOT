@@ -21,7 +21,7 @@ export const compararPedidos = async (req, res) => {
     
     console.log(`Comparação concluída: ${resultados.length} resultados`);
     
-    res.json({
+    return res.json({
       success: true,
       periodo: `${dataInicial} - ${dataFinal}`,
       totalPedidosTiny: pedidosTiny.length,
@@ -32,7 +32,7 @@ export const compararPedidos = async (req, res) => {
     
   } catch (error) {
     console.error("Erro na comparação:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });
@@ -206,14 +206,14 @@ export const compararPedidoNuvem = async (req, res) => {
     const pedidosNuvem = await fetchNuvemShopOrders(store, dataInicial, dataFinal);
     console.log(`[NuvemShop] ${pedidosNuvem.length} pedidos encontrados`);
     
-    res.json({
+    return res.json({
       success: true,
       pedidosNuvem
     });
     
   } catch (error) {
     console.error("Erro tiny:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });
@@ -228,14 +228,14 @@ export const compararPedidosTiny = async (req, res) => {
     const pedidosTiny = await fetchTinyOrdersWithDetails(store, dataInicial, dataFinal);
     console.log(`[Tiny] ${pedidosTiny.length} pedidos encontrados`);
     
-    res.json({
+    return res.json({
       success: true,
       pedidosTiny
     });
     
   } catch (error) {
     console.error("Erro tiny:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });

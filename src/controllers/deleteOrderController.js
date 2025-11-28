@@ -14,9 +14,9 @@ export const deleteOrderByOwnerNote = async (req, res) => {
 		if (result.rowCount === 0) {
 			return res.status(404).json({ error: "Order not found" })
 		}
-		res.status(200).json({ message: "Order deleted successfully" })
+		return res.status(200).json({ message: "Order deleted successfully" })
 	} catch (err) {
 		console.error("Error deleting order:", err)
-		res.status(500).json({ error: "Failed to delete order" })
+		return res.status(500).json({ error: "Failed to delete order" })
 	}
 }

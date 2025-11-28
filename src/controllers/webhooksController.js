@@ -44,10 +44,10 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
 
-		res.status(200).send(result)
+		return res.status(200).send(result)
 	} catch (error) {
 		// logWebhook(`Erro ao processar o webhook: ${error}`)
-		res.status(200)
+		return res.status(200)
 	}
 }
 
@@ -58,10 +58,10 @@ export const createOrderEcommerceWebhook = async (req, res) => {
 		const { message } = await processEcommerceWebhook(body)
 
 		logEcommerce(message)
-		res.sendStatus(200)
+		return res.sendStatus(200)
 	} catch (error) {
 		logEcommerce(`Erro ao processar o webhook: ${error}`)
-		res.sendStatus(200)
+		return res.sendStatus(200)
 	}
 }
 
@@ -80,11 +80,11 @@ export const mandaeWebhook = async (req, res) => {
     
 		logMandae(result.message, result.details)
     
-		res.sendStatus(200)
+		return res.sendStatus(200)
 	} catch (err) {
     
 		//logMandae(`Erro ao processar o webhook Mandae no pedido com código de rastreio ${mandaeData.trackingCode} : ${err}`)
-		res.sendStatus(200)
+		return res.sendStatus(200)
 
 	}
 }

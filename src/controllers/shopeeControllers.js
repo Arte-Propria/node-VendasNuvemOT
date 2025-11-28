@@ -3,10 +3,10 @@ import { fetchShopeeAuth, generateAuthUrl } from "../services/shopeeServices.js"
 export const getShopeeAuth = async (req, res) => {
 	try {
 		const authUrl = generateAuthUrl()
-		res.redirect(authUrl)
+		return res.redirect(authUrl)
 	} catch (error) {
 		console.error("Erro ao gerar URL de autorização da Shopee:", error)
-		res.status(500).json({
+		return res.status(500).json({
 			success: false,
 			message: "Erro ao gerar URL de autorização da Shopee",
 			error: error.message
