@@ -56,9 +56,9 @@ export const updateOrdersMarketplaceByDate = async (req, res) => {
 	try {
 		const orders = await fetchUpdateOrdersMarketplaceByDate(createdAtMin, createdAtMax)
 		logMarketplace(`Pedidos do marketplace atualizados com sucesso. ${orders.length} pedidos.`)
-		res.status(200).json({ orders: orders.length, message: "Pedidos do marketplace atualizados com sucesso." })
+		return res.status(200).json({ orders: orders.length, message: "Pedidos do marketplace atualizados com sucesso." })
 	} catch (error) {
 		logMarketplace(`Erro ao atualizar pedidos do marketplace: ${error}`)
-		res.status(500).json({ error: "Erro ao atualizar pedidos do marketplace" })
+		return res.status(500).json({ error: "Erro ao atualizar pedidos do marketplace" })
 	}
 }

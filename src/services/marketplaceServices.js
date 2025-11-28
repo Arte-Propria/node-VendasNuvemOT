@@ -241,34 +241,40 @@ export const fetchUpdateOrdersMarketplaceByDate = async (createdAtMin, createdAt
 
 		// Processa os pedidos de forma síncrona para evitar sobrecarga
 		for (const order of orders) {
-			const id = parseInt(order.pedido.id)
-			const orderDB = await query(`
-					SELECT id, situacao FROM pedidos_marketplace WHERE id = $1
-				`, [id])
-	
-			const orderExists = orderDB.rows.length > 0
-				
-			if(!orderExists) {
-				const isStatusPermitido = checkStatus(order)
-				if(!isStatusPermitido) {
-					continue
-				}
+			try {
+				const id = parseInt(order.pedido.id)
+				const orderDB = await query(`
+						SELECT id, situacao FROM pedidos_marketplace WHERE id = $1
+					`, [id])
+		
+				const orderExists = orderDB.rows.length > 0
+					
+				if(!orderExists) {
+					const isStatusPermitido = checkStatus(order)
+					if(!isStatusPermitido) {
+						continue
+					}
 
-				const orderDetails = await getOrderDetails(id, config.tinyApiToken)
-				const isContinue = checkOrder(order, orderDetails)
+					const orderDetails = await getOrderDetails(id, config.tinyApiToken)
+					const isContinue = checkOrder(order, orderDetails)
 
-				if(!isContinue) {
-					continue
-				}
-				await saveOrder(orderDetails)
-				ordersUpdated.push(order)
-			} else {
-				if(orderDB.rows[0].situacao !== order.pedido.situacao) {
-					await updateOrder(order.pedido.situacao, id)
+					if(!isContinue) {
+						continue
+					}
+					await saveOrder(orderDetails)
 					ordersUpdated.push(order)
 				} else {
-					logDB(`Pedido ${order.pedido.id} já está atualizado.`)
+					if(orderDB.rows[0].situacao !== order.pedido.situacao) {
+						await updateOrder(order.pedido.situacao, id)
+						ordersUpdated.push(order)
+					} else {
+						logDB(`Pedido ${order.pedido.id} já está atualizado.`)
+					}
 				}
+			} catch (error) {
+				logDB(`Erro ao processar pedido ${order.pedido.id}: ${error.message}`)
+				// Continua processando os próximos pedidos mesmo se um falhar
+				continue
 			}
 		}
 			
