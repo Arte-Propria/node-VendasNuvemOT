@@ -16,7 +16,7 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
 		accountID = process.env.META_ID_ACCOUNT_ARTEPROPRIA
 	}
 
-	const campaignsUrl = `https://graph.facebook.com/v20.0/act_${accountID}/campaigns`
+	const campaignsUrl = `https://graph.facebook.com/v24.0/act_${accountID}/campaigns`
 
 	const campaignParams = {
 		fields: "id,name",
@@ -25,20 +25,51 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
 	}
 
 	try {
-		const campaignsResponse = await axios.get(campaignsUrl, { params: campaignParams })
-		let campaigns = campaignsResponse.data.data
+		// Função para buscar todas as campanhas com paginação
+		let allCampaigns = []
+		let nextPageUrl = campaignsUrl
+		let pageParams = { ...campaignParams }
+		let hasNextPage = true
+		let pageCount = 0
+		const maxPages = 100 // Limite de segurança para evitar loops infinitos
+
+		while (hasNextPage && pageCount < maxPages) {
+			const campaignsResponse = await axios.get(nextPageUrl, { params: pageParams })
+			const responseData = campaignsResponse.data
+
+			if (responseData.data && responseData.data.length > 0) {
+				allCampaigns = allCampaigns.concat(responseData.data)
+			}
+
+			// Verifica se há próxima página
+			if (responseData.paging && responseData.paging.cursors && responseData.paging.cursors.after) {
+				pageParams.after = responseData.paging.cursors.after
+				pageCount++
+			} else {
+				hasNextPage = false
+			}
+		}
+
+		let campaigns = allCampaigns
 
 		// Busca insights para cada campanha
 		const insightsPromises = campaigns.map(async (campaign) => {
-			const insightsUrl = `https://graph.facebook.com/v20.0/${campaign.id}/insights`
-			const params = {
-				time_range: `{"since":"${createdAtMin}","until":"${createdAtMax}"}`,
-				access_token: accessToken,
-				fields: "spend,account_id,impressions"
-			}
+			try {
+				const insightsUrl = `https://graph.facebook.com/v20.0/${campaign.id}/insights`
+				const params = {
+					time_range: `{"since":"${createdAtMin}","until":"${createdAtMax}"}`,
+					access_token: accessToken,
+					fields: "spend,account_id,impressions"
+				}
 
-			const insightsResponse = await axios.get(insightsUrl, { params })
-			return { campaignName: campaign.name, insights: insightsResponse.data.data }
+				const insightsResponse = await axios.get(insightsUrl, { params })
+				const insights = insightsResponse.data.data || []
+				return { campaignName: campaign.name, insights }
+			} catch (error) {
+				// Se falhar ao buscar insights de uma campanha, retorna array vazio
+				console.warn(`Erro ao buscar insights da campanha ${campaign.name}:`, error.message)
+				return { campaignName: campaign.name, insights: [] }
+			}
 		})
 
 		const insightsArray = await Promise.all(insightsPromises)
@@ -55,28 +86,38 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
 		let account_id = accountID
 
 		insightsArray.forEach(({ campaignName, insights }) => {
-			insights.forEach((insight) => {
-				const spend = parseFloat(insight.spend)
-				totalSpend += spend
+			if (!insights || !Array.isArray(insights)) return
 
-				if (campaignName.toLowerCase().includes("ecom")) {
+			insights.forEach((insight) => {
+				if (!insight) return
+
+				const spend = parseFloat(insight.spend) || 0
+				const impressions = parseInt(insight.impressions, 10) || 0
+
+				totalSpend += spend
+				totalImpressions += impressions
+
+				if (insight.account_id) {
+					account_id = insight.account_id
+				}
+
+				const campaignNameLower = campaignName.toLowerCase()
+
+				if (campaignNameLower.includes("ecom")) {
 					totalSpendEcom += spend
-				} else if (campaignName.toLowerCase().includes("quadro")) {
+				} else if (campaignNameLower.includes("quadro")) {
 					totalSpendQuadros += spend
-				} else if (campaignName.toLowerCase().includes("espelho")) {
+				} else if (campaignNameLower.includes("espelho")) {
 					totalSpendEspelhos += spend
 				} else if (campaignName.includes("WSP")) {
 					totalSpendChatbot += spend
-				} else if (campaignName.toLowerCase().includes("instagram")){
+				} else if (campaignNameLower.includes("instagram")) {
 					totalSpendInsta += spend
-				} else if (campaignName.toLowerCase().includes("geral")){
-					totalSpendGeral += spend
 				}
-
-				totalImpressions += parseInt(insight.impressions, 10)
-				account_id = insight.account_id
 			})
 		})
+
+		totalSpendGeral = totalSpend - totalSpendEcom - totalSpendQuadros - totalSpendEspelhos - totalSpendChatbot - totalSpendInsta
 
 		// Retorna os valores formatados com `toFixed(2)`
 		const result = [{
