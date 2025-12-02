@@ -18,6 +18,7 @@ import { deleteOrderByOwnerNote } from "../controllers/deleteOrderController.js"
 import {
 	createdOrderWebhook,
 	createOrderEcommerceWebhook,
+	createOrderEcommerceWebhookManual,
 	createOrderMarketplaceWebhook,
 	mandaeWebhook
 } from "../controllers/webhooksController.js"
@@ -149,6 +150,7 @@ router.post("/webhook/mandae", mandaeWebhook) // Webhook para atualizações da 
 
 // TINY ESINTEGRADA
 router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
+router.post("/webhooks/order-ecommerce-manual", createOrderEcommerceWebhookManual)
 
 // Rotas TINY
 router.get("/tiny/order/:id/:cpf", getOrderTiny)

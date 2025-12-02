@@ -22,6 +22,12 @@ export const GETOrdersTinyINTEGRADA = async (endpoint, data) => {
 	return pedidos
 }
 
+export const GETOrdersTinyINTEGRADAES = async (endpoint, data) => {
+	const { pedidos } = await tinyApiRequestPaginated(endpoint, config.tinyApiTokenArteIntegradaES, data)
+
+	return pedidos
+}
+
 export const GETOrdersTinyBASEL = async (endpoint, data) => {
 	const { pedidos } = await tinyApiRequestPaginated(endpoint, config.tinyApiTokenBasel, data)
 
@@ -148,6 +154,44 @@ export const GETNuvemOrder = async (id) => {
 			}
 		})
 		return responseArtePropria.data
+	}
+}
+
+export const GETNuvemOrderByCPF = async (cpf) => {
+	try {
+		// Tenta buscar primeiro na loja Outlet
+		const url = `${config.nuvemshopApiBaseUrl}/${config.storeIdOutlet}/orders`
+		const response = await axios({
+			method: "get",
+			url,
+			headers: {
+				Authentication: `bearer ${config.accessTokenOutlet}`,
+				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+				"Content-Type": "application/json"
+			},
+			params: {
+				"per_page": 156,
+				"q": cpf
+			}
+		})
+		return response.data[0]
+	} catch (error) {
+		// Se falhar, tenta buscar na loja Arte Própria
+		const urlArtePropria = `${config.nuvemshopApiBaseUrl}/${config.storeIdArtePropria}/orders`
+		const responseArtePropria = await axios({
+			method: "get",
+			url: urlArtePropria,
+			headers: {
+				Authentication: `bearer ${config.accessTokenArtePropria}`,
+				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+				"Content-Type": "application/json"
+			},
+			params: {
+				"per_page": 156,
+				"q": cpf
+			}
+		})
+		return responseArtePropria.data[0]
 	}
 }
 

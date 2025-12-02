@@ -1,6 +1,6 @@
 /* eslint-disable camelcase */
 import { fetchOrder, insertOrderWebhook } from "../services/orderServicesNuvem.js"
-import { processEcommerceWebhook, processMarketplaceWebhook } from "../services/webhookServices.js"
+import { processEcommerceWebhook, processEcommerceWebhookGetOrders, processEcommerceWebhookManual, processMarketplaceWebhook } from "../services/webhookServices.js"
 import { logEcommerce, logMandae } from "../utils/logger.js"
 import { parseStatusMandae, updateMandaeInfo, webhookMandaeInfo } from "../services/mandaeServices.js"
 import { query } from "../db/db.js"
@@ -58,6 +58,27 @@ export const createOrderEcommerceWebhook = async (req, res) => {
 		const { message } = await processEcommerceWebhook(body)
 
 		logEcommerce(message)
+		return res.sendStatus(200)
+	} catch (error) {
+		logEcommerce(`Erro ao processar o webhook: ${error}`)
+		return res.sendStatus(200)
+	}
+}
+
+export const createOrderEcommerceWebhookManual = async (req, res) => {
+	try {
+		const { createdAtMin, createdAtMax } = req.query
+
+		const orders = await processEcommerceWebhookGetOrders(createdAtMin, createdAtMax)
+
+		logEcommerce(`Processando ${orders.length} pedidos`)
+		let ordersProcessed = 0
+		for (const order of orders) {
+			const { message } = await processEcommerceWebhookManual(order)
+			logEcommerce(message + ` - ${ordersProcessed} de ${orders.length}`)
+			ordersProcessed++
+		}
+
 		return res.sendStatus(200)
 	} catch (error) {
 		logEcommerce(`Erro ao processar o webhook: ${error}`)

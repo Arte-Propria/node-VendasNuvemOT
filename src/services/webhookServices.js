@@ -1,5 +1,5 @@
 /* eslint-disable camelcase */
-import { GETNuvemOrder, GETNuvemOrderByNumberOrder } from "../api/get.js"
+import { GETNuvemOrder, GETNuvemOrderByCPF, GETNuvemOrderByNumberOrder, GETOrdersTinyINTEGRADAES } from "../api/get.js"
 import { GETtiny, POSTtiny, PUTtiny } from "../api/tiny.js"
 import { saveOrder, updateOrderStatus } from "../db/saveOrder.js"
 import {
@@ -347,6 +347,99 @@ async function processUpdateOrder(dados, pedido) {
 	} catch (error) {
 		logWebhookMarketplace(`Erro ao processar o pedido: ${error}, ${dados}`)
 		return { status: "error", message: "Erro ao processar o pedido" }
+	}
+}
+
+export const processEcommerceWebhookGetOrders = async (createdAtMin, createdAtMax) => {
+	const data = {
+		dataInicial: createdAtMin,
+		dataFinal: createdAtMax
+	}
+	const endpoint = "pedidos.pesquisa.php"
+	
+	logEcommerce(`Recuperando pedidos do intervalo: ${createdAtMin} até ${createdAtMax}`)
+
+	const ordersIntegradaES = await GETOrdersTinyINTEGRADAES(endpoint, data)
+
+	const orders = ordersIntegradaES.filter((order) => order.pedido.situacao.toLowerCase() === "faturado").map((order) => ({
+		tipo: "atualizacao_pedido",
+		dados: {
+			id: order.pedido.id,
+			numero_ecommerce: order.pedido.numero_ecommerce,
+			data: order.pedido.data_pedido,
+			codigoSituacao: order.pedido.situacao.toLowerCase(),
+			status: order.pedido.situacao
+		}
+	})) 
+
+	return orders
+}
+
+export const processEcommerceWebhookManual = async (body) => {
+	const { tipo, dados } = body
+	const { codigoSituacao: status } = dados
+
+	if (tipo === "inclusao_pedido") {
+		return {
+			status: "ignored",
+			message: "Novo pedido criado"
+		}
+	}
+
+	if (tipo === "atualizacao_pedido" && status !== "faturado") {
+		return {
+			status: "ignored",
+			message: "Pedido não faturado"
+		}
+	}
+
+	if (tipo === "atualizacao_pedido" && status === "faturado") {
+		const orderDetails = await getOrderDetailsES(dados.id)
+		const pedidosExistentes = await GETtiny.ABSTRACT("pedidos.pesquisa.php", {
+			dataInicialOcorrencia: dados.data,
+			cliente: orderDetails.cliente.nome,
+			cpf_cnpj: orderDetails.cliente.cpf_cnpj
+		})
+
+		const isPedidoExistente = pedidosExistentes.some((pedido) => pedido.pedido.numero_ecommerce === dados.numero_ecommerce.toString())
+
+		if (isPedidoExistente) {
+			return {
+				status: "success",
+				message: `Pedido já existe na conta Abstract. Pedido com ID: ${dados.id}`
+			}
+		}
+
+		const nota_fiscal = await GETtiny.ESnote("nota.fiscal.obter.php", {
+			id: orderDetails.id_nota_fiscal
+		})
+
+		let retry = true
+		let result = null
+
+		while(retry) {
+			result = await POSTtiny.ABSTRACT("pedido.incluir.php", {
+				...orderDetails,
+				nota_fiscal
+			})
+
+			if(result.retorno.codigo_erro === 6) {
+				await new Promise(resolve => setTimeout(resolve, 30000))
+				retry = true
+			} else {
+				retry = false
+			}
+
+		}
+
+		const id = result.retorno.registros.registro.id
+
+		await new Promise(resolve => setTimeout(resolve, 5000))
+
+		return {
+			status: "success",
+			message: `Pedido salvo na conta Abstract. Pedido com ID: ${id}`
+		}
 	}
 }
 
