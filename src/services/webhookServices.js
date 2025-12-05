@@ -202,7 +202,9 @@ export const processMarketplaceWebhookGaleria9 = async (body) => {
 	const { marcadores } = pedido
 	const isGaleria9 = marcadores.some((marcador) => marcador.marcador.descricao.toLowerCase() === "trianguladogaleria9")
 
+	console.log("marcadores", marcadores)
 	if(isGaleria9) {
+		console.log("isGaleria9", isGaleria9)
 		try {
 			await POSTgaleria9(body)
 			logGaleria9(`Pedido ${pedido.id} enviado para o Galeria9 com sucesso`)
