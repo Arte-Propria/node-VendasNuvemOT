@@ -200,9 +200,11 @@ export async function processUpdateOrderGSheets(dados) {
 export const processMarketplaceWebhookGaleria9 = async (body) => {
 	const { pedido } = body
 	const { marcadores } = pedido
+	console.log(pedido)
 	const isGaleria9 = marcadores.some((marcador) => marcador.marcador.descricao.toLowerCase() === "trianguladogaleria9")
 
 	if(isGaleria9) {
+		console.log("Enviando pedido para o Galeria9")
 		try {
 			await POSTgaleria9(body)
 			logGaleria9(`Pedido ${pedido.id} enviado para o Galeria9 com sucesso`)
