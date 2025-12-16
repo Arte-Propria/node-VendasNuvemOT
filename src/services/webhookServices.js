@@ -445,7 +445,7 @@ export const processEcommerceWebhookManual = async (body) => {
 
 export const processEcommerceWebhook = async (body) => {
 	const { tipo, dados } = body
-	const { codigoSituacao: status } = dados
+	const { situacao: status } = dados
 
 	if (tipo === "inclusao_pedido") {
 		return {
