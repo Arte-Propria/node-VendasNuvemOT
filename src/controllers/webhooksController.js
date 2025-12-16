@@ -54,14 +54,15 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 export const createOrderEcommerceWebhook = async (req, res) => {
 	try {
 		const { body } = req
+		console.log(body)
 
 		const { message } = await processEcommerceWebhook(body)
 
 		logEcommerce(message)
-		return res.sendStatus(200)
+		return res.status(200)
 	} catch (error) {
 		logEcommerce(`Erro ao processar o webhook: ${error}`)
-		return res.sendStatus(200)
+		return res.status(200)
 	}
 }
 
