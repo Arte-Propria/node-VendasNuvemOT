@@ -54,7 +54,7 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 export const createOrderEcommerceWebhook = async (req, res) => {
 	try {
 		const { body } = req
-		console.log(body)
+		console.log(req)
 
 		const { message } = await processEcommerceWebhook(body)
 
