@@ -223,12 +223,11 @@ export async function atualizarPlanilhaGaleria9(pedidoDados) {
       'Content-Type': 'application/json',
       // Adicione um cabeçalho de autenticação se você implementou no doPost
       // 'X-Webhook-Token': process.env.WEBHOOK_SECRET
-    },
-    timeout: WEBHOOK_CONFIG.TIMEOUT
+    }
   };
 
   logGaleria9(`[TinyWebhookService] Enviando atualização para pedido ID: ${pedidoDados.id}`);
-  logGaleria9(`[TinyWebhookService] Endpoint: ${WEBHOOK_CONFIG.URL}`);
+  logGaleria9(`[TinyWebhookService] Endpoint: ${WEBHOOK_URL}`);
 
   try {
     // 3. Faz a requisição HTTP POST
