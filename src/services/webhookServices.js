@@ -205,7 +205,7 @@ export const processMarketplaceWebhookGaleria9 = async (body) => {
 	if (isGaleria9) {
 		try {
 			await POSTgaleria9(body)
-			await atualizarPlanilhaGaleria9(body)
+			await atualizarPlanilhaGaleria9(pedido)
 			logGaleria9(`Pedido ${pedido.id} enviado para o Galeria9 com sucesso`)
 			logGaleria9(`
 				id: ${pedido.id}, 
@@ -213,6 +213,7 @@ export const processMarketplaceWebhookGaleria9 = async (body) => {
 				codigo_rastreamento: ${pedido.codigo_rastreamento}, 
 				url_rastreamento: ${pedido.url_rastreamento}
 				`)
+
 			return {
 				status: "success",
 				message: `Pedido ${pedido.id} enviado para o Galeria9 com sucesso`
