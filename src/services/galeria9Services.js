@@ -1,6 +1,7 @@
 import axios from "axios"
 import { google } from "googleapis"
 import dotenv from "dotenv"
+import { logGaleria9 } from "../utils/logger.js"
 
 dotenv.config()
 
@@ -200,7 +201,7 @@ const testPayload = {
 };
 
 
-export async function enviarAtualizacaoDePedido(pedidoDados) {
+export async function atualizarPlanilhaGaleria9(pedidoDados) {
   // 1. Monta o payload no formato exato que a sua função doPost espera
   const payload = {
     retorno: {
@@ -226,14 +227,14 @@ export async function enviarAtualizacaoDePedido(pedidoDados) {
     timeout: WEBHOOK_CONFIG.TIMEOUT
   };
 
-  console.log(`[TinyWebhookService] Enviando atualização para pedido ID: ${pedidoDados.id}`);
-  console.log(`[TinyWebhookService] Endpoint: ${WEBHOOK_CONFIG.URL}`);
+  logGaleria9(`[TinyWebhookService] Enviando atualização para pedido ID: ${pedidoDados.id}`);
+  logGaleria9(`[TinyWebhookService] Endpoint: ${WEBHOOK_CONFIG.URL}`);
 
   try {
     // 3. Faz a requisição HTTP POST
     const resposta = await axios(opcoesRequisicao);
 
-    console.log(`[TinyWebhookService] Sucesso! Status: ${resposta.status}`);
+    logGaleria9(`[TinyWebhookService] Sucesso! Status: ${resposta.status}`);
     return {
       success: true,
       statusCode: resposta.status,
