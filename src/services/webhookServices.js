@@ -103,9 +103,8 @@ export async function processUpdateOrderGSheets(dados) {
 					timeZone: "America/Sao_Paulo"
 				})
 				const historicoAnterior = linha[31] || ""
-				const novoHistorico = `[${agora}] ${novaSituacao} ${
-					historicoAnterior ? "\n" + historicoAnterior : ""
-				}`
+				const novoHistorico = `[${agora}] ${novaSituacao} ${historicoAnterior ? "\n" + historicoAnterior : ""
+					}`
 
 				// Atualiza as colunas diretamente na aba de origem
 				await sheets.spreadsheets.values.update({
@@ -202,11 +201,11 @@ export const processMarketplaceWebhookGaleria9 = async (body) => {
 	const { marcadores } = pedido
 	const isGaleria9 = marcadores.some((marcador) => marcador.marcador.descricao.toLowerCase() === "trianguladogaleria9")
 
-	if(isGaleria9) {
+	if (isGaleria9) {
 		try {
 			await POSTgaleria9(body)
 			logGaleria9(`Pedido ${pedido.id} enviado para o Galeria9 com sucesso`)
-			logGaleria9('Retorno: ', pedido)
+			logGaleria9(`Retorno: ${pedido}`)
 			return {
 				status: "success",
 				message: `Pedido ${pedido.id} enviado para o Galeria9 com sucesso`
@@ -227,8 +226,8 @@ export const processMarketplaceWebhook = async (body) => {
 	if (tipo === "inclusao_pedido") {
 		const { nomeEcommerce, codigoSituacao, cliente } = dados
 		const isClientFullEstoque =
-      cliente.nome.toUpperCase().includes("FULL") ||
-      cliente.nome.toUpperCase().includes("ESTOQUE")
+			cliente.nome.toUpperCase().includes("FULL") ||
+			cliente.nome.toUpperCase().includes("ESTOQUE")
 
 		const resultGaleria9 = await processMarketplaceWebhookGaleria9(body)
 		if (resultGaleria9) {
@@ -241,7 +240,7 @@ export const processMarketplaceWebhook = async (body) => {
 			return {
 				status: "ignored",
 				message:
-          "Pedido não pertence aos marketplaces configurados e cliente não é FULL/ESTOQUE"
+					"Pedido não pertence aos marketplaces configurados e cliente não é FULL/ESTOQUE"
 			}
 		}
 
@@ -263,8 +262,8 @@ export const processMarketplaceWebhook = async (body) => {
 	if (tipo === "atualizacao_pedido") {
 		const { nomeEcommerce, cliente } = dados
 		const isClientFullEstoque =
-      cliente.nome.toUpperCase().includes("FULL") ||
-      cliente.nome.toUpperCase().includes("ESTOQUE")
+			cliente.nome.toUpperCase().includes("FULL") ||
+			cliente.nome.toUpperCase().includes("ESTOQUE")
 		const { marcadores } = pedido
 		const isIntegradaES = marcadores.some((marcador) => marcador.marcador.descricao.toLowerCase() === "integradaes")
 
@@ -357,7 +356,7 @@ export const processEcommerceWebhookGetOrders = async (createdAtMin, createdAtMa
 		dataFinal: createdAtMax
 	}
 	const endpoint = "pedidos.pesquisa.php"
-	
+
 	logEcommerce(`Recuperando pedidos do intervalo: ${createdAtMin} até ${createdAtMax}`)
 
 	const ordersIntegradaES = await GETOrdersTinyINTEGRADAES(endpoint, data)
@@ -371,7 +370,7 @@ export const processEcommerceWebhookGetOrders = async (createdAtMin, createdAtMa
 			codigoSituacao: order.pedido.situacao.toLowerCase(),
 			status: order.pedido.situacao
 		}
-	})) 
+	}))
 
 	return orders
 }
@@ -418,13 +417,13 @@ export const processEcommerceWebhookManual = async (body) => {
 		let retry = true
 		let result = null
 
-		while(retry) {
+		while (retry) {
 			result = await POSTtiny.ABSTRACT("pedido.incluir.php", {
 				...orderDetails,
 				nota_fiscal
 			})
 
-			if(result.retorno.codigo_erro === 6) {
+			if (result.retorno.codigo_erro === 6) {
 				await new Promise(resolve => setTimeout(resolve, 30000))
 				retry = true
 			} else {
@@ -518,18 +517,18 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 	const isUpdateOrderNuvemshop = orderDetailsABSTRACT.situacao === "Enviado" && orderDetailsABSTRACT.codigo_rastreamento
 
 	// Atualiza codigo de rastreamento e status diretamente na Nuvemshop se o pedido for Enviado com codigo de rastreamento
-	if(isUpdateOrderNuvemshop) {
+	if (isUpdateOrderNuvemshop) {
 		const { numero_ecommerce, codigo_rastreamento, url_rastreamento, marcadores } = orderDetailsABSTRACT
 
 		const dataOrderNuvemshop = {
 			numberOrder: numero_ecommerce,
 			tracking_number: codigo_rastreamento,
 			tracking_url: url_rastreamento,
-			marcadores 
+			marcadores
 		}
 
 		// await updateStatusShippingNuvemshop(dataOrderNuvemshop)
-	
+
 	}
 
 	const data = {
@@ -553,7 +552,7 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 
 	const isUpdateOrder = statusPermitidos.includes(orderDetailsABSTRACT.situacao)
 
-	if(!isUpdateOrder) {
+	if (!isUpdateOrder) {
 		logEcommerce(`Pedido ${id} não pode ser atualizado. Situacao: ${orderDetailsABSTRACT.situacao}`)
 		return {
 			status: "error",
@@ -577,7 +576,7 @@ async function updateStatusShippingNuvemshop(dataOrderNuvemshop) {
 
 	const { id } = await GETNuvemOrderByNumberOrder(numberOrder, marcadorNuvemshop)
 
-	if(!id) {
+	if (!id) {
 		logEcommerce(`Não foi encontrado o pedido ${numberOrder} na Nuvemshop`)
 		return {
 			status: "error",
@@ -593,7 +592,7 @@ async function updateStatusShippingNuvemshop(dataOrderNuvemshop) {
 
 	const result = await PUTOrderNuvemshop(id, dataUpdateOrderNuvemshop, marcadorNuvemshop)
 
-	if(result.status === "success") {
+	if (result.status === "success") {
 		logEcommerce(`Pedido ${numberOrder} atualizado na Nuvemshop`)
 		return {
 			status: "success",
