@@ -5,7 +5,7 @@ import dotenv from "dotenv"
 dotenv.config()
 
 // Your deployed Google Apps Script Web App URL
-const WEBHOOK_URL =  process.env.WEBHOOK_TESTE_URL;
+const WEBHOOK_URL = process.env.WEBHOOK_TESTE_URL;
 
 // The payload structure expected by your doPost(e) function
 const testPayload = {
@@ -199,28 +199,72 @@ const testPayload = {
   }
 };
 
-export async function testWebhook() {
-  console.log(`🚀 Sending test request to: ${WEBHOOK_URL}`);
-  console.log(`📦 Payload:`, JSON.stringify(testPayload, null, 2));
+
+export async function enviarAtualizacaoDePedido(pedidoDados) {
+  // 1. Monta o payload no formato exato que a sua função doPost espera
+  const payload = {
+    retorno: {
+      pedido: {
+        id: pedidoDados.id,
+        situacao: pedidoDados.situacao,
+        codigo_rastreamento: pedidoDados.codigo_rastreamento || null,
+        url_rastreamento: pedidoDados.url_rastreamento || null
+      }
+    }
+  };
+
+  // 2. Configuração da requisição HTTP
+  const opcoesRequisicao = {
+    method: 'POST',
+    url: WEBHOOK_URL,
+    data: payload,
+    headers: {
+      'Content-Type': 'application/json',
+      // Adicione um cabeçalho de autenticação se você implementou no doPost
+      // 'X-Webhook-Token': process.env.WEBHOOK_SECRET
+    },
+    timeout: WEBHOOK_CONFIG.TIMEOUT
+  };
+
+  console.log(`[TinyWebhookService] Enviando atualização para pedido ID: ${pedidoDados.id}`);
+  console.log(`[TinyWebhookService] Endpoint: ${WEBHOOK_CONFIG.URL}`);
 
   try {
-    const response = await axios.post(WEBHOOK_URL, testPayload, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    console.log('✅ Success! Server responded:');
-    console.log('   Status:', response.status);
-    console.log('   Response Body:', response.data);
-  } catch (error) {
-    console.error('❌ Request failed:');
-    if (error.response) {
-      // Server responded with an error status
-      console.log('   Status:', error.response.status);
-      console.log('   Error Data:', error.response.data);
+    // 3. Faz a requisição HTTP POST
+    const resposta = await axios(opcoesRequisicao);
+
+    console.log(`[TinyWebhookService] Sucesso! Status: ${resposta.status}`);
+    return {
+      success: true,
+      statusCode: resposta.status,
+      data: resposta.data,
+      message: 'Webhook processado com sucesso.'
+    };
+
+  } catch (erro) {
+    // 4. Tratamento robusto de erros
+    console.error(`[TinyWebhookService] Erro na requisição para o pedido ${pedidoDados.id}:`, erro.message);
+
+    let erroFormatado = {
+      success: false,
+      message: 'Falha ao comunicar com o webhook.',
+      pedidoId: pedidoDados.id
+    };
+
+    if (erro.response) {
+      // O servidor respondeu com um status de erro (4xx, 5xx)
+      erroFormatado.statusCode = erro.response.status;
+      erroFormatado.data = erro.response.data;
+      erroFormatado.message = `Servidor retornou erro: ${erro.response.status}`;
+    } else if (erro.request) {
+      // A requisição foi feita mas não houve resposta
+      erroFormatado.message = 'Sem resposta do servidor (timeout ou rede).';
     } else {
-      // Network or other errors
-      console.log('   Error:', error.message);
+      // Erro ao configurar a requisição
+      erroFormatado.message = `Erro na configuração: ${erro.message}`;
     }
+
+    throw erroFormatado; // Propaga o erro para o controller tratar
   }
 }
+

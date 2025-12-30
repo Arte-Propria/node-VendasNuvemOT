@@ -16,6 +16,7 @@ import { delay, getSheetIdByName } from "../tools/tools.js"
 import { PUTOrderNuvemshop } from "../api/put.js"
 import axios from "axios"
 import { POSTgaleria9 } from "../api/post.js"
+import { atualizarPlanilhaGaleria9 } from "./galeria9Services.js"
 
 const marketplaceNames = [
 	"Shopee",
@@ -204,8 +205,14 @@ export const processMarketplaceWebhookGaleria9 = async (body) => {
 	if (isGaleria9) {
 		try {
 			await POSTgaleria9(body)
+			atualizarPlanilhaGaleria9(body)
 			logGaleria9(`Pedido ${pedido.id} enviado para o Galeria9 com sucesso`)
-			logGaleria9(`id: ${pedido.id},	situacao: ${pedido.situacao}, codigo_rastreamento: ${pedido.codigo_rastreamento},	url_rastreamento: ${pedido.url_rastreamento}`)
+			logGaleria9(`
+				id: ${pedido.id}, 
+				situacao: ${pedido.situacao}, 
+				codigo_rastreamento: ${pedido.codigo_rastreamento}, 
+				url_rastreamento: ${pedido.url_rastreamento}
+				`)
 			return {
 				status: "success",
 				message: `Pedido ${pedido.id} enviado para o Galeria9 com sucesso`
