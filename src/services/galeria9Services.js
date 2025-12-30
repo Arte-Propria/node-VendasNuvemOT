@@ -218,7 +218,7 @@ export async function atualizarPlanilhaGaleria9(pedidoDados) {
   const opcoesRequisicao = {
     method: 'POST',
     url: WEBHOOK_URL,
-    data: payload,
+    data: pedidoDados,
     headers: {
       'Content-Type': 'application/json',
       // Adicione um cabeçalho de autenticação se você implementou no doPost
@@ -231,7 +231,11 @@ export async function atualizarPlanilhaGaleria9(pedidoDados) {
 
   try {
     // 3. Faz a requisição HTTP POST
-    const resposta = await axios(opcoesRequisicao);
+    const resposta = await axios.post(WEBHOOK_URL, pedidoDados, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
     logGaleria9(`[TinyWebhookService] Sucesso! Status: ${resposta.status}`);
     return {
