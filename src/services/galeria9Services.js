@@ -228,10 +228,11 @@ export async function atualizarPlanilhaGaleria9(pedidoDados) {
 
   logGaleria9(`[TinyWebhookService] Enviando atualização para pedido ID: ${pedidoDados.id}`);
   logGaleria9(`[TinyWebhookService] Endpoint: ${WEBHOOK_URL}`);
+  logGaleria9(`[TinyWebhookService] Payload: ${payload}`);
 
   try {
     // 3. Faz a requisição HTTP POST
-    const resposta = await axios.post(WEBHOOK_URL, pedidoDados, {
+    const resposta = await axios.post(WEBHOOK_URL, payload, {
       headers: {
         'Content-Type': 'application/json',
       },
