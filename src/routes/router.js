@@ -192,6 +192,6 @@ router.get("/chatfunnel/:store/categories", getCategoriesChatFunnel)
 router.get("/tracking/:id", testarBuscaRastreioIsolada)
 
 // Rotas ChatFunnel
-//router.get("/teste/galeria9", testWebhook)
+router.get("/teste/galeria9", testWebhook)
 
 export default router

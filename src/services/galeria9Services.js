@@ -214,21 +214,9 @@ export async function atualizarPlanilhaGaleria9(pedidoDados) {
     }
   };
 
-  // 2. Configuração da requisição HTTP
-  const opcoesRequisicao = {
-    method: 'POST',
-    url: WEBHOOK_URL,
-    data: pedidoDados,
-    headers: {
-      'Content-Type': 'application/json',
-      // Adicione um cabeçalho de autenticação se você implementou no doPost
-      // 'X-Webhook-Token': process.env.WEBHOOK_SECRET
-    }
-  };
-
-  logGaleria9(`[TinyWebhookService] Enviando atualização para pedido ID: ${pedidoDados.id}`);
-  logGaleria9(`[TinyWebhookService] Endpoint: ${WEBHOOK_URL}`);
-  logGaleria9(`[TinyWebhookService] Payload: ${payload}`);
+  //logGaleria9(`[TinyWebhookService] Enviando atualização para pedido ID: ${pedidoDados.id}`);
+  //logGaleria9(`[TinyWebhookService] Endpoint: ${WEBHOOK_URL}`);
+  //logGaleria9(`[TinyWebhookService] Payload: ${payload}`);
 
   try {
     // 3. Faz a requisição HTTP POST
@@ -238,7 +226,7 @@ export async function atualizarPlanilhaGaleria9(pedidoDados) {
       },
     });
 
-    logGaleria9(`[TinyWebhookService] Sucesso! Status: ${resposta.status}`);
+    logGaleria9(`Enviado pedido ${pedidoDados.id} para a planilha/apps script`);
     return {
       success: true,
       statusCode: resposta.status,
