@@ -80,6 +80,7 @@ import {
 } from "../controllers/mandaeControllers.js"
 import { fetchUpdateOrdersMarketplaceByDate } from "../services/marketplaceServices.js"
 import { testWebhook } from "../controllers/galeria9Controllers.js"
+import { getDbQuery } from "../controllers/segmentacaoControllers.js"
 
 const router = express.Router()
 
@@ -191,7 +192,10 @@ router.get("/chatfunnel/:store/categories", getCategoriesChatFunnel)
 // Rotas ChatFunnel
 router.get("/tracking/:id", testarBuscaRastreioIsolada)
 
-// Rotas ChatFunnel
+// Rotas galeria9 teste 
 router.get("/teste/galeria9", testWebhook)
+
+// Rotas teste Db query
+router.get("/dbquery/:querySelect", getDbQuery)
 
 export default router

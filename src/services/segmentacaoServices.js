@@ -1,26 +1,19 @@
-import axios from "axios"
-import dotenv from "dotenv"
-import { query } from "../db/db.js"
 import { dataBase, dataBaseDb } from "../db/dataBaseQueryList.js"
 
-export async function queryDb(querySelect) {
-  try {
-    const response = await query(`SELECT * FROM ${querySelect}`)
-    return response
-  } catch (error) {
-    console.error("Error fetching data from Query", error.message)
-    return []
-  }
-}
 
-// 1. Função para realizar o fetch
-export const fetchRequest = async (querySelect) => {
+// 1. Função para realizar o MAP dos itens, com base em qual query será acessada
+// o parametro querySelect será usado para:
+// - fazer o fetch;
+// - usando switch case, o querySelect vai definir qual caso será usado para a requisição 
+export const fetchRequest = async (queryData, querySelect) => {
   let allRequests = []
 
   try {
-    const response = await queryDb(querySelect)
+    const response = queryData
 
     const result = response.rows.map((delivery) => {
+      // o objeto dataBase possui o nome de cada banco de dados
+      // o objeto dataBaseDb engloba cada caso a ser usado pelo map
       switch (querySelect) {
         case dataBase.ads:
           return dataBaseDb.ads.transform(delivery)
