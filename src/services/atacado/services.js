@@ -1,6 +1,6 @@
 import { saveOrderAtacado, updateOrderAtacadoStatus } from "../../db/saveOrder.js"
 import { logAtacado } from "../../utils/logger.js"
-import { getProductDetails } from "../../utils/tiny.js"
+import { getProductDetails } from "../../utils/tiny"
 
 const atacadoNames = [
 	"leroymerlin",
@@ -75,22 +75,27 @@ export async function processSaveOrderAtacado(dados, pedido) {
 }
 
 export async function processUpdateOrderAtacado(dados, pedido) {
-	try {
+	const { marcadores } = pedido
+	const isAtacado = marcadores.some((marcador) => atacadoNames.includes(marcador.marcador.descricao.toLowerCase()))
+
+	if (isAtacado) {
+		try {
 		// Obter detalhes do pedido
-		const orderDetails = pedido
+			const orderDetails = pedido
 
-		// Atualizar status do pedido
-		const { success } = await updateOrderAtacadoStatus(orderDetails)
+			// Atualizar status do pedido
+			const { success } = await updateOrderAtacadoStatus(orderDetails)
 
-		if (!success) {
-			const result = await processSaveOrderAtacado(dados, pedido)
-			return result
+			if (!success) {
+				const result = await processSaveOrderAtacado(dados, pedido)
+				return result
+			}
+
+			return { status: "success", message: "Pedido atualizado com sucesso" }
+		} catch (error) {
+			logAtacado(`Erro ao processar o pedido: ${error}, ${dados}`)
+			return { status: "error", message: "Erro ao processar o pedido" }
 		}
-
-		return { status: "success", message: "Pedido atualizado com sucesso" }
-	} catch (error) {
-		logAtacado(`Erro ao processar o pedido: ${error}, ${dados}`)
-		return { status: "error", message: "Erro ao processar o pedido" }
 	}
 }
 
