@@ -41,3 +41,7 @@ export const logAdsMarketplace = (message) => {
 export const logGaleria9 = (message) => {
 	console.log(`WEBHOOK Galeria9: ${message}`)
 }
+
+export const logAtacado = (message) => {
+	console.log(`WEBHOOK Atacado: ${message}`)
+}

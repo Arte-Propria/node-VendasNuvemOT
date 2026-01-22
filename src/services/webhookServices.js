@@ -1,8 +1,9 @@
 /* eslint-disable camelcase */
-import { GETNuvemOrder, GETNuvemOrderByCPF, GETNuvemOrderByNumberOrder, GETOrdersTinyINTEGRADAES } from "../api/get.js"
+import { GETNuvemOrder, GETNuvemOrderByNumberOrder, GETOrdersTinyINTEGRADAES } from "../api/get.js"
 import { GETtiny, POSTtiny, PUTtiny } from "../api/tiny.js"
-import { saveOrder, updateOrderStatus } from "../db/saveOrder.js"
+import { saveOrder, updateOrderAtacadoStatus, updateOrderStatus } from "../db/saveOrder.js"
 import {
+	logAtacado,
 	logEcommerce,
 	logGaleria9,
 	logPCP,
@@ -14,9 +15,9 @@ import { JWT } from "google-auth-library"
 import { config } from "../config/env.js"
 import { delay, getSheetIdByName } from "../tools/tools.js"
 import { PUTOrderNuvemshop } from "../api/put.js"
-import axios from "axios"
 import { POSTgaleria9 } from "../api/post.js"
 import { atualizarPlanilhaGaleria9 } from "./galeria9Services.js"
+import { processAtacadoWebhook, processSaveOrderAtacado, processUpdateOrderAtacado } from "./atacado/services.js"
 
 const marketplaceNames = [
 	"Shopee",
@@ -105,7 +106,7 @@ export async function processUpdateOrderGSheets(dados) {
 				})
 				const historicoAnterior = linha[31] || ""
 				const novoHistorico = `[${agora}] ${novaSituacao} ${historicoAnterior ? "\n" + historicoAnterior : ""
-					}`
+				}`
 
 				// Atualiza as colunas diretamente na aba de origem
 				await sheets.spreadsheets.values.update({
@@ -231,9 +232,16 @@ export const processMarketplaceWebhook = async (body) => {
 			cliente.nome.toUpperCase().includes("FULL") ||
 			cliente.nome.toUpperCase().includes("ESTOQUE")
 
+		// Processar pedido da Galeria9
 		const resultGaleria9 = await processMarketplaceWebhookGaleria9(body)
 		if (resultGaleria9) {
 			return resultGaleria9
+		}
+
+		// Processar pedido de Atacado
+		const resultAtacado = await processAtacadoWebhook(body)
+		if (resultAtacado) {
+			return resultAtacado
 		}
 
 		// Verificar se o pedido é de um marketplace configurado ou se o cliente é FULL/ESTOQUE
@@ -279,6 +287,11 @@ export const processMarketplaceWebhook = async (body) => {
 			return resultGaleria9
 		}
 
+		const resultAtacado = await processUpdateOrderAtacado(dados, pedido)
+		if (resultAtacado) {
+			return resultAtacado
+		}
+
 		// Verificar se o pedido é de um marketplace configurado
 		if (!marketplaceNames.includes(nomeEcommerce) && !isClientFullEstoque) {
 			logWebhookMarketplace(`Pedido não pertence aos marketplaces configurados e não é um pedido FULL/ESTOQUE, id: ${dados.id}, nomeEcommerce: ${nomeEcommerce}, cliente: ${cliente.nome}`)
@@ -320,7 +333,7 @@ async function processSaveOrder(dados, pedido) {
 		const enrichedOrder = { ...orderDetails, produtos: enrichedItems }
 
 		// Salvar pedido no banco de dados
-		await saveOrder(enrichedOrder)
+		await saveOrder(enrichedOrder, "pedidos_marketplace")
 
 		return {
 			status: "success",
@@ -426,7 +439,7 @@ export const processEcommerceWebhookManual = async (body) => {
 			})
 
 			if (result.retorno.codigo_erro === 6) {
-				await new Promise(resolve => setTimeout(resolve, 30000))
+				await new Promise((resolve) => setTimeout(resolve, 30000))
 				retry = true
 			} else {
 				retry = false
@@ -436,7 +449,7 @@ export const processEcommerceWebhookManual = async (body) => {
 
 		const id = result.retorno.registros.registro.id
 
-		await new Promise(resolve => setTimeout(resolve, 5000))
+		await new Promise((resolve) => setTimeout(resolve, 5000))
 
 		return {
 			status: "success",

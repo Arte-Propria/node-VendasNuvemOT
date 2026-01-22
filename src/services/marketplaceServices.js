@@ -198,7 +198,7 @@ export const fetchUpdateOrdersMarketplace = async (days) => {
 						const orderDetails = await getOrderDetails(id, config.tinyApiToken)
 						const isMarketplaceList = marketplaceNamesList.includes(orderDetails.ecommerce.nomeEcommerce)
 						if(isMarketplaceList) {
-							await saveOrder(orderDetails)
+							await saveOrder(orderDetails, "pedidos_marketplace")
 							ordersUpdated.push(order)
 						}
 					}
@@ -261,7 +261,7 @@ export const fetchUpdateOrdersMarketplaceByDate = async (createdAtMin, createdAt
 					if(!isContinue) {
 						continue
 					}
-					await saveOrder(orderDetails)
+					await saveOrder(orderDetails, "pedidos_marketplace")
 					ordersUpdated.push(order)
 				} else {
 					if(orderDB.rows[0].situacao !== order.pedido.situacao) {

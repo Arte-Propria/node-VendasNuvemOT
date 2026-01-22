@@ -146,8 +146,8 @@ router.post("/order/:store", createOrder) // Adicione a rota para criar um novo 
 router.delete("/order/:store/:ownerNote", deleteOrderByOwnerNote) // Adicione a rota para criar um novo pedido
 
 // WEBHOOKS
-router.post("/webhooks/order-created", createdOrderWebhook)
-router.post("/webhooks/order-marketplace", createOrderMarketplaceWebhook)
+router.post("/webhooks/order-created", createdOrderWebhook) // Nuvemshop
+router.post("/webhooks/order-marketplace", createOrderMarketplaceWebhook) // Tiny
 router.post("/webhook/mandae", mandaeWebhook) // Webhook para atualizações da Mandae
 
 // TINY ESINTEGRADA
