@@ -1,6 +1,6 @@
-import { saveOrderAtacado, updateOrderAtacadoStatus } from "../../db/saveOrder"
-import { logAtacado } from "../../utils/logger"
-import { getProductDetails } from "../../utils/tiny"
+import { saveOrderAtacado, updateOrderAtacadoStatus } from "../../db/saveOrder.js"
+import { logAtacado } from "../../utils/logger.js"
+import { getProductDetails } from "../../utils/tiny.js"
 
 const atacadoNames = [
 	"leroymerlin",
