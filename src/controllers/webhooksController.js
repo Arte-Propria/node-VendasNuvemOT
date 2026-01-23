@@ -43,6 +43,7 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
+		console.log(body)
 
 		return res.status(200).send(result)
 	} catch (error) {
