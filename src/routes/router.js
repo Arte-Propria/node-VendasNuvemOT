@@ -196,6 +196,6 @@ router.get("/tracking/:id", testarBuscaRastreioIsolada)
 router.get("/teste/galeria9", testWebhook)
 
 // Rotas teste Db query
-router.get("/dbquery/:querySelect", getDbQuery)
+router.get("/dbquery/:querySelect/:startDate/:endDate", getDbQuery)
 
 export default router
