@@ -81,6 +81,7 @@ import {
 import { fetchUpdateOrdersMarketplaceByDate } from "../services/marketplaceServices.js"
 import { testWebhook } from "../controllers/galeria9Controllers.js"
 import { getDbQuery } from "../controllers/segmentacaoControllers.js"
+import { getNuvemshopCallback } from "../controllers/authNuvemshop.js"
 
 const router = express.Router()
 
@@ -197,5 +198,8 @@ router.get("/teste/galeria9", testWebhook)
 
 // Rotas teste Db query
 router.get("/dbquery/:querySelect", getDbQuery)
+
+// Rotas de teste de aplicativo Nuvemshop
+router.get("/apps/nuvemshop/callback", getNuvemshopCallback)
 
 export default router

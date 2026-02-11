@@ -23,5 +23,9 @@ export const config = {
 	shopeeRedirectUri: process.env.SHOPEE_REDIRECT_URI,
 	sheinClientId: process.env.SHEIN_APP_ID,
 	sheinClientSecret: process.env.SHEIN_SECRET_KEY,
-	sheinRedirectUri: process.env.SHEIN_REDIRECT_URI
+	sheinRedirectUri: process.env.SHEIN_REDIRECT_URI,
+	// App Nuvemshop (OAuth)
+	nuvemshopClientId: process.env.CLIENT_ID,
+	nuvemshopClientSecret: process.env.CLIENT_SECRET,
+	nuvemshopRedirectUri: process.env.NUVEMSHOP_REDIRECT_URI
 }
