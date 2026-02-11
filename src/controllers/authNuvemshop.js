@@ -66,7 +66,7 @@ export const getNuvemshopCallback = async (req, res) => {
 		// TODO: persistir access_token e user_id (ex.: por loja no banco)
 		// await salvarTokenPorLoja(data.user_id, data.access_token)
 
-		const appUrl = "https://www.3print.com.br/dashboard/integrations"
+		const appUrl = config.nuvemshopRedirectUri
 		if (appUrl) {
 			const url = new URL(appUrl)
 			return res.redirect(302, url.toString())
