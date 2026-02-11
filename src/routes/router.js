@@ -197,7 +197,7 @@ router.get("/tracking/:id", testarBuscaRastreioIsolada)
 router.get("/teste/galeria9", testWebhook)
 
 // Rotas teste Db query
-router.get("/dbquery/:querySelect", getDbQuery)
+router.get("/dbquery/:querySelect/:startDate/:endDate", getDbQuery)
 
 // Rotas de teste de aplicativo Nuvemshop
 router.get("/apps/nuvemshop/callback", getNuvemshopCallback)
