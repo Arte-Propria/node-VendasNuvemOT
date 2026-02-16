@@ -60,7 +60,7 @@ export const createOrderEcommerceWebhook = async (req, res) => {
 		logEcommerce(message)
 		return res.sendStatus(200)
 	} catch (error) {
-		logEcommerce(req.body)
+		logEcommerce(JSON.stringify(req.body, null, 2))
 		logEcommerce(`Erro ao processar o webhook: ${error}`)
 		return res.sendStatus(200)
 	}
