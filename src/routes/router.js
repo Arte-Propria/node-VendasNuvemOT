@@ -41,7 +41,6 @@ import {
 	getOrdersAllMarketplace,
 	getOrdersAllMarketplaceOptimized,
 	getOrdersByMarketplace,
-	updateOrdersMarketplace,
 	updateOrdersMarketplaceByDate
 } from "../controllers/marketplaceControllers.js"
 import {
@@ -78,10 +77,10 @@ import {
 	executeBatchUpdate,
 	executeFullBatchUpdate
 } from "../controllers/mandaeControllers.js"
-import { fetchUpdateOrdersMarketplaceByDate } from "../services/marketplaceServices.js"
 import { testWebhook } from "../controllers/galeria9Controllers.js"
 import { getDbQuery } from "../controllers/segmentacaoControllers.js"
 import { getNuvemshopCallback } from "../controllers/authNuvemshop.js"
+import { getStatusPlatform } from "../controllers/statusPlatformController.js"
 
 const router = express.Router()
 
@@ -201,5 +200,8 @@ router.get("/dbquery/:querySelect/:startDate/:endDate", getDbQuery)
 
 // Rotas de teste de aplicativo Nuvemshop
 router.get("/apps/nuvemshop/callback", getNuvemshopCallback)
+
+// Rotas de teste de status plataforma
+router.get("/status/platform/:platform", getStatusPlatform)
 
 export default router
