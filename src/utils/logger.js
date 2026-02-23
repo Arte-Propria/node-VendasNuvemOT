@@ -45,3 +45,7 @@ export const logGaleria9 = (message) => {
 export const logAtacado = (message) => {
 	console.log(`WEBHOOK Atacado: ${message}`)
 }
+
+export const logStatusPlatform = (message) => {
+	console.log(`STATUS PLATFORM: ${message}`)
+}

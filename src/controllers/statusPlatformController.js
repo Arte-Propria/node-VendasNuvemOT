@@ -1,15 +1,17 @@
 import { getStatusPlatformService } from "../services/statusPlatformServices.js"
+import { logStatusPlatform } from "../utils/logger.js"
 
 export const getStatusPlatform = async (req, res) => {
 	const { platform } = req.params
 	try {
 		const status = await getStatusPlatformService(platform)
-		return res.json({
+		logStatusPlatform(`Status da plataforma ${platform} obtido com sucesso: ${status}`)
+		return res.status(200).json({
 			success: true,
 			message: `Status da plataforma ${platform} obtido com sucesso`,
 			data: {
-        status
-      }
+				status
+			}
 		})
 	} catch (error) {
 		console.error(error)
