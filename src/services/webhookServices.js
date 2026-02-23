@@ -18,6 +18,7 @@ import { PUTOrderNuvemshop } from "../api/put.js"
 import { POSTgaleria9 } from "../api/post.js"
 import { atualizarPlanilhaGaleria9 } from "./galeria9Services.js"
 import { processAtacadoWebhook, processSaveOrderAtacado, processUpdateOrderAtacado } from "./atacado/services.js"
+import { updateStatusPlatform } from "../db/updateStatusTiny.js"
 
 const marketplaceNames = [
 	"Shopee",
@@ -460,7 +461,17 @@ export const processEcommerceWebhookManual = async (body) => {
 }
 
 export const processEcommerceWebhook = async (body) => {
+	if (!body || typeof body !== "object") {
+		await updateStatusPlatform({ platform: "tiny_integradaes", status: 0 })
+		return { status: "error", message: "Body inválido ou ausente" }
+	}
+
 	const { tipo, dados } = body
+	if (tipo === undefined || dados === undefined || dados === null) {
+		await updateStatusPlatform({ platform: "tiny_integradaes", status: 0 })
+		return { status: "error", message: "Body deve conter 'tipo' e 'dados'" }
+	}
+
 	const { codigoSituacao: status } = dados
 
 	if (tipo === "inclusao_pedido") {
