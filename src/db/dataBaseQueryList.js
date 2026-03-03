@@ -102,7 +102,7 @@ export const dataBaseDb = {
     })
   },
 }
-
+/*
 export const ordersDbNuvemshop = {
   client: {
     name: nuvemshopOrder.contact_name || nuvemshopOrder.customer?.name,
@@ -327,3 +327,4 @@ console.log('Orders:', combinedOrders);
 console.log('Products:', combinedProducts);
 console.log('Clients:', combinedClients);
 console.log('Coupons:', combinedCoupons);
+*/
