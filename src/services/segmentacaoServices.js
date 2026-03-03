@@ -1,5 +1,5 @@
 import { dataBase, dataBaseDb } from "../db/dataBaseQueryList.js"
-
+import { query } from '../db/db.js';
 
 // 1. Função para realizar o MAP dos itens, com base em qual query será acessada
 // o parametro querySelect será usado para:
@@ -129,7 +129,7 @@ export const filterBdByDateRange = (queryData, querySelect, { startDate, endDate
       // Início do dia: 00:00:00.000
       start.setUTCHours(0, 0, 0, 0);
     }
-    
+
     if (end) {
       // Final do dia: 23:59:59.999
       end.setUTCHours(23, 59, 59, 999);
@@ -188,3 +188,37 @@ export const filterBdByDateRange = (queryData, querySelect, { startDate, endDate
     throw new Error(`Falha ao filtrar por data: ${error.message}`);
   }
 };
+
+export async function nuvemDbWebhook(queryData, querySelect) {
+
+  let payload;
+
+  switch (querySelect) {
+    case dataBase.ads:
+      payload = dataBaseDb.ads.transform(queryData)
+
+    case dataBase.clients:
+      payload = dataBaseDb.clients.transform(queryData)
+
+    case dataBase.coupon:
+      payload = dataBaseDb.coupon.transform(queryData)
+
+    case dataBase.daily_sales:
+      payload = dataBaseDb.daily_sales.transform(queryData)
+
+    case dataBase.orders_shop:
+      payload = dataBaseDb.orders_shop.transform(queryData)
+
+    case dataBase.product:
+      payload = dataBaseDb.product.transform(queryData)
+
+    default:
+      console.log("Database desconhecida");
+  }
+
+  try {
+    const resposta =  await query(`SELECT * FROM ${querySelect}`);
+  } catch (error) {
+    
+  }
+}
