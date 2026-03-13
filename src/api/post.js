@@ -189,11 +189,21 @@ export const POSTincluirMarcadorTiny = async (pedidoId, marcador) => {
 	// Adiciona formato=json na URL para forçar resposta JSON
 	const url = `${config.tinyApiBaseUrl}/pedido.marcadores.incluir.php?formato=json`;
 
+	// Constrói o JSON dos marcadores exatamente como a API espera
+	const marcadoresJson = JSON.stringify({
+		marcadores: [
+			{
+				marcador: {
+					descricao: marcador   // Ex: "PAGO"
+				}
+			}
+		]
+	});
+
 	const params = new URLSearchParams({
 		token: config.tinyApiTokenArteIntegradaES,
 		idPedido: pedidoId,
-		marcadores: marcador
-		// formato removido do corpo, pois já está na URL
+		marcadores: marcadoresJson   // Agora é um JSON válido!
 	});
 
 	try {
@@ -203,30 +213,19 @@ export const POSTincluirMarcadorTiny = async (pedidoId, marcador) => {
 			body: params.toString()
 		});
 
-		const contentType = response.headers.get('content-type') || '';
+		const text = await response.text(); // Lê a resposta como texto
 
-		// Se a resposta for JSON, processa normalmente
-		if (contentType.includes('application/json')) {
-			const data = await response.json();
+		// Tenta interpretar a resposta como JSON
+		try {
+			const data = JSON.parse(text);
 			if (data.retorno?.status !== 'OK') {
 				const erro = data.retorno?.erros?.erro || JSON.stringify(data);
 				throw new Error(`Erro da API Tiny: ${erro}`);
 			}
 			return data;
-		}
-		// Se for XML, tenta extrair a mensagem de erro (fallback)
-		else if (contentType.includes('text/xml') || contentType.includes('application/xml')) {
-			const text = await response.text();
-			logEcommerce(`Resposta XML do Tiny: ${text}`);
-			// Tenta extrair a mensagem de erro do XML (simples)
-			const match = text.match(/<erro>(.*?)<\/erro>/);
-			const erroMsg = match ? match[1] : 'Erro desconhecido (resposta XML)';
-			throw new Error(`Erro da API Tiny (XML): ${erroMsg}`);
-		}
-		// Outro formato inesperado
-		else {
-			const text = await response.text();
-			logEcommerce(`Resposta inesperada do Tiny: ${text}`);
+		} catch (parseError) {
+			// Se não for JSON, loga o conteúdo bruto para debug
+			logEcommerce(`Resposta não-JSON do Tiny: ${text}`);
 			throw new Error(`Resposta inesperada do Tiny: ${text.substring(0, 200)}`);
 		}
 	} catch (error) {
