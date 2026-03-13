@@ -15,7 +15,7 @@ import { JWT } from "google-auth-library"
 import { config } from "../config/env.js"
 import { delay, getSheetIdByName } from "../tools/tools.js"
 import { PUTOrderNuvemshop } from "../api/put.js"
-import { POSTgaleria9 } from "../api/post.js"
+import { POSTgaleria9, POSTincluirMarcadorTiny } from "../api/post.js"
 import { atualizarPlanilhaGaleria9 } from "./galeria9Services.js"
 import { processAtacadoWebhook, processSaveOrderAtacado, processUpdateOrderAtacado } from "./atacado/services.js"
 import { updateStatusPlatform } from "../db/updateStatusTiny.js"
@@ -108,7 +108,7 @@ export async function processUpdateOrderGSheets(dados) {
 				})
 				const historicoAnterior = linha[31] || ""
 				const novoHistorico = `[${agora}] ${novaSituacao} ${historicoAnterior ? "\n" + historicoAnterior : ""
-				}`
+					}`
 
 				// Atualiza as colunas diretamente na aba de origem
 				await sheets.spreadsheets.values.update({
@@ -461,17 +461,47 @@ export const processEcommerceWebhookManual = async (body) => {
 	}
 }
 
+
 export const processEcommerceWebhook = async (body) => {
+
 	if (!body || typeof body !== "object") {
 		await updateStatusPlatformService({ platform: "tiny_integradaes", status: 0 })
 		return { status: "error", message: "Body inválido ou ausente" }
 	}
 
-	const { tipo, dados } = body
+	const { tipo, dados, pedido, marcadores } = body
+
+
+	// Inclui o marcador "PAGO" no pedido do Tiny
+	const marcadorPago = [
+		{
+			marcador: {
+				descricao: "PAGO"
+			}
+		}
+	]
+
 	if (tipo === undefined || dados === undefined || dados === null) {
 		await updateStatusPlatformService({ platform: "tiny_integradaes", status: 0 })
 		return { status: "error", message: "Body deve conter 'tipo' e 'dados'" }
 	}
+
+	// --- NOVO BLOCO: verificar pagamento e adicionar marcador ---
+	if (dados.idPedidoEcommerce) {
+		try {
+			// Busca o pedido na Nuvemshop
+			const nuvemOrder = await GETNuvemOrder(dados.idPedidoEcommerce)
+
+			// Verifica se o campo de pagamento está como "paid" (confirme o campo exato!)
+			if (nuvemOrder?.payment_status === "paid") {
+
+			}
+		} catch (error) {
+			// Apenas loga o erro, sem interromper o processamento
+			console.error("Erro ao processar marcador de pagamento:", error)
+		}
+	}
+	// ---------------------------------------------------------
 
 	const { codigoSituacao: status } = dados
 
@@ -497,14 +527,33 @@ export const processEcommerceWebhook = async (body) => {
 			cpf_cnpj: dados.cliente.cpfCnpj
 		})
 
-		const { number: numberOrderRetry } = await GETNuvemOrder(dados.idPedidoEcommerce)
+		const { number: numberOrderRetry, payment_status: paid } = await GETNuvemOrder(dados.idPedidoEcommerce)
 		const isPedidoExistente = pedidosExistentes.some((pedido) => pedido.pedido.numero_ecommerce === numberOrderRetry.toString())
 
+
+
+
 		if (isPedidoExistente) {
-			return {
-				status: "success",
-				message: `Pedido já existe na conta Abstract. Pedido com ID: ${dados.id}`
+			// --- NOVO BLOCO: verificar pagamento e adicionar marcador ---
+			// Verifica se o campo de pagamento está como "paid" (confirme o campo exato!)
+			if (paid === "paid") {
+				await POSTtiny.ES("pedido.incluir.php", {
+					...orderDetails,
+					marcadores: marcadorPago
+				})
+				return {
+					status: "success",
+					message: `Pedido na ES teve marcador "PAGO" incluido. Pedido com ID: ${dados.id}`
+				}
 			}
+			// ---------------------------------------------------------
+			else {
+				return {
+					status: "success",
+					message: `Pedido já existe na conta Abstract. Pedido com ID: ${dados.id}`
+				}
+			}
+
 		}
 
 		const nota_fiscal = await GETtiny.ESnote("nota.fiscal.obter.php", {

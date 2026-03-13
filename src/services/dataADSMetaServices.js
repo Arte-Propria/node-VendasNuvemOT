@@ -134,7 +134,6 @@ export const fetchDataADSMeta = async ({ store, createdAtMin, createdAtMax }) =>
 			impressions: totalImpressions
 		}]
 
-		console.log("DEBUG META",result)
 		return result
     
 	} catch (error) {

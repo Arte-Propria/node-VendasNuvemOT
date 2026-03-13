@@ -78,7 +78,7 @@ import {
 	executeFullBatchUpdate
 } from "../controllers/mandaeControllers.js"
 import { testWebhook } from "../controllers/galeria9Controllers.js"
-import { getDbQuery } from "../controllers/segmentacaoControllers.js"
+import { getDbQuery, postDbQueryNuvemshop, postDbQueryTiny } from "../controllers/segmentacaoControllers.js"
 import { getNuvemshopCallback } from "../controllers/authNuvemshop.js"
 import { getStatusPlatform } from "../controllers/statusPlatformController.js"
 
@@ -149,6 +149,8 @@ router.delete("/order/:store/:ownerNote", deleteOrderByOwnerNote) // Adicione a 
 router.post("/webhooks/order-created", createdOrderWebhook) // Nuvemshop
 router.post("/webhooks/order-marketplace", createOrderMarketplaceWebhook) // Tiny
 router.post("/webhook/mandae", mandaeWebhook) // Webhook para atualizações da Mandae
+router.post("/webhook/db/nuvemshop", postDbQueryNuvemshop) // Rotas pedidos Nuvemshop via webhook 
+router.post("/webhook/db/tiny", postDbQueryTiny) // Rotas pedidos Nuvemshop via webhook 
 
 // TINY ESINTEGRADA
 router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
@@ -203,5 +205,7 @@ router.get("/apps/nuvemshop/callback", getNuvemshopCallback)
 
 // Rotas de teste de status plataforma
 router.get("/status/platform/:platform", getStatusPlatform)
+
+
 
 export default router

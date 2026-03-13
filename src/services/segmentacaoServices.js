@@ -1,4 +1,4 @@
-import { dataBase, dataBaseDb } from "../db/dataBaseQueryList.js"
+import { dataBase, dataBaseDb, mapNuvemshopToDelivery, mapTinyToDelivery, upsertRecord } from "../db/dataBaseQueryList.js"
 import { query } from '../db/db.js';
 
 // 1. Função para realizar o MAP dos itens, com base em qual query será acessada
@@ -217,8 +217,92 @@ export async function nuvemDbWebhook(queryData, querySelect) {
   }
 
   try {
-    const resposta =  await query(`SELECT * FROM ${querySelect}`);
+    const resposta = await query(`SELECT * FROM ${querySelect}`);
   } catch (error) {
-    
+
   }
+}
+
+// Função para processar um pedido da Nuvenshop
+export async function processOrderFromNuvemshop(nuvemData) {
+    // Mapear
+    const delivery = mapNuvemshopToDelivery(nuvemData);
+
+    console.log('delivery recebido, tipos:');
+    console.log(' - orders_shop:', Array.isArray(delivery.orders_shop) ? 'array' : typeof delivery.orders_shop);
+    console.log(' - clients:', Array.isArray(delivery.clients) ? 'array' : typeof delivery.clients);
+    console.log(' - product:', Array.isArray(delivery.product) ? 'array' : typeof delivery.product);
+    console.log(' - coupons:', Array.isArray(delivery.coupons) ? 'array' : typeof delivery.coupons);
+    console.log(' - ads:', Array.isArray(delivery.ads) ? 'array' : typeof delivery.ads);
+
+    // Garantir que sejam arrays (caso algo tenha dado errado)
+    const safeDelivery = {
+      orders_shop: Array.isArray(delivery.orders_shop) ? delivery.orders_shop : [],
+      clients: Array.isArray(delivery.clients) ? delivery.clients : [],
+      product: Array.isArray(delivery.product) ? delivery.product : [],
+      coupons: Array.isArray(delivery.coupons) ? delivery.coupons : [],
+      ads: Array.isArray(delivery.ads) ? delivery.ads : [],
+    };
+
+    // Aplicar transforms e simular upsert
+    console.log('\n--- REGISTROS A SEREM PERSISTIDOS ---');
+
+    safeDelivery.clients.forEach(item => {
+      const record = dataBaseDb.clients.transform(item);
+      console.log('\n[clients]', JSON.stringify(record, null, 2));
+      console.log(`-> Upsert clients com id_cli = ${record.id_cli}`);
+    });
+
+    safeDelivery.product.forEach(item => {
+      const record = dataBaseDb.product.transform(item);
+      console.log('\n[product]', JSON.stringify(record, null, 2));
+      console.log(`-> Upsert product com id_product = ${record.id_product}`);
+    });
+
+    safeDelivery.orders_shop.forEach(item => {
+      const record = dataBaseDb.orders_shop.transform(item);
+      console.log('\n[orders_shop]', JSON.stringify(record, null, 2));
+      console.log(`-> Upsert orders_shop com order_id = ${record.order_id}`);
+    });
+
+    safeDelivery.coupons.forEach(item => {
+      const record = dataBaseDb.coupon.transform(item);
+      console.log('\n[coupon]', JSON.stringify(record, null, 2));
+      console.log(`-> Upsert coupon com id_coupon = ${record.id_coupon}`);
+    });
+
+    safeDelivery.ads.forEach(item => {
+      console.log('\n[ads] (ignorado)');
+    });
+
+}
+
+// Função para processar um pedido da Tiny (similar)
+export async function processOrderFromTiny(tinyResponse) {
+  const delivery = mapTinyToDelivery(tinyResponse);
+
+  // orders_shop
+  for (const item of delivery.orders_shop) {
+    const record = dataBaseDb.orders_shop.transform(item);
+    await upsertRecord('orders_shop', record, 'order_id');
+  }
+
+  // clients
+  for (const item of delivery.clients) {
+    const record = dataBaseDb.clients.transform(item);
+    await upsertRecord('clients', record, 'id_cli');
+  }
+
+  // product
+  for (const item of delivery.product) {
+    const record = dataBaseDb.product.transform(item);
+    await upsertRecord('product', record, 'id_product');
+  }
+
+  // coupons
+  for (const item of delivery.coupons) {
+    const record = dataBaseDb.coupon.transform(item);
+    await upsertRecord('coupon', record, 'id_coupon');
+  }
+
 }

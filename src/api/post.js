@@ -107,7 +107,7 @@ export const POSTtinyABSTRACT = async (endpoint, data) => {
 			situacao: "aberto",
 			obs: observacao,
 			numero_pedido_ecommerce:
-        data.numero_ecommerce || data.numero_ordem_compra,
+				data.numero_ecommerce || data.numero_ordem_compra,
 			ecommerce: ecommerceName,
 			marcadores: marcadoresINTEGRADAES,
 			id_natureza_operacao: "798952072",
@@ -182,4 +182,34 @@ export const POSTgaleria9 = async (body) => {
 		logGaleria9(`Erro ao enviar webhook para Galeria9. Pedido: ${body.pedido.id}, Erro: ${error.message}`)
 		throw error
 	}
+}
+
+/**
+ * Inclui um marcador em um pedido no Tiny
+ */
+export const POSTincluirMarcadorTiny = async (pedidoId, marcador) => {
+	// Use o token configurado no seu ambiente (ex: variável de ambiente)
+	const token = config.tinyApiToken
+
+	// Monta os parâmetros da requisição
+	const params = new URLSearchParams()
+	params.append("token", token)
+	params.append("id", pedidoId)
+	params.append("marcador", marcador)
+	params.append("formato", "json") // opcional, facilita o tratamento da resposta
+
+	// Faz a chamada POST
+	const response = await fetch(`${config.tinyApiBaseUrl}/pedido.marcadores.incluir.php`, {
+		method: "POST",
+		body: params
+	})
+
+	const data = await response.json()
+
+	// Verifica se a operação foi bem-sucedida
+	if (data.retorno?.status !== "OK") {
+		throw new Error(`Falha ao incluir marcador: ${data.retorno?.erros?.erro || "erro desconhecido"}`)
+	}
+
+	return data
 }

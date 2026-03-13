@@ -1,3 +1,5 @@
+import { query } from '../db/db.js';
+
 export const dataBase = {
   ads: 'ads',
   clients: 'clients',
@@ -102,229 +104,228 @@ export const dataBaseDb = {
     })
   },
 }
-/*
-export const ordersDbNuvemshop = {
-  client: {
-    name: nuvemshopOrder.contact_name || nuvemshopOrder.customer?.name,
-    email: nuvemshopOrder.contact_email,
-    phone: nuvemshopOrder.contact_phone,
-    cpfCnpj: nuvemshopOrder.contact_identification,
-    address: nuvemshopOrder.billing_address,
-    number: nuvemshopOrder.billing_number,
-    complement: nuvemshopOrder.billing_floor,
-    neighborhood: nuvemshopOrder.billing_locality,
-    city: nuvemshopOrder.billing_city,
-    state: nuvemshopOrder.billing_province,
-    zip: nuvemshopOrder.billing_zipcode,
-    type: nuvemshopOrder.billing_customer_type || (nuvemshopOrder.contact_identification?.length === 11 ? 'F' : 'J'),
-  },
-  // Produtos
-  products: (nuvemshopOrder.products || []).map(p => ({
-    sku: p.sku,
-    name: p.name,
-    quantity: parseInt(p.quantity) || 1,
-    price: parseFloat(p.price) || 0,
-    image: p.image?.src,
-  })),
-  // Cupons
-  coupons: (nuvemshopOrder.coupon || []).map(c => ({
-    code: c.code,
-    type: c.type,
-    value: parseFloat(c.value) || 0,
-    discount: parseFloat(nuvemshopOrder.discount_coupon) || 0,
-  })),
-}
 
-export const ordersDbTiny = {
-  client: {
-    name: pedido.cliente?.nome,
-    email: pedido.cliente?.email,
-    phone: pedido.cliente?.fone,
-    cpfCnpj: pedido.cliente?.cpf_cnpj?.replace(/\D/g, ''),
-    address: pedido.cliente?.endereco,
-    number: pedido.cliente?.numero,
-    complement: pedido.cliente?.complemento,
-    neighborhood: pedido.cliente?.bairro,
-    city: pedido.cliente?.cidade,
-    state: pedido.cliente?.uf,
-    zip: pedido.cliente?.cep?.replace(/\D/g, ''),
-    type: pedido.cliente?.tipo_pessoa, // 'F' ou 'J'
-  },
-  // Produtos
-  products: (pedido.itens || []).map(i => ({
-    sku: i.item.codigo,
-    name: i.item.descricao,
-    quantity: parseFloat(i.item.quantidade) || 1,
-    price: parseFloat(i.item.valor_unitario) || 0,
-    image: null, // Tiny não retorna imagem no webhook
-  })),
-}
-
-// helpers.js - Funções utilitárias para limpeza e formatação
+// ==================== helpers.js ====================
 const cleanCpfCnpj = (value) => (value || '').replace(/[^\d]/g, '');
 const cleanPhone = (value) => (value || '').replace(/[^\d+]/g, '');
+const toNumber = (value) => (value ? parseFloat(value) : 0);
+const toISOString = (dateStr) => {
+  if (!dateStr) return null;
+  // Se já estiver no formato ISO, retorna direto
+  if (dateStr.includes('T')) return dateStr;
+  // Tenta converter dd/mm/aaaa -> aaaa-mm-dd
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    const [dia, mes, ano] = parts;
+    return new Date(`${ano}-${mes}-${dia}`).toISOString();
+  }
+  return new Date(dateStr).toISOString();
+};
+
+// Extrai o número do pedido (identificador único) dos dados da Tiny
 const extractOrderNumber = (tinyData) => {
-  // Tenta extrair o número do pedido (usado como chave) nos dados da Tiny
   const pedido = tinyData.retorno.pedido;
   return pedido.numero_ecommerce || pedido.numero_ordem_compra || pedido.ecommerce?.numeroPedidoEcommerce || null;
 };
 
-// Mapeamento Nuvemshop -> Tabelas
-function mapNuvemshopToTables(nuvemData) {
-  const orderNumber = nuvemData.number;  // identificador único do pedido
+// ==================== mappers/nuvemshop.js ====================
+export function mapNuvemshopToDelivery(nuvemData) {
+  console.log('Iniciando mapNuvemshopToDelivery');
+  const orderNumber = nuvemData?.number;
+  console.log('orderNumber:', orderNumber);
   const now = new Date().toISOString();
 
   // Cliente
-  const cliente = nuvemData.customer || {};
-  const clienteId = cleanCpfCnpj(cliente.identification) || cliente.email || `temp_${orderNumber}`;
-  const clienteObj = {
+  const c = nuvemData?.customer || {};
+  console.log('customer data:', c);
+
+  const clienteId = cleanCpfCnpj(c.identification) || c.email || `temp_${orderNumber || Date.now()}`;
+  const clienteDelivery = {
     id_cli: clienteId,
-    cpf_cnpj_cli: cleanCpfCnpj(cliente.identification),
-    nome_cli: cliente.name || nuvemData.contact_name,
-    email_cli: cliente.email || nuvemData.contact_email,
-    fone_cli: cleanPhone(cliente.phone || nuvemData.contact_phone),
-    tipo_cli: (cliente.identification && cliente.identification.length > 11) ? 'J' : 'F', // heuristic
-    endereco_cli: cliente.billing_address || cliente.default_address?.address,
-    numero_cli: cliente.billing_number || cliente.default_address?.number,
-    bairro_cli: cliente.billing_locality || cliente.default_address?.locality,
-    cidade_cli: cliente.billing_city || cliente.default_address?.city,
-    uf_cli: cliente.billing_province || cliente.default_address?.province,
-    cep_cli: (cliente.billing_zipcode || cliente.default_address?.zipcode)?.replace(/\D/g, ''),
-    dt_criacao_cli: cliente.created_at || nuvemData.created_at,
+    cpf_cnpj_cli: cleanCpfCnpj(c.identification),
+    nome_cli: c.name || nuvemData?.contact_name,
+    email_cli: c.email || nuvemData?.contact_email,
+    fone_cli: cleanPhone(c.phone || nuvemData?.contact_phone),
+    tipo_cli: (c.identification && c.identification.length > 11) ? 'J' : 'F',
+    bairro_cli: c.billing_locality || c.default_address?.locality,
+    cidade_cli: c.billing_city || c.default_address?.city,
+    numero_cli: c.billing_number || c.default_address?.number,
+    uf_cli: c.billing_province || c.default_address?.province,
+    cep_cli: (c.billing_zipcode || c.default_address?.zipcode)?.replace(/\D/g, ''),
+    endereco_cli: c.billing_address || c.default_address?.address,
+    dt_criacao_cli: toISOString(c.created_at || nuvemData?.created_at),
     ativo: true,
     dt_att_ativo: now,
-    origem_cli: nuvemData.customer_visit?.utm_parameters?.utm_source || null,
+    origem_cli: nuvemData?.customer_visit?.utm_parameters?.utm_source || null,
   };
+  console.log('clienteDelivery criado:', clienteDelivery);
 
   // Produtos
-  const produtos = (nuvemData.products || []).map(prod => ({
+  const produtosDelivery = (nuvemData?.products || []).map(prod => ({
     id_product: prod.sku || `prod_${prod.id}`,
     sku: prod.sku,
     description: prod.name,
     quantity: parseInt(prod.quantity, 10) || 1,
-    price: parseFloat(prod.price) || 0,
+    price: toNumber(prod.price),
     image: prod.image?.src || null,
   }));
+  console.log('produtosDelivery:', produtosDelivery);
 
   // Cupons
-  const cupons = (nuvemData.coupon || []).map(c => ({
-    id_coupons: c.id,
-    date: nuvemData.created_at,
-    name: c.code,
-    quantity: c.used, // ou 1 por pedido, dependendo do contexto
-    value: parseFloat(c.value) || 0,
-    discount: parseFloat(nuvemData.discount_coupon) || 0,
+  const couponsDelivery = (nuvemData?.coupon || []).map(coupon => ({
+    id_coupon: coupon.id?.toString() || `cupom_${orderNumber}`,
+    date_coupon: toISOString(nuvemData?.created_at),
+    name: coupon.code,
+    quantity: coupon.used || 1,
+    total_money: toNumber(coupon.value),
+    total_discount: toNumber(nuvemData?.discount_coupon),
     order_ids: [orderNumber],
   }));
+  console.log('couponsDelivery:', couponsDelivery);
 
   // Pedido
-  const orderObj = {
+  const orderDelivery = {
     order_id: orderNumber,
-    id_cli: clienteId,
-    store: store_id === 3889735 ? "outlet" : store_id === 1146504 ? "artepropria" : "",
-    total: parseFloat(nuvemData.total) || 0,
-    subtotal: parseFloat(nuvemData.subtotal) || 0,
-    payment_status: nuvemData.payment_status || null,
-    coupons: (nuvemData.coupon || []).map(c => c.code),
-    coupon_discount: parseFloat(nuvemData.discount_coupon) || 0,
-    products: produtos.map(p => p.id_product),
-    shipping_option: nuvemData.shipping_option || null,
+    client: clienteId,
+    store: null,
+    total: toNumber(nuvemData?.total),
+    subtotal: toNumber(nuvemData?.subtotal),
+    payment_status: nuvemData?.payment_status || null,
+    coupons: (nuvemData?.coupon || []).map(c => c.code),
+    coupon_discount: toNumber(nuvemData?.discount_coupon),
+    products: produtosDelivery.map(p => p.id_product),
+    shipping_option: nuvemData?.shipping_option || null,
     created_at: now,
-    paid_at: nuvemData.paid_at || null,
+    paid_at: toISOString(nuvemData?.paid_at),
     updated_at: now,
-    active: true,
+    active: nuvemData?.status !== 'cancelled',
   };
+  console.log('orderDelivery:', orderDelivery);
 
-  return {
-    orders_shop: [orderObj],
-    coupons: cupons,
-    product: produtos,
-    clients: [clienteObj],
+  const result = {
+    orders_shop: [orderDelivery],
+    ads: [],
+    coupons: couponsDelivery,
+    product: produtosDelivery,
+    clients: [clienteDelivery],
   };
+  console.log('result keys:', Object.keys(result));
+  return result;
 }
 
-// Mapeamento Tiny -> Tabelas
-function mapTinyToTables(tinyData) {
+// ==================== mappers/tiny.js ====================
+export async function mapTinyToDelivery(tinyData) {
   const pedido = tinyData.retorno.pedido;
   const orderNumber = extractOrderNumber(tinyData);
   if (!orderNumber) throw new Error('Número do pedido não encontrado no Tiny');
   const now = new Date().toISOString();
 
-  // Cliente
+  // ----- Cliente -----
   const c = pedido.cliente;
   const clienteId = cleanCpfCnpj(c.cpf_cnpj) || c.email || `temp_${orderNumber}`;
-  const clienteObj = {
+  const clienteDelivery = {
     id_cli: clienteId,
     cpf_cnpj_cli: cleanCpfCnpj(c.cpf_cnpj),
     nome_cli: c.nome,
     email_cli: c.email,
     fone_cli: cleanPhone(c.fone),
     tipo_cli: c.tipo_pessoa, // 'F' ou 'J'
-    endereco_cli: c.endereco,
-    numero_cli: c.numero,
     bairro_cli: c.bairro,
     cidade_cli: c.cidade,
+    numero_cli: c.numero,
     uf_cli: c.uf,
     cep_cli: c.cep?.replace(/\D/g, ''),
-    dt_criacao_cli: pedido.data_pedido, // formato dd/mm/aaaa
+    endereco_cli: c.endereco,
+    dt_criacao_cli: toISOString(pedido.data_pedido), // formato dd/mm/aaaa – ajuste se necessário
     ativo: true,
     dt_att_ativo: now,
     origem_cli: null, // Tiny não tem origem
   };
 
-  // Produtos
-  const produtos = (pedido.itens || []).map(item => ({
+  // ----- Produtos -----
+  const produtosDelivery = (pedido.itens || []).map(item => ({
     id_product: item.item.codigo || `prod_${item.item.id_produto}`,
     sku: item.item.codigo,
     description: item.item.descricao,
     quantity: parseFloat(item.item.quantidade) || 1,
     price: parseFloat(item.item.valor_unitario) || 0,
-    image: null, // Tiny não tem imagem no pedido
+    image: null, // Tiny não fornece imagem no pedido
   }));
 
-  // Pedido
-  const orderObj = {
+  // ----- Cupons -----
+  const couponsDelivery = [];
+  if (parseFloat(pedido.valor_desconto) > 0) {
+    couponsDelivery.push({
+      id_coupon: `tiny_discount_${orderNumber}`,
+      date_coupon: toISOString(pedido.data_pedido),
+      name: 'Desconto Tiny',
+      quantity: 1,
+      total_money: parseFloat(pedido.valor_desconto),
+      total_discount: parseFloat(pedido.valor_desconto),
+      order_ids: [orderNumber],
+    });
+  }
+
+  // ----- Pedido -----
+  const orderDelivery = {
     order_id: orderNumber,
-    id_cli: clienteId,
+    client: clienteId,
     store: pedido.ecommerce?.nomeEcommerce || null,
     total: parseFloat(pedido.total_pedido) || 0,
     subtotal: parseFloat(pedido.total_produtos) || 0,
-    payment_status: null, // Tiny não tem status de pagamento explícito
-    coupons: cupons.map(c => c.name),
+    payment_status: null, // Tiny não explicita status de pagamento
+    coupons: couponsDelivery.map(c => c.name),
     coupon_discount: parseFloat(pedido.valor_desconto) || 0,
-    products: produtos.map(p => p.id_product),
+    products: produtosDelivery.map(p => p.id_product),
     shipping_option: pedido.forma_envio || pedido.forma_frete || null,
     created_at: now,
-    paid_at: null, // pode ser derivado da primeira parcela
+    paid_at: null, // pode ser derivado da primeira parcela, se necessário
     updated_at: now,
-    active: true,
+    active: pedido.situacao !== 'Cancelado', // ajuste conforme valores reais
   };
 
-  // Ads (não disponível)
-  const ads = [];
+  // ----- Ads (não disponível) -----
+  const adsDelivery = [];
 
   return {
-    orders_shop: [orderObj],
-    product: produtos,
-    clients: [clienteObj],
+    orders_shop: [orderDelivery],
+    ads: adsDelivery,
+    coupons: couponsDelivery,
+    product: produtosDelivery,
+    clients: [clienteDelivery],
   };
 }
 
-// Exemplo de uso integrado (simulação)
-//const nuvemResponse = { ... }; // cole aqui o JSON da Nuvemshop
-//const tinyResponse = { ... };   // cole aqui o JSON da Tiny
+// Função genérica para upsert (insert or update) baseada em um campo de referência
+export async function upsertRecord(tableName, record, referenceField) {
+  const referenceValue = record[referenceField];
+  if (!referenceValue) {
+    throw new Error(`Campo de referência ${referenceField} não encontrado no registro`);
+  }
 
-const nuvemTables = mapNuvemshopToTables(nuvemResponse);
-const tinyTables = mapTinyToTables(tinyResponse);
+  // 1. Verificar se o registro já existe
+  const selectSql = `SELECT * FROM ${tableName} WHERE ${referenceField} = $1`;
+  const selectResult = await query(selectSql, [referenceValue]);
 
-// Para unificar, você pode combinar os dados (ex: usar o número do pedido como chave)
-const combinedOrders = [...nuvemTables.orders_shop, ...tinyTables.orders_shop];
-const combinedProducts = [...nuvemTables.product, ...tinyTables.product];
-const combinedClients = [...nuvemTables.clients, ...tinyTables.clients];
-const combinedCoupons = [...nuvemTables.coupons, ...tinyTables.coupons];
-
-console.log('Orders:', combinedOrders);
-console.log('Products:', combinedProducts);
-console.log('Clients:', combinedClients);
-console.log('Coupons:', combinedCoupons);
-*/
+  if (selectResult.rows.length > 0) {
+    // 2. Registro existe: fazer UPDATE
+    const fields = Object.keys(record);
+    const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+    // O campo de referência é incluído no SET, mas também está no WHERE; isso é ok,
+    // mas para evitar alterar a chave, podemos removê-lo do SET (opcional).
+    // Neste exemplo, mantemos tudo, mas você pode ajustar.
+    const values = fields.map(field => record[field]);
+    const updateSql = `UPDATE ${tableName} SET ${setClause} WHERE ${referenceField} = $${fields.length + 1}`;
+    // Adiciona o valor da referência no final dos parâmetros
+    await query(updateSql, [...values, referenceValue]);
+    console.log(`Registro atualizado em ${tableName} com ${referenceField} = ${referenceValue}`);
+  } else {
+    // 3. Registro não existe: fazer INSERT
+    const fields = Object.keys(record);
+    const placeholders = fields.map((_, index) => `$${index + 1}`).join(', ');
+    const insertSql = `INSERT INTO ${tableName} (${fields.join(', ')}) VALUES (${placeholders})`;
+    const values = fields.map(field => record[field]);
+    await query(insertSql, values);
+    console.log(`Registro inserido em ${tableName} com ${referenceField} = ${referenceValue}`);
+  }
+}

@@ -5,7 +5,7 @@ import { logEcommerce, logMandae } from "../utils/logger.js"
 import { parseStatusMandae, updateMandaeInfo, webhookMandaeInfo } from "../services/mandaeServices.js"
 import { query } from "../db/db.js"
 
-export const createdOrderWebhook = async  (req, res) => {
+export const createdOrderWebhook = async (req, res) => {
 	try {
 		const { store_id, event, id } = req.body
 
@@ -15,18 +15,18 @@ export const createdOrderWebhook = async  (req, res) => {
 			3889735: "outlet",
 			1146504: "artepropria"
 		}
-		
+
 		const data = {
 			store: stores[store_id],
 			id
-		} 
+		}
 
 		//Receber dados da Nuvemshop
 		const order = await fetchOrder(data)
 
 		await insertOrderWebhook(order, stores[store_id])
 		console.log(`Pedido ID: ${id} atualizado`)
-		
+
 		// Atualizar a tabela info_mandae
 		await updateMandaeInfo(order, stores[store_id])
 
@@ -57,7 +57,9 @@ export const createOrderEcommerceWebhook = async (req, res) => {
 
 		const { message } = await processEcommerceWebhook(body)
 
+		logEcommerce(body)
 		logEcommerce(message)
+		
 		return res.sendStatus(200)
 	} catch (error) {
 		logEcommerce(JSON.stringify(req.body, null, 2))
@@ -92,19 +94,19 @@ export const mandaeWebhook = async (req, res) => {
 	try {
 		// Validar dados recebidos
 		if (!mandaeData.trackingCode || !mandaeData.events || !Array.isArray(mandaeData.events)) {
-			return res.status(200).json({ 
-				error: "trackingCode e events (array) são obrigatórios" 
+			return res.status(200).json({
+				error: "trackingCode e events (array) são obrigatórios"
 			})
 		}
 
 		// Chamar o service para atualizar a informação
 		const result = await webhookMandaeInfo(mandaeData)
-    
+
 		logMandae(result.message, result.details)
-    
+
 		return res.sendStatus(200)
 	} catch (err) {
-    
+
 		//logMandae(`Erro ao processar o webhook Mandae no pedido com código de rastreio ${mandaeData.trackingCode} : ${err}`)
 		return res.sendStatus(200)
 
@@ -168,10 +170,10 @@ export const debugParseStatusMandae = async (orderId) => {
 		console.log("Eventos:", JSON.stringify(parsed3, null, 2))
 
 		// Verificar entrega realizada
-		const entregaRealizada = parsed3.find((event) => 
-			event && 
-      (event.id === "1" || event.id === 1) && 
-      (event.name === "Entrega realizada" || event.name === "Pedido entregue"))
+		const entregaRealizada = parsed3.find((event) =>
+			event &&
+			(event.id === "1" || event.id === 1) &&
+			(event.name === "Entrega realizada" || event.name === "Pedido entregue"))
 
 		console.log("\n=== VERIFICAÇÃO DE ENTREGA REALIZADA ===")
 		console.log("Encontrou entrega realizada:", !!entregaRealizada)
