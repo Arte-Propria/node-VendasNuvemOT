@@ -189,8 +189,8 @@ export const POSTincluirMarcadorTiny = async (pedidoId, marcador) => {
 	const url = `${config.tinyApiBaseUrl}/pedido.marcadores.incluir.php`;
 	const params = new URLSearchParams({
 		token: config.tinyApiTokenArteIntegradaES,
-		id: pedidoId,
-		marcador: marcador,
+		idPedido: pedidoId,        // ← nome correto
+		marcadores: marcador,       // ← nome correto (valor é a descrição do marcador)
 		formato: 'json'
 	});
 
@@ -208,8 +208,7 @@ export const POSTincluirMarcadorTiny = async (pedidoId, marcador) => {
 		}
 		return data;
 	} catch (error) {
-		// Log detalhado
 		logEcommerce(`Falha na requisição para incluir marcador: ${error.message}`);
-		throw error; // Repassa para quem chamou
+		throw error;
 	}
 };
