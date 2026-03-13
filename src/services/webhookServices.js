@@ -474,44 +474,56 @@ export const processEcommerceWebhook = async (body) => {
 		return { status: "error", message: "Body deve conter 'tipo' e 'dados'" };
 	}
 
-	// 2. Obter dados da Nuvemshop (status de pagamento e número do pedido)
+	// 2. --- VERIFICAÇÃO DE PAGAMENTO (sempre executada) ---
 	let nuvemOrder = null;
 	if (dados.idPedidoEcommerce) {
 		try {
 			nuvemOrder = await GETNuvemOrder(dados.idPedidoEcommerce);
+			logEcommerce(`Status de pagamento do pedido ${dados.idPedidoEcommerce}: ${nuvemOrder?.payment_status}`);
 		} catch (error) {
 			logEcommerce(`Erro ao buscar pedido na Nuvemshop: ${error.message}`);
 		}
 	}
 
-	// 3. Se o pagamento estiver confirmado, incluir marcador "PAGO" no Tiny
+	// 3. --- INCLUSÃO DO MARCADOR (se pago) ---
 	if (nuvemOrder?.payment_status === "paid") {
 		try {
-			await POSTincluirMarcadorTiny(dados.id, "PAGO");
-			logEcommerce(`Marcador PAGO incluído no pedido Tiny ${dados.id}`);
+			// Tenta incluir o marcador, independente do pedido existir ou não no Tiny? 
+			// Precisamos do ID do pedido no Tiny, que está em dados.id
+			if (dados.id) {
+				await POSTincluirMarcadorTiny(dados.id, "PAGO");
+				logEcommerce(`Marcador PAGO incluído com sucesso no pedido Tiny ${dados.id}`);
+			} else {
+				logEcommerce(`ID do pedido Tiny não fornecido no webhook para inclusão de marcador.`);
+			}
 		} catch (error) {
 			logEcommerce(`Falha ao incluir marcador PAGO: ${error.message}`);
 		}
+	} else {
+		logEcommerce(`Pedido não está pago (status: ${nuvemOrder?.payment_status})`);
 	}
 
-	// 4. Processar o tipo de webhook (inclusão ou atualização)
+	// 4. --- CONTINUAÇÃO DO FLUXO NORMAL ---
 	const { codigoSituacao: status } = dados;
 
 	if (tipo === "inclusao_pedido") {
+		// Aqui você pode querer processar a inclusão se necessário
 		return {
 			status: "ignored",
 			message: "Novo pedido criado"
 		};
 	}
 
-	if (tipo === "atualizacao_pedido" && status !== "faturado") {
-		return {
-			status: "ignored",
-			message: "Pedido não faturado"
-		};
-	}
+	if (tipo === "atualizacao_pedido") {
+		// Se não estiver faturado, ainda assim podemos registrar e ignorar a atualização
+		if (status !== "faturado") {
+			return {
+				status: "ignored",
+				message: "Pedido não faturado"
+			};
+		}
 
-	if (tipo === "atualizacao_pedido" && status === "faturado") {
+		// Agora sim, processa a atualização para faturado
 		const orderDetails = await getOrderDetailsES(dados.id);
 		const pedidosExistentes = await GETtiny.ABSTRACT("pedidos.pesquisa.php", {
 			dataInicialOcorrencia: dados.data,
@@ -519,11 +531,9 @@ export const processEcommerceWebhook = async (body) => {
 			cpf_cnpj: dados.cliente.cpfCnpj
 		});
 
-		// Usa o número do pedido obtido da Nuvemshop (nuvemOrder.number)
 		const numberOrderRetry = nuvemOrder?.number;
 		if (!numberOrderRetry) {
-			logEcommerce("Número do pedido na Nuvemshop não disponível");
-			// Talvez buscar novamente ou tratar como erro? Por segurança, podemos buscar novamente
+			logEcommerce("Número do pedido na Nuvemshop não disponível para verificação de existência.");
 		}
 
 		const isPedidoExistente = pedidosExistentes.some(
@@ -553,7 +563,7 @@ export const processEcommerceWebhook = async (body) => {
 		};
 	}
 
-	// Se chegou aqui, tipo não reconhecido
+	// Tipo não reconhecido
 	return {
 		status: "ignored",
 		message: `Tipo não processado: ${tipo}`
@@ -562,26 +572,34 @@ export const processEcommerceWebhook = async (body) => {
 
 export const updateOrderNuvemshop = async (dados, pedido) => {
 	const orderDetailsABSTRACT = pedido;
+
+	// 1. Buscar o pedido no Tiny ES
 	const orderIntegradaES = await GETtiny.ES("pedidos.pesquisa.php", {
 		dataInicialOcorrencia: dados.data,
 		idPedidoEcommerce: dados.idPedidoEcommerce,
 		cpf_cnpj: dados.cliente.cpfCnpj
 	});
-	const id = orderIntegradaES.id;
+	const id = orderIntegradaES?.id;
 
 	if (!id) {
 		logEcommerce(`Não foram encontrados pedidos com o CPF/CNPJ: ${dados.cliente.cpfCnpj}`);
+		// Mesmo assim, podemos tentar verificar pagamento? Não temos ID do Tiny, então não podemos incluir marcador.
 		return {
 			status: "error",
 			message: `Não foram encontrados pedidos com o CPF/CNPJ: ${dados.cliente.cpfCnpj}`
 		};
 	}
 
-	// Verificar pagamento na Nuvemshop
-	const { payment_status: paid } = await GETNuvemOrder(dados.idPedidoEcommerce);
+	// 2. Verificar pagamento na Nuvemshop
+	let nuvemOrder;
+	try {
+		nuvemOrder = await GETNuvemOrder(dados.idPedidoEcommerce);
+	} catch (error) {
+		logEcommerce(`Erro ao buscar pedido na Nuvemshop: ${error.message}`);
+	}
 
-	// Se pago, incluir marcador (se ainda não tiver)
-	if (paid === "paid") {
+	// 3. Incluir marcador se pago (sempre que possível)
+	if (nuvemOrder?.payment_status === "paid") {
 		try {
 			await POSTincluirMarcadorTiny(id, "PAGO");
 			logEcommerce(`Marcador PAGO incluído no pedido Tiny ${id}`);
@@ -590,7 +608,7 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 		}
 	}
 
-	// Atualizar rastreamento na Nuvemshop se o pedido foi enviado
+	// 4. Atualizar rastreamento na Nuvemshop se enviado
 	const isUpdateOrderNuvemshop = orderDetailsABSTRACT.situacao === "Enviado" && orderDetailsABSTRACT.codigo_rastreamento;
 	if (isUpdateOrderNuvemshop) {
 		const { numero_ecommerce, codigo_rastreamento, url_rastreamento } = orderDetailsABSTRACT;
@@ -599,17 +617,10 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 			tracking_number: codigo_rastreamento,
 			tracking_url: url_rastreamento
 		};
-		// await updateStatusShippingNuvemshop(dataOrderNuvemshop); // descomente se implementado
+		// await updateStatusShippingNuvemshop(dataOrderNuvemshop);
 	}
 
-	// Atualizar situação e rastreamento no Tiny (usando PUTtinyES)
-	const data = {
-		id,
-		situacao: orderDetailsABSTRACT.situacao,
-		codigoRastreamento: orderDetailsABSTRACT.codigo_rastreamento,
-		urlRastreamento: encodeURI(orderDetailsABSTRACT.url_rastreamento)
-	};
-
+	// 5. Atualizar situação e rastreamento no Tiny (se permitido)
 	const statusPermitidos = [
 		"Pronto para envio",
 		"Enviado",
@@ -623,12 +634,20 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 	];
 
 	if (!statusPermitidos.includes(orderDetailsABSTRACT.situacao)) {
-		logEcommerce(`Pedido ${id} não pode ser atualizado. Situacao: ${orderDetailsABSTRACT.situacao}`);
+		logEcommerce(`Pedido ${id} não pode ser atualizado. Situação: ${orderDetailsABSTRACT.situacao}`);
+		// Não retorna erro, pois o marcador já foi inserido se pago
 		return {
-			status: "error",
-			message: `Pedido ${id} não pode ser atualizado. Situacao: ${orderDetailsABSTRACT.situacao}`
+			status: "ignored",
+			message: `Situação não permitida para atualização: ${orderDetailsABSTRACT.situacao}`
 		};
 	}
+
+	const data = {
+		id,
+		situacao: orderDetailsABSTRACT.situacao,
+		codigoRastreamento: orderDetailsABSTRACT.codigo_rastreamento,
+		urlRastreamento: encodeURI(orderDetailsABSTRACT.url_rastreamento)
+	};
 
 	await PUTtiny.ES(data);
 	logEcommerce(`Pedido atualizado no Tiny Integrada ES. Pedido com ID: ${id}`);
