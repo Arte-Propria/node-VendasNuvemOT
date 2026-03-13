@@ -186,31 +186,49 @@ export const POSTgaleria9 = async (body) => {
 
 // Função dedicada para incluir marcador em um pedido no Tiny
 export const POSTincluirMarcadorTiny = async (pedidoId, marcador) => {
-	const url = `${config.tinyApiBaseUrl}/pedido.marcadores.incluir.php`;
+	// Adiciona formato=json na URL para forçar resposta JSON
+	const url = `${config.tinyApiBaseUrl}/pedido.marcadores.incluir.php?formato=json`;
 
-	// Monta o payload em JSON com os nomes corretos dos parâmetros
-	const payload = {
+	const params = new URLSearchParams({
 		token: config.tinyApiTokenArteIntegradaES,
-		idPedido: pedidoId,       // nome correto (conforme erro anterior)
-		marcadores: marcador,      // nome correto (no plural)
-		formato: 'json'
-	};
+		idPedido: pedidoId,
+		marcadores: marcador
+		// formato removido do corpo, pois já está na URL
+	});
 
 	try {
 		const response = await fetch(url, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(payload)
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: params.toString()
 		});
 
-		const data = await response.json();
+		const contentType = response.headers.get('content-type') || '';
 
-		if (data.retorno?.status !== 'OK') {
-			const erro = data.retorno?.erros?.erro || JSON.stringify(data);
-			throw new Error(`Erro da API Tiny: ${erro}`);
+		// Se a resposta for JSON, processa normalmente
+		if (contentType.includes('application/json')) {
+			const data = await response.json();
+			if (data.retorno?.status !== 'OK') {
+				const erro = data.retorno?.erros?.erro || JSON.stringify(data);
+				throw new Error(`Erro da API Tiny: ${erro}`);
+			}
+			return data;
 		}
-
-		return data;
+		// Se for XML, tenta extrair a mensagem de erro (fallback)
+		else if (contentType.includes('text/xml') || contentType.includes('application/xml')) {
+			const text = await response.text();
+			logEcommerce(`Resposta XML do Tiny: ${text}`);
+			// Tenta extrair a mensagem de erro do XML (simples)
+			const match = text.match(/<erro>(.*?)<\/erro>/);
+			const erroMsg = match ? match[1] : 'Erro desconhecido (resposta XML)';
+			throw new Error(`Erro da API Tiny (XML): ${erroMsg}`);
+		}
+		// Outro formato inesperado
+		else {
+			const text = await response.text();
+			logEcommerce(`Resposta inesperada do Tiny: ${text}`);
+			throw new Error(`Resposta inesperada do Tiny: ${text.substring(0, 200)}`);
+		}
 	} catch (error) {
 		logEcommerce(`Falha na requisição para incluir marcador: ${error.message}`);
 		throw error;
