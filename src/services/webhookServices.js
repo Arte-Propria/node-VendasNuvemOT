@@ -463,14 +463,8 @@ export const processEcommerceWebhookManual = async (body) => {
 
 
 export const processEcommerceWebhook = async (body) => {
-
-	if (!body || typeof body !== "object") {
-		await updateStatusPlatformService({ platform: "tiny_integradaes", status: 0 })
-		return { status: "error", message: "Body inválido ou ausente" }
-	}
-
+	const { number: numberOrderRetry, payment_status: paid } = await GETNuvemOrder(dados.idPedidoEcommerce)
 	const { tipo, dados, pedido, marcadores } = body
-
 
 	// Inclui o marcador "PAGO" no pedido do Tiny
 	const marcadorPago = [
@@ -481,27 +475,39 @@ export const processEcommerceWebhook = async (body) => {
 		}
 	]
 
+	// Atualiza marcadores no tiny
+	const atualizarMarcadorPaid = async (marcadorPago) => {
+
+		const dataOrderPaid = {
+			marcadores: marcadorPago
+		}
+
+		await PUTtiny.ES(dataOrderPaid)
+		logEcommerce(`Marcador atualizado no Tiny Integrada ES. Pedido com ID: ${id}. Marcador: ${marcadores}`)
+	}
+	// --- NOVO BLOCO: verificar pagamento e adicionar marcador ---
+	// Verifica se o campo de pagamento está como "paid" (confirme o campo exato!)
+	if (paid === "paid") {
+
+		await atualizarMarcadorPaid(marcadorPago)
+
+		return {
+			status: "success",
+			message: `Pedido na ES teve marcador "PAGO" incluido. Pedido com ID: ${dados.id}`
+		}
+	}
+	// ---------------------------------------------------------
+
+	if (!body || typeof body !== "object") {
+		await updateStatusPlatformService({ platform: "tiny_integradaes", status: 0 })
+		return { status: "error", message: "Body inválido ou ausente" }
+	}
+
+
 	if (tipo === undefined || dados === undefined || dados === null) {
 		await updateStatusPlatformService({ platform: "tiny_integradaes", status: 0 })
 		return { status: "error", message: "Body deve conter 'tipo' e 'dados'" }
 	}
-
-	// --- NOVO BLOCO: verificar pagamento e adicionar marcador ---
-	if (dados.idPedidoEcommerce) {
-		try {
-			// Busca o pedido na Nuvemshop
-			const nuvemOrder = await GETNuvemOrder(dados.idPedidoEcommerce)
-
-			// Verifica se o campo de pagamento está como "paid" (confirme o campo exato!)
-			if (nuvemOrder?.payment_status === "paid") {
-
-			}
-		} catch (error) {
-			// Apenas loga o erro, sem interromper o processamento
-			console.error("Erro ao processar marcador de pagamento:", error)
-		}
-	}
-	// ---------------------------------------------------------
 
 	const { codigoSituacao: status } = dados
 
@@ -527,33 +533,13 @@ export const processEcommerceWebhook = async (body) => {
 			cpf_cnpj: dados.cliente.cpfCnpj
 		})
 
-		const { number: numberOrderRetry, payment_status: paid } = await GETNuvemOrder(dados.idPedidoEcommerce)
 		const isPedidoExistente = pedidosExistentes.some((pedido) => pedido.pedido.numero_ecommerce === numberOrderRetry.toString())
 
-
-
-
 		if (isPedidoExistente) {
-			// --- NOVO BLOCO: verificar pagamento e adicionar marcador ---
-			// Verifica se o campo de pagamento está como "paid" (confirme o campo exato!)
-			if (paid === "paid") {
-				await POSTtiny.ES("pedido.incluir.php", {
-					...orderDetails,
-					marcadores: marcadorPago
-				})
-				return {
-					status: "success",
-					message: `Pedido na ES teve marcador "PAGO" incluido. Pedido com ID: ${dados.id}`
-				}
+			return {
+				status: "success",
+				message: `Pedido já existe na conta Abstract. Pedido com ID: ${dados.id}`
 			}
-			// ---------------------------------------------------------
-			else {
-				return {
-					status: "success",
-					message: `Pedido já existe na conta Abstract. Pedido com ID: ${dados.id}`
-				}
-			}
-
 		}
 
 		const nota_fiscal = await GETtiny.ESnote("nota.fiscal.obter.php", {
@@ -591,7 +577,17 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 		}
 	}
 
+	// Inclui o marcador "PAGO" no pedido do Tiny
+	const marcadorPago = [
+		{
+			marcador: {
+				descricao: "PAGO"
+			}
+		}
+	]
+
 	const isUpdateOrderNuvemshop = orderDetailsABSTRACT.situacao === "Enviado" && orderDetailsABSTRACT.codigo_rastreamento
+	const { payment_status: paid } = await GETNuvemOrder(dados.idPedidoEcommerce)
 
 	// Atualiza codigo de rastreamento e status diretamente na Nuvemshop se o pedido for Enviado com codigo de rastreamento
 	if (isUpdateOrderNuvemshop) {
@@ -606,6 +602,19 @@ export const updateOrderNuvemshop = async (dados, pedido) => {
 
 		// await updateStatusShippingNuvemshop(dataOrderNuvemshop)
 
+	}
+
+
+	// Atualiza marcadores no tiny
+	if (paid === "paid") {
+		const { marcadores } = orderDetailsABSTRACT
+
+		const dataOrderPaid = {
+			marcadores: marcadorPago
+		}
+
+		await PUTtiny.ES(dataOrderPaid)
+		logEcommerce(`Marcador atualizado no Tiny Integrada ES. Pedido com ID: ${id}. Marcador: ${marcadores}`)
 	}
 
 	const data = {
