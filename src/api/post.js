@@ -184,32 +184,23 @@ export const POSTgaleria9 = async (body) => {
 	}
 }
 
-/**
- * Inclui um marcador em um pedido no Tiny
- */
+// Função dedicada para incluir marcador em um pedido no Tiny
 export const POSTincluirMarcadorTiny = async (pedidoId, marcador) => {
-	// Use o token configurado no seu ambiente (ex: variável de ambiente)
-	const token = config.tinyApiToken
+    const url = `${config.tinyApiBaseUrl}/pedido.marcadores.incluir.php?token=${config.tinyApiTokenArteIntegradaES}&formato=json`;
+    const payload = new URLSearchParams({
+        id: pedidoId,
+        marcador: marcador
+    });
 
-	// Monta os parâmetros da requisição
-	const params = new URLSearchParams()
-	params.append("token", token)
-	params.append("id", pedidoId)
-	params.append("marcador", marcador)
-	params.append("formato", "json") // opcional, facilita o tratamento da resposta
+    const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: payload.toString()
+    });
 
-	// Faz a chamada POST
-	const response = await fetch(`${config.tinyApiBaseUrl}/pedido.marcadores.incluir.php`, {
-		method: "POST",
-		body: params
-	})
-
-	const data = await response.json()
-
-	// Verifica se a operação foi bem-sucedida
-	if (data.retorno?.status !== "OK") {
-		throw new Error(`Falha ao incluir marcador: ${data.retorno?.erros?.erro || "erro desconhecido"}`)
-	}
-
-	return data
-}
+    const data = await response.json();
+    if (data.retorno?.status !== "OK") {
+        throw new Error(`Erro ao incluir marcador: ${data.retorno?.erros?.erro || 'desconhecido'}`);
+    }
+    return data;
+};
