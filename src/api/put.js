@@ -109,3 +109,37 @@ export const PUTOrderNuvemshop = async (id, data, store) => {
 	}  
 }
 
+
+export const PUTProductNuvemshop = async (id, data, store) => {
+	let storeId
+	let code
+	
+	if (store === "outlet") {
+		code = config.accessTokenOutlet
+		storeId = config.storeIdOutlet
+	} else if (store === "artepropria") {
+		code = config.accessTokenArtePropria
+		storeId = config.storeIdArtePropria
+	}
+
+	const url = `${config.nuvemshopApiBaseUrl}/${storeId}/products/${id}`
+	try {
+		const response = await axios.put(url, data, {
+			headers: {
+				"Authentication": `bearer ${code}`,
+				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+				"Content-Type": "application/json"
+			}
+		})
+
+		return {
+			status: 200,
+			success: true,
+			message: `Produto ${id} atualizado na Nuvemshop`,
+			data: response
+		}
+	} catch (error) {
+		logEcommerce(`Erro ao atualizar produto ${id} na Nuvemshop: ${error.message}`)
+		throw new Error(`Erro ao atualizar produto ${id} na Nuvemshop: ${error}`)
+	}
+}

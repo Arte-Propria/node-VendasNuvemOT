@@ -81,6 +81,7 @@ import { testWebhook } from "../controllers/galeria9Controllers.js"
 import { getDbQuery, postDbQueryNuvemshop, postDbQueryTiny } from "../controllers/segmentacaoControllers.js"
 import { getNuvemshopCallback } from "../controllers/authNuvemshop.js"
 import { getStatusPlatform } from "../controllers/statusPlatformController.js"
+import { generateTagsIA } from "../controllers/generateTagsControllers.js"
 
 const router = express.Router()
 
@@ -206,6 +207,7 @@ router.get("/apps/nuvemshop/callback", getNuvemshopCallback)
 // Rotas de teste de status plataforma
 router.get("/status/platform/:platform", getStatusPlatform)
 
+router.get("/generate-tags/ia/:store/:date", generateTagsIA)
 
 
 export default router

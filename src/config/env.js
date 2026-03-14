@@ -27,5 +27,6 @@ export const config = {
 	// App Nuvemshop (OAuth)
 	nuvemshopClientId: process.env.CLIENT_ID,
 	nuvemshopClientSecret: process.env.CLIENT_SECRET,
-	nuvemshopRedirectUri: process.env.NUVEMSHOP_REDIRECT_URI
+	nuvemshopRedirectUri: process.env.NUVEMSHOP_REDIRECT_URI,
+	geminiApiKey: process.env.GEMINI_API_KEY
 }

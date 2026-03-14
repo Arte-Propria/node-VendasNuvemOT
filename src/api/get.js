@@ -1,6 +1,9 @@
 import axios from "axios"
 import { config } from "../config/env.js"
 import { logEcommerce } from "../utils/logger.js"
+import { getNextPageUrl, delay } from "../tools/tools.js"
+
+const USER_AGENT = "API-NuvemShop (lucasecom@artepropria.com)"
 
 export const GETtinyES = async (endpoint, data) => {
 	const { idPedidoEcommerce, ...dataOrder } = data
@@ -166,7 +169,7 @@ export const GETNuvemOrderByCPF = async (cpf) => {
 			url,
 			headers: {
 				Authentication: `bearer ${config.accessTokenOutlet}`,
-				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+				"User-Agent": USER_AGENT,
 				"Content-Type": "application/json"
 			},
 			params: {
@@ -183,7 +186,7 @@ export const GETNuvemOrderByCPF = async (cpf) => {
 			url: urlArtePropria,
 			headers: {
 				Authentication: `bearer ${config.accessTokenArtePropria}`,
-				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+				"User-Agent": USER_AGENT,
 				"Content-Type": "application/json"
 			},
 			params: {
@@ -214,7 +217,7 @@ export const GETNuvemOrderByNumberOrder = async (numberOrder, store) => {
 		const response = await axios.get(url, {
 			headers: {
 				"Authentication": `bearer ${code}`,
-				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+				"User-Agent": USER_AGENT,
 				"Content-Type": "application/json"
 			},
 			params: {
@@ -234,4 +237,64 @@ export const GETNuvemOrderByNumberOrder = async (numberOrder, store) => {
 	}
 }
 
+export async function GETlistProducts(store, params) {
+	let code = null
+	let storeId = null
 
+	let allProducts = []
+
+	if (store === "outlet") {
+		code = config.accessTokenOutlet
+		storeId = config.storeIdOutlet
+	} else if (store === "artepropria") {
+		code = config.accessTokenArtePropria
+		storeId = config.storeIdArtePropria
+	}
+
+	let url = `https://api.tiendanube.com/v1/${storeId}/products/${params}`
+
+	while (url) {
+		try {
+			const response = await axios.get(url, {
+				headers: {
+					Authentication: `bearer ${code}`,
+					"User-Agent": USER_AGENT,
+					"Content-Type": "application/json"
+				},
+			})
+
+			if (response.status === 200 || response.status === 201) {
+				const products = response.data
+				allProducts = [...allProducts, ...products.map(mapProduct)]
+
+				// Obter a próxima URL da página do cabeçalho 'link'
+				url = getNextPageUrl(response.headers.link)
+				url = false
+
+				const remainingRequests = parseInt(response.headers["x-rate-limit-remaining"])
+				const resetTime = parseInt(response.headers["x-rate-limit-reset"])
+
+				// Se estiver prestes a atingir o limite, aguarde o tempo de reset
+				if (remainingRequests <= 1 && url) {
+					await delay(resetTime)
+				} else if (url) {
+					await delay(500)
+				}
+			} else {
+				throw new Error(`Erro ao recuperar produtos: ${response}`)
+			}
+		} catch (error) {
+			throw new Error(`Erro ao recuperar produtos: ${error}`)
+		}
+	}
+
+	return allProducts
+}
+
+function mapProduct(element) {
+	return {
+		...element,
+		name: element.name.pt,
+		images: element.images.map(image => image.src)
+	}
+}

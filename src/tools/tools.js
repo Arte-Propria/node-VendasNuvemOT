@@ -67,3 +67,8 @@ export function generateDateRanges(daysBack) {
 	
 	return ranges
 }
+
+export function getNextPageUrl(linkHeader) {
+	const nextLinkMatch = /<([^>]+)>;\s*rel="next"/.exec(linkHeader)
+	return nextLinkMatch ? nextLinkMatch[1] : null
+}
