@@ -59,7 +59,7 @@ export const generateTagsIAServices = async (store, date) => {
 		const productsWithTags = []
 		for (const product of products) {
 			const imageUrl = product.images?.[0]
-      const productIsUpdated = product.id < 327935257
+      const productIsUpdated = product.id < 327940697
 			if (!imageUrl || productIsUpdated) {
 				continue
 			}
