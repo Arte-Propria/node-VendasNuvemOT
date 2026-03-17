@@ -49,30 +49,30 @@ export async function generateTagsFromImage(imageUrl) {
 	return tags
 }
 
-export const generateTagsIAServices = async (store, date) => {
+export const generateTagsIAServices = async (
+	store, date, idMax, idMin
+) => {
 	try {
-		const products = await GETlistProducts(
-			store,
-			`?published=true&per_page=156&created_at_min=${date}&fields=id,name,images,tags`
-		)
+		const products = await GETlistProducts(store,
+			`?published=true&per_page=156&created_at_min=${date}&fields=id,name,images,tags`)
 
 		const productsWithTags = []
 		for (const product of products) {
 			const imageUrl = product.images?.[0]
-      const productIsUpdated = product.id < 327940697
+			const productIsUpdated = product.id > idMax || product.id < idMin
 			if (!imageUrl || productIsUpdated) {
 				continue
 			}
-      const tagsAI = await generateTagsFromImage(imageUrl)
-      const tags = `${product.tags},${tagsAI.join(",")}`
-      productsWithTags.push({ id: product.id, name: product.name, tags })
+			const tagsAI = await generateTagsFromImage(imageUrl)
+			const tags = `${product.tags},${tagsAI.join(",")}`
+			productsWithTags.push({ id: product.id, name: product.name, tags })
 
-      const result = await PUTProductNuvemshop(product.id, { tags }, store)
-      if (result.status === 200) {
-        console.log(`Tags do produto ${product.id} ${product.name} atualizado na Nuvemshop com sucesso`)
-      } else {
-        console.error(`Erro ao atualizar tags do produto ${product.id} ${product.name} na Nuvemshop: ${result}`)
-      }
+			const result = await PUTProductNuvemshop(product.id, { tags }, store)
+			if (result.status === 200) {
+				console.log(`Tags do produto ${product.id} ${product.name} atualizado na Nuvemshop com sucesso`)
+			} else {
+				console.error(`Erro ao atualizar tags do produto ${product.id} ${product.name} na Nuvemshop: ${result}`)
+			}
 		}
 
 		return {

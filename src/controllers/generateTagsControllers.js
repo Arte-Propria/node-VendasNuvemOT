@@ -2,8 +2,10 @@ import { generateTagsIAServices } from "../services/generateTagsServices.js"
 
 export const generateTagsIA = async (req, res) => {
 	try {
-		const { store, date } = req.params
-		const response = await generateTagsIAServices(store, date)
+		const { store, date, idMax, idMin } = req.params
+		const response = await generateTagsIAServices(
+			store, date, idMax, idMin
+		)
 
 		return res.status(response.status).json({
 			success: response.success,

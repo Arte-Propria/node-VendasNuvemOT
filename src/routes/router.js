@@ -207,7 +207,7 @@ router.get("/apps/nuvemshop/callback", getNuvemshopCallback)
 // Rotas de teste de status plataforma
 router.get("/status/platform/:platform", getStatusPlatform)
 
-router.get("/generate-tags/ia/:store/:date", generateTagsIA)
+router.get("/generate-tags/ia/:store/:date/:idMax/:idMin", generateTagsIA)
 
 
 export default router

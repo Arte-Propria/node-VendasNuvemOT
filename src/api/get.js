@@ -260,7 +260,7 @@ export async function GETlistProducts(store, params) {
 					Authentication: `bearer ${code}`,
 					"User-Agent": USER_AGENT,
 					"Content-Type": "application/json"
-				},
+				}
 			})
 
 			if (response.status === 200 || response.status === 201) {
@@ -295,6 +295,6 @@ function mapProduct(element) {
 	return {
 		...element,
 		name: element.name.pt,
-		images: element.images.map(image => image.src)
+		images: element.images.map((image) => image.src)
 	}
 }
