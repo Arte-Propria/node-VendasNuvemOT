@@ -255,8 +255,7 @@ export const processMarketplaceWebhook = async (body) => {
 			logEcommerce(`Falha ao incluir marcador PAGO: ${error.message}`);
 		}
 	} else {
-		logEcommerce(`Pedido ${dados?.id} ${dados?.idPedidoEcommerce} não está pago (status: ${nuvemOrder?.payment_status})`);
-		logEcommerce(`Impressão dados: ${dados}`);
+		logEcommerce(`Pedido ${dados?.id} não está pago (status: ${nuvemOrder?.payment_status})`);
 	}
 
 
