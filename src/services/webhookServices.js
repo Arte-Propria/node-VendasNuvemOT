@@ -256,6 +256,7 @@ export const processMarketplaceWebhook = async (body) => {
 		}
 	} else {
 		logEcommerce(`Pedido ${dados?.id} ${dados?.idPedidoEcommerce} não está pago (status: ${nuvemOrder?.payment_status})`);
+		logEcommerce(`Impressão dados: ${dados}`);
 	}
 
 
