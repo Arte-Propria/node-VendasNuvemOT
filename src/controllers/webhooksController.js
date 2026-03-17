@@ -44,7 +44,7 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
 
-		logEcommerce(`Body: ${JSON.stringify(body)}`)
+		//logEcommerce(`Body: ${JSON.stringify(body)}`)
 		logEcommerce(message)
 
 		return res.status(200).send(result)
@@ -60,7 +60,7 @@ export const createOrderEcommerceWebhook = async (req, res) => {
 
 		const { message } = await processEcommerceWebhook(body)
 
-		logEcommerce(body)
+		//logEcommerce(body)
 		logEcommerce(message)
 
 		return res.sendStatus(200)
