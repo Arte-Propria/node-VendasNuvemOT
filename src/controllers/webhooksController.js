@@ -59,7 +59,6 @@ export const createOrderEcommerceWebhook = async (req, res) => {
 
 		const { message } = await processEcommerceWebhook(body)
 
-		logEcommerce(`Body createOrderEcommerceWebhook: ${JSON.stringify(body)}`)
 		logEcommerce(message)
 
 		return res.sendStatus(200)
