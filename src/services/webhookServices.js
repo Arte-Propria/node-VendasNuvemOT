@@ -282,36 +282,6 @@ export const processMarketplaceWebhook = async (body) => {
 
 		if (isIntegradaES) {
 			const result = await updateOrderNuvemshop(dados, pedido)
-
-			// --- VERIFICAÇÃO DE PAGAMENTO (sempre executada) ---
-			let nuvemOrder = null;
-			if (dados.idPedidoEcommerce) {
-				try {
-					nuvemOrder = await GETNuvemOrder(dados.idPedidoEcommerce);
-					logEcommerce(`Status de pagamento do pedido ${dados.idPedidoEcommerce}: ${nuvemOrder?.payment_status}`);
-				} catch (error) {
-					logEcommerce(`Erro ao buscar pedido na Nuvemshop: ${error.message}`);
-				}
-			}
-
-			// --- INCLUSÃO DO MARCADOR (se pago) ---
-			if (nuvemOrder?.payment_status === "paid") {
-				try {
-					// Tenta incluir o marcador, independente do pedido existir ou não no Tiny? 
-					// Precisamos do ID do pedido no Tiny, que está em dados.id
-					if (dados.id) {
-						await POSTincluirMarcadorTiny(dados.id, "PAGO");
-						logEcommerce(`Marcador PAGO incluído com sucesso no pedido Tiny ${dados.id}`);
-					} else {
-						logEcommerce(`ID do pedido Tiny não fornecido no webhook para inclusão de marcador.`);
-					}
-				} catch (error) {
-					logEcommerce(`Falha ao incluir marcador PAGO: ${error.message}`);
-				}
-			} else {
-				logEcommerce(`createOrderMarketplaceWebhook:Pedido ${dados?.id} não está pago (status: ${nuvemOrder?.payment_status})`);
-			}
-
 			return result
 		}
 
