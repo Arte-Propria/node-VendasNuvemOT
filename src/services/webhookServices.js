@@ -277,13 +277,9 @@ export const processMarketplaceWebhook = async (body) => {
 		const isClientFullEstoque =
 			cliente.nome.toUpperCase().includes("FULL") ||
 			cliente.nome.toUpperCase().includes("ESTOQUE")
-		const { marcadores } = pedido
-		const isIntegradaES = marcadores.some((marcador) => marcador.marcador.descricao.toLowerCase() === "integradaes")
 
-		if (isIntegradaES) {
-			const result = await updateOrderNuvemshop(dados, pedido)
-			return result
-		}
+		// Se for da Outlet ou Arte Própria, adicionar marcador PAGO
+		// ADICIONAR LOGICA AQUI
 
 		const resultGaleria9 = await processMarketplaceWebhookGaleria9(body)
 		if (resultGaleria9) {

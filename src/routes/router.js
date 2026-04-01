@@ -154,8 +154,8 @@ router.post("/webhook/db/nuvemshop", postDbQueryNuvemshop) // Rotas pedidos Nuve
 router.post("/webhook/db/tiny", postDbQueryTiny) // Rotas pedidos Nuvemshop via webhook 
 
 // TINY ESINTEGRADA
-router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
-router.post("/webhooks/order-ecommerce-manual", createOrderEcommerceWebhookManual)
+// router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
+// router.post("/webhooks/order-ecommerce-manual", createOrderEcommerceWebhookManual)
 
 // Rotas TINY
 router.get("/tiny/order/:id/:cpf", getOrderTiny)
