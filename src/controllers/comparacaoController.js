@@ -1,22 +1,40 @@
 // controllers/comparacaoController.js
 import { fetchTinyOrdersWithDetails } from "../services/tinyPedidosService.js"
+import { fetchTinyOrdersByIdsWithDetails, fetchTinyOrdersListByDate } from "../services/tinyPedidosService.js"
 import { fetchNuvemShopOrders } from "../services/orderServicesNuvem.js"
-import { parseDate, isDateInRange } from "../utils/dateUtils.js"
 
 export const compararPedidos = async (req, res) => {
 	const { store, dataInicial, dataFinal } = req.params
 	console.log(`Iniciando comparação: ${store} de ${dataInicial} a ${dataFinal}`)
   
 	try {
-		// 1. Buscar pedidos do Tiny
-		const pedidosTiny = await fetchTinyOrdersWithDetails(store, dataInicial, dataFinal)
-		console.log(`[Tiny] ${pedidosTiny.length} pedidos encontrados`)
-    
-		// 2. Buscar pedidos da NuvemShop
+		// 1. Buscar pedidos da NuvemShop (fonte de verdade do período)
 		const pedidosNuvem = await fetchNuvemShopOrders(store, dataInicial, dataFinal)
 		console.log(`[NuvemShop] ${pedidosNuvem.length} pedidos encontrados`)
+
+		// 2. Buscar lista de pedidos do Tiny por data (com paginação)
+		const listaTiny = await fetchTinyOrdersListByDate(dataInicial, dataFinal)
+		console.log(`[Tiny] ${listaTiny.length} pedidos listados no período`)
+
+		// 3. Filtrar os pedidos do Tiny que existem na NuvemShop via numero_ecommerce
+		const numerosNuvem = new Set((pedidosNuvem || [])
+			.map((p) => p?.pedido ?? p?.number)
+			.map((n) => String(n || "").trim())
+			.filter(Boolean))
+
+		const pedidosTinyNoEcommerce = (listaTiny || [])
+			.filter((p) => numerosNuvem.has(String(p?.numero_ecommerce || "").trim()))
+
+		const idsTinyFiltrados = pedidosTinyNoEcommerce
+			.map((p) => p?.id)
+			.filter((id) => id != null)
+
+		// 4. Obter detalhes (itens/SKUs) apenas dos IDs filtrados
+		const pedidosTiny = await fetchTinyOrdersByIdsWithDetails(idsTinyFiltrados, { concurrency: 5 })
+
+		console.log(`[Tiny] ${pedidosTiny.length} pedidos detalhados (pedido.obter) após filtro`)
     
-		// 3. Comparar os pedidos apenas pelo número do pedido
+		// 5. Comparar os pedidos apenas pelo número do pedido
 		const resultados = compararPedidosPorNumero(pedidosTiny, pedidosNuvem)
     
 		console.log(`Comparação concluída: ${resultados.length} resultados`)
@@ -26,6 +44,9 @@ export const compararPedidos = async (req, res) => {
 			periodo: `${dataInicial} - ${dataFinal}`,
 			totalPedidosTiny: pedidosTiny.length,
 			totalPedidosNuvem: pedidosNuvem.length,
+			totalPedidosTinyListados: listaTiny.length,
+			totalPedidosTinyFiltradosPorEcommerce: idsTinyFiltrados.length,
+			totalPedidosNuvemConsiderados: numerosNuvem.size,
 			totalComparados: resultados.length,
 			resultados
 		})

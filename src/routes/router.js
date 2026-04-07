@@ -17,8 +17,6 @@ import { getCategories } from "../controllers/categoriesControllers.js"
 import { deleteOrderByOwnerNote } from "../controllers/deleteOrderController.js"
 import {
 	createdOrderWebhook,
-	createOrderEcommerceWebhook,
-	createOrderEcommerceWebhookManual,
 	createOrderMarketplaceWebhook,
 	mandaeWebhook
 } from "../controllers/webhooksController.js"

@@ -798,12 +798,7 @@ export const fetchNuvemShopOrders = async (store,
 	createdAtMin,
 	createdAtMax) => {
 	let startDate = new Date(createdAtMin)
-	startDate.setDate(startDate.getDate() - 1) // Subtrai um dia
-	startDate.setHours(startDate.getHours() - 3) // Ajuste para UTC-3
-
 	let endDate = new Date(createdAtMax)
-	endDate.setDate(endDate.getDate() + 1) // Adiciona um dia
-	endDate.setHours(endDate.getHours() - 3) // Ajuste para UTC-3
 
 	try {
 		const tableName =
