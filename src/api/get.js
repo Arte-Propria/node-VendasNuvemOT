@@ -269,7 +269,6 @@ export async function GETlistProducts(store, params) {
 
 				// Obter a próxima URL da página do cabeçalho 'link'
 				url = getNextPageUrl(response.headers.link)
-				url = false
 
 				const remainingRequests = parseInt(response.headers["x-rate-limit-remaining"])
 				const resetTime = parseInt(response.headers["x-rate-limit-reset"])

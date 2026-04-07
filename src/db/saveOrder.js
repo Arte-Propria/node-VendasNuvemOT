@@ -388,7 +388,8 @@ export const updateOrderAtacadoStatus = async (order) => {
 		obs_interna: order.obs_interna || null,
 		url_rastreamento: order.url_rastreamento || null,
 		id_nota_fiscal: order.id_nota_fiscal || null,
-		id_natureza_operacao: order.id_natureza_operacao || null
+		id_natureza_operacao: order.id_natureza_operacao || null,
+		marcadores: JSON.stringify(order.marcadores || [])
 	}
 
 	const queryText = `
@@ -405,8 +406,9 @@ export const updateOrderAtacadoStatus = async (order) => {
       obs_interna = $9,
       url_rastreamento = $10,
       id_nota_fiscal = $11,
-      id_natureza_operacao = $12
-    WHERE id = $13
+      id_natureza_operacao = $12,
+      marcadores = $13,
+    WHERE id = $14
     RETURNING *
   `
 

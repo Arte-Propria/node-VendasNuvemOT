@@ -1,7 +1,7 @@
 /* eslint-disable camelcase */
 import { fetchOrder, insertOrderWebhook } from "../services/orderServicesNuvem.js"
 import { processEcommerceWebhook, processEcommerceWebhookGetOrders, processEcommerceWebhookManual, processMarketplaceWebhook } from "../services/webhookServices.js"
-import { logEcommerce, logMandae } from "../utils/logger.js"
+import { logEcommerce, logMandae, logWebhookMarketplace } from "../utils/logger.js"
 import { parseStatusMandae, updateMandaeInfo, webhookMandaeInfo } from "../services/mandaeServices.js"
 import { query } from "../db/db.js"
 
@@ -44,7 +44,7 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
 
-		logEcommerce(message)
+		logWebhookMarketplace(result.message)
 
 		return res.status(200).send(result)
 	} catch (error) {
