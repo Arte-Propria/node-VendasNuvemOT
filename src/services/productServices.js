@@ -72,60 +72,60 @@ export const fetchProduct = async ({ store, id }) => {
 	let url = `https://api.tiendanube.com/v1/${storeId}/products/${id}`
 	console.log("Recuperando dado do produto...")
 
-		const response = await axios({
-			method: "get",
-			url: url,
-			headers: {
-				"Authentication": `bearer ${code}`,
-				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
-				"Content-Type": "application/json"
-			},
-		})
+	const response = await axios({
+		method: "get",
+		url: url,
+		headers: {
+			"Authentication": `bearer ${code}`,
+			"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+			"Content-Type": "application/json"
+		}
+	})
 
-		const data = response.data
+	const data = response.data
 	
 	return data
 }
 
 export async function fetchCreateProduct({ store, body }) {
-  let code;
-  let storeId;
+	let code
+	let storeId
 
-  if (store === "outlet") {
-    code = process.env.ACCESS_TOKEN_OUTLET;
-    storeId = process.env.STORE_ID_OUTLET;
-  }
-  if (store === "artepropria") {
-    code = process.env.ACCESS_TOKEN_ARTEPROPRIA;
-    storeId = process.env.STORE_ID_ARTEPROPRIA;
-  }
+	if (store === "outlet") {
+		code = process.env.ACCESS_TOKEN_OUTLET
+		storeId = process.env.STORE_ID_OUTLET
+	}
+	if (store === "artepropria") {
+		code = process.env.ACCESS_TOKEN_ARTEPROPRIA
+		storeId = process.env.STORE_ID_ARTEPROPRIA
+	}
 
-  let url = `https://api.tiendanube.com/v1/${storeId}/products`;
-  console.log(`Cadastrando produto...`);
+	let url = `https://api.tiendanube.com/v1/${storeId}/products`
+	console.log("Cadastrando produto...")
 
-  try {
-    const response = await axios({
-      method: "post",
-      url,
-      data: body,
-      headers: {
-        "Authentication": `bearer ${code}`,
-        "User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
-        "Content-Type": "application/json"
-      },
-    });
+	try {
+		const response = await axios({
+			method: "post",
+			url,
+			data: body,
+			headers: {
+				"Authentication": `bearer ${code}`,
+				"User-Agent": "API-NuvemShop (lucasecom@artepropria.com)",
+				"Content-Type": "application/json"
+			}
+		})
 
-    console.log(response.status);
+		console.log(response.status)
 
 		if (response.status === 200 || response.status === 201) {
-      console.log(`Produto cadastrado com sucesso!`);
-      return response;
-    } else {
-      throw new Error(`Erro ao cadastrar produto: ${response.statusText}`);
-    }
+			console.log("Produto cadastrado com sucesso!")
+			return response
+		} else {
+			throw new Error(`Erro ao cadastrar produto: ${response.statusText}`)
+		}
 
-  } catch (error) {
-    console.error(error);
-    throw new Error("Erro ao cadastrar produto na Nuvemshop");
-  }
+	} catch (error) {
+		console.error(error)
+		throw new Error("Erro ao cadastrar produto na Nuvemshop")
+	}
 }
