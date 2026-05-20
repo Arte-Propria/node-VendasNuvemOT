@@ -294,87 +294,97 @@ export async function processOrderFromNuvemshop(nuvemData) {
 }
 
 // Função para processar um pedido da Tiny (similar)
+
 export async function processOrderFromTiny(tinyResponse) {
 	const delivery = await mapTinyToDelivery(tinyResponse)
 
 	console.log("delivery recebido, tipos:")
-	console.log(" - orders_shop:",
-		Array.isArray(delivery.orders_shop) ? "array" : typeof delivery.orders_shop)
-	console.log(" - clients:",
-		Array.isArray(delivery.clients) ? "array" : typeof delivery.clients)
-	console.log(" - product:",
-		Array.isArray(delivery.product) ? "array" : typeof delivery.product)
-	console.log(" - coupons:",
-		Array.isArray(delivery.coupons) ? "array" : typeof delivery.coupons)
-	console.log(" - ads:",
-		Array.isArray(delivery.ads) ? "array" : typeof delivery.ads)
+	console.log(" - orders_shop:", Array.isArray(delivery.orders_shop) ? "array" : typeof delivery.orders_shop)
+	console.log(" - clients:", Array.isArray(delivery.clients) ? "array" : typeof delivery.clients)
+	console.log(" - product:", Array.isArray(delivery.product) ? "array" : typeof delivery.product)
+	console.log(" - coupons:", Array.isArray(delivery.coupons) ? "array" : typeof delivery.coupons)
+	console.log(" - ads:", Array.isArray(delivery.ads) ? "array" : typeof delivery.ads)
 
-	// Garantir que sejam arrays (caso algo tenha dado errado)
 	const safeDelivery = {
-		orders_shop: Array.isArray(delivery.orders_shop)
-			? delivery.orders_shop
-			: [],
+		orders_shop: Array.isArray(delivery.orders_shop) ? delivery.orders_shop : [],
 		clients: Array.isArray(delivery.clients) ? delivery.clients : [],
 		product: Array.isArray(delivery.product) ? delivery.product : [],
 		coupons: Array.isArray(delivery.coupons) ? delivery.coupons : [],
 		ads: Array.isArray(delivery.ads) ? delivery.ads : []
 	}
 
-	// orders_shop
-	for (const item of safeDelivery.orders_shop) {
-		const fullRecord = dataBaseDb.orders_shop.transform(item) // com todos os campos
-		const updateRecord = {
-			order_id: item.order_id,
-			products: item.products, // já é array
-			shipping_option: item.shipping_option,
-			updated_at: item.updated_at,
-			shipping_status: item.shipping_status
-		}
-		console.log("orders_shop record:", updateRecord) // debug
-
-		await upsertOrderShop(updateRecord, fullRecord)
-	}
-
-	// clients
+	// 1. Inserir/atualizar clientes
 	for (const client of safeDelivery.clients) {
 		const record = dataBaseDb.clients.transform(client)
-		console.log("client record:", record) // debug
 		await upsertClient(record)
 	}
 
-	// product
+	// 2. Inserir/atualizar produtos
 	for (const prod of safeDelivery.product) {
 		const record = dataBaseDb.product.transform(prod)
-		await upsertRecord(dataBase.product, record, "cod_categoria")
-	}
-	for (const prod of safeDelivery.product) {
-		const record = dataBaseDb.product.transform(prod)
-		console.log("Produto record:", record) // debug
 		await upsertProduct(record)
 	}
-	// coupons
-	for (const coup of safeDelivery.coupons) {
-		const record = dataBaseDb.coupon.transform(coup)
-		console.log("coupons record:", record) // debug
-		await upsertRecord(dataBase.coupon, record, "id_coupon")
-	}
-	// Dentro de processOrderFromNuvemshop, após o upsert do pedido (orders_shop)
-	const orderDate = tinyResponse.created_at
-		? tinyResponse?.created_at?.split("T")[0]
-		: new Date().toISOString().split("T")[0]
-	const storeId = tinyResponse.store
 
-	if (orderDate && storeId) {
-		// Prepara os dados do pedido atual como fallback
-		const currentOrderData = {
-			order_id: delivery.order_id,
-			payment_status: delivery.payment_status,
-			total: delivery.total,
-			coupons: delivery.coupons,
-			coupon_discount: delivery.coupon_discount
+	// 3. Inserir/atualizar pedido (orders_shop)
+	const firstOrder = safeDelivery.orders_shop[0]
+	if (firstOrder) {
+		// Garantir que order_id seja número
+		firstOrder.order_id = Number(firstOrder.order_id)
+		const fullRecord = dataBaseDb.orders_shop.transform(firstOrder)
+		const updateRecord = {
+			order_id: firstOrder.order_id,
+			products: firstOrder.products,
+			shipping_option: firstOrder.shipping_option,
+			updated_at: firstOrder.updated_at,
+			shipping_status: firstOrder.shipping_status || null
 		}
-		await upsertDailySales(orderDate, storeId, currentOrderData)
+		await upsertOrderShop(updateRecord, fullRecord)
+	}
+
+	// 4. Tiny não envia cupons – nada a fazer
+
+	// 5. Atualizar daily_sales (após persistir o pedido)
+	if (firstOrder) {
+		const pedido = tinyResponse.retorno.pedido
+		const dataStr = pedido.data_pedido // "26/01/2026"
+		const [dia, mes, ano] = dataStr.split("/")
+		const orderDate = `${ano}-${mes}-${dia}`
+
+		// Mapear loja
+		const storeName = pedido.ecommerce?.nomeEcommerce?.toLowerCase() // "outletdosquadros"
+		let storeNumeric = null
+		if (storeName === "outletdosquadros") storeNumeric = 3889735
+		else if (storeName === "artepropria") storeNumeric = 1146504
+		else {
+			storeNumeric = storeMapping.nameToNumeric[storeName]
+		}
+
+		if (!storeNumeric) {
+			console.warn(`Loja não mapeada: ${storeName}. Usando store original.`)
+			storeNumeric = storeName // fallback (pode causar erro, mas prossegue)
+		}
+
+		// Buscar IDs de anúncios para a data e loja (nome amigável)
+		let adsIds = []
+		const storeNameForAds = storeMapping.numericToName[storeNumeric]
+		if (storeNameForAds) {
+			const adsSql = `SELECT id_ads FROM ${dataBase.ads} WHERE date_ads = $1 AND store = $2`
+			const adsResult = await query(adsSql, [orderDate, storeNameForAds])
+			adsIds = adsResult.rows.map((row) => row.id_ads)
+		}
+
+		// Dados do pedido atual para daily_sales – forçar order_id como número
+		const currentOrderData = {
+			order_id: Number(firstOrder.order_id),
+			payment_status: firstOrder.payment_status || null,
+			total: Number(firstOrder.total),
+			coupons: Array.isArray(firstOrder.coupons) ? firstOrder.coupons : [],
+			status: pedido.situacao === "Cancelado" ? "cancelled" : "open",
+			ads_ids: adsIds
+		}
+
+		await upsertDailySales(orderDate, storeNumeric, currentOrderData)
 	} else {
-		console.warn("⚠️ Não foi possível atualizar daily_sales: data ou loja ausentes")
+		console.warn("⚠️ Nenhum pedido encontrado no payload do Tiny.")
 	}
 }
