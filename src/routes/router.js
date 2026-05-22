@@ -150,7 +150,7 @@ router.post("/webhooks/order-marketplace", createOrderMarketplaceWebhook) // Tin
 router.post("/webhook/mandae", mandaeWebhook) // Webhook para atualizações da Mandae
 //router.post("/webhook/db/nuvemshop", postDbQueryNuvemshop) // Rotas pedidos Nuvemshop via webhook 
 //router.post("/webhook/db/tiny", postDbQueryTiny) // Rotas pedidos Nuvemshop via webhook 
-//router.post("/webhook/db/:ads/:store/:date", postDbQueryAds) // atualizar ads db via cron job
+router.post("/webhook/db/:ads/:store/:date", postDbQueryAds) // atualizar ads db via cron job
 
 // TINY ESINTEGRADA
 // router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
