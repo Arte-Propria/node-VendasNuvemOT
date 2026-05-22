@@ -233,8 +233,8 @@ export async function upsertAds(record) {
 	const { date_ads, plataform, store } = record
 	if (!date_ads || !plataform) throw new Error("date_ads e plataform são obrigatórios")
 
-	const selectSql = `SELECT id_ads FROM ${dataBase.ads} WHERE date_ads = $1 AND plataform = $2`
-	const selectResult = await query(selectSql, [date_ads, plataform])
+	const selectSql = `SELECT id_ads FROM ${dataBase.ads} WHERE date_ads = $1 AND plataform = $2 AND store = $3`
+	const selectResult = await query(selectSql, [date_ads, plataform, store])
 
 	if (selectResult.rows.length > 0) {
 		// Atualiza os campos de funding e active
