@@ -231,38 +231,47 @@ export async function updateDailySalesWithAds(date, storeName) {
  */
 export async function upsertAds(record) {
 	const { date_ads, plataform, store } = record
-	if (!date_ads || !plataform) throw new Error("date_ads e plataform são obrigatórios")
+	if (!date_ads || !plataform || !store)
+		throw new Error("date_ads, plataform e store são obrigatórios")
 
+	// Busca existente por (data, plataforma, loja)
 	const selectSql = `SELECT id_ads FROM ${dataBase.ads} WHERE date_ads = $1 AND plataform = $2 AND store = $3`
 	const selectResult = await query(selectSql, [date_ads, plataform, store])
 
 	if (selectResult.rows.length > 0) {
-		// Atualiza os campos de funding e active
+		// Atualiza apenas os campos de funding e active (NÃO atualiza 'store')
 		const fields = [
 			"funding_ecom", "funding_store", "funding_general",
 			"funding_chatbot", "funding_insta", "funding_mirror",
-			"funding_painting", "active", "store"
+			"funding_painting", "active"
 		]
-		const setClause = fields.map((f, idx) => `${f} = $${idx+1}`).join(", ")
-		const values = fields.map((f) => record[f] !== undefined ? record[f] : 0)
-		const updateSql = `UPDATE ${dataBase.ads} SET ${setClause} WHERE date_ads = $${fields.length+1} AND plataform = $${fields.length+2}`
-		values.push(date_ads, plataform)
+		const setClause = fields.map((f, idx) => `${f} = $${idx + 1}`).join(", ")
+		const values = fields.map((f) => (record[f] !== undefined ? record[f] : 0))
+		// Inclui as condições WHERE com data, plataforma e loja
+		const updateSql = `
+            UPDATE ${dataBase.ads}
+            SET ${setClause}
+            WHERE date_ads = $${fields.length + 1}
+              AND plataform = $${fields.length + 2}
+              AND store = $${fields.length + 3}
+        `
+		values.push(date_ads, plataform, store)
 		await query(updateSql, values)
-		console.log(`Ads atualizado: ${date_ads} / ${plataform}`)
+		console.log(`Ads atualizado: ${date_ads} / ${plataform} / ${store}`)
 	} else {
-		// Inserir novo, gerando id_ads da sequência
+		// Inserir novo registro
 		const seqResult = await query("SELECT nextval('ads_id_seq') as new_id")
 		const newId = seqResult.rows[0].new_id
 		const newRecord = { ...record, id_ads: newId }
 		const fields = Object.keys(newRecord)
-		const placeholders = fields.map((_, idx) => `$${idx+1}`).join(", ")
+		const placeholders = fields.map((_, idx) => `$${idx + 1}`).join(", ")
 		const insertSql = `INSERT INTO ${dataBase.ads} (${fields.join(", ")}) VALUES (${placeholders})`
 		const values = fields.map((f) => newRecord[f])
 		await query(insertSql, values)
-		console.log(`Ads inserido: ${date_ads} / ${plataform} (id ${newId})`)
+		console.log(`Ads inserido: ${date_ads} / ${plataform} / ${store} (id ${newId})`)
 	}
 
-	// Após inserir/atualizar anúncios, atualizar daily_sales para esta data e loja
+	// Após atualizar, sincroniza daily_sales
 	if (store) {
 		await updateDailySalesWithAds(date_ads, store)
 	}
