@@ -1,6 +1,7 @@
 import { removeNullFields,toNumber } from "../tools/helpers.js"
 import { query } from "../db/db.js"
 import { dataBase, storeMapping } from "./dataBaseQueryList.js"
+import { logWebhookDB } from "../utils/logger.js"
 
 // Função genérica para upsert (insert or update) baseada em um campo de referência
 export async function upsertRecord(tableName, record, referenceField) {
@@ -28,7 +29,7 @@ export async function upsertRecord(tableName, record, referenceField) {
 		const updateSql = `UPDATE ${tableName} SET ${setClause} WHERE ${referenceField} = $${fields.length + 1}`
 		// Adiciona o valor da referência no final dos parâmetros
 		await query(updateSql, [...values, referenceValue])
-		console.log(`Registro atualizado em ${tableName} com ${referenceField} = ${referenceValue}`)
+		logWebhookDB(`Registro atualizado em ${tableName} com ${referenceField} = ${referenceValue}`)
 	} else {
 		// 3. Registro não existe: fazer INSERT
 		const fields = Object.keys(cleanRecord)
@@ -36,7 +37,7 @@ export async function upsertRecord(tableName, record, referenceField) {
 		const insertSql = `INSERT INTO ${tableName} (${fields.join(", ")}) VALUES (${placeholders})`
 		const values = fields.map((field) => cleanRecord[field])
 		await query(insertSql, values)
-		console.log(`Registro inserido em ${tableName} com ${referenceField} = ${referenceValue}`)
+		logWebhookDB(`Registro inserido em ${tableName} com ${referenceField} = ${referenceValue}`)
 	}
 }
 
@@ -68,7 +69,7 @@ export async function upsertClient(clientRecord) {
 				const values = fields.map((f) => updateFields[f])
 				const updateSql = `UPDATE ${dataBase.clients} SET ${setClause} WHERE id_cli = $${fields.length + 1}`
 				await query(updateSql, [...values, existingId])
-				console.log(`Cliente atualizado: CPF ${cpf}, id_cli ${existingId}`)
+				logWebhookDB(`Cliente atualizado: CPF ${cpf}, id_cli ${existingId}`)
 				return existingId
 			} else {
 				// Inserir novo cliente – obtém próximo ID da sequência
@@ -80,13 +81,13 @@ export async function upsertClient(clientRecord) {
 				const insertSql = `INSERT INTO ${dataBase.clients} (${fields.join(", ")}) VALUES (${placeholders})`
 				const values = fields.map((f) => newRecord[f])
 				await query(insertSql, values)
-				console.log(`Cliente inserido: CPF ${cpf}, id_cli ${newId}`)
+				logWebhookDB(`Cliente inserido: CPF ${cpf}, id_cli ${newId}`)
 				return newId
 			}
 		} catch (error) {
 			// Se for erro de violação de unique (código 23505) e ainda há tentativas, aguarda e repete
 			if (error.code === "23505" && attempt < maxRetries) {
-				console.log(`Conflito ao inserir/atualizar cliente CPF ${cpf}, tentativa ${attempt} de ${maxRetries}, aguardando...`)
+				logWebhookDB(`Conflito ao inserir/atualizar cliente CPF ${cpf}, tentativa ${attempt} de ${maxRetries}, aguardando...`)
 				await new Promise((resolve) => setTimeout(resolve, 100 * attempt))
 				continue
 			}
@@ -128,7 +129,7 @@ export async function upsertOrderShop(updateRecord, fullRecord) {
 			cleanUpdate.shipping_status,
 			orderId
 		])
-		console.log(`Pedido ${orderId} atualizado (parcialmente)`)
+		logWebhookDB(`Pedido ${orderId} atualizado (parcialmente)`)
 	} else {
 		// INSERT completo
 		const fields = Object.keys(cleanFull)
@@ -136,7 +137,7 @@ export async function upsertOrderShop(updateRecord, fullRecord) {
 		const insertSql = `INSERT INTO ${dataBase.orders_shop} (${fields.join(", ")}) VALUES (${placeholders})`
 		const values = fields.map((f) => cleanFull[f])
 		await query(insertSql, values)
-		console.log(`Pedido ${orderId} inserido (completo)`)
+		logWebhookDB(`Pedido ${orderId} inserido (completo)`)
 	}
 }
 
@@ -159,7 +160,7 @@ export async function upsertProduct(record) {
 		const insertSql = `INSERT INTO ${dataBase.product} (${fields.join(", ")}) VALUES (${placeholders})`
 		const values = fields.map((f) => cleanRecord[f])
 		await query(insertSql, values)
-		console.log(`✅ Produto inserido: ${productId}`)
+		logWebhookDB(`✅ Produto inserido: ${productId}`)
 	} else {
 		// Comparar apenas diferenças
 		const existing = selectResult.rows[0]
@@ -176,7 +177,7 @@ export async function upsertProduct(record) {
 		}
 
 		if (changedFields.length === 0) {
-			console.log(`⏭️ Produto ${productId} sem alterações`)
+			logWebhookDB(`⏭️ Produto ${productId} sem alterações`)
 			return
 		}
 
@@ -187,7 +188,7 @@ export async function upsertProduct(record) {
 		const updateSql = `UPDATE ${dataBase.product} SET ${setClause} WHERE cod_categoria = $${changedFields.length + 1}`
 		updateValues.push(productId)
 		await query(updateSql, updateValues)
-		console.log(`🔄 Produto ${productId} atualizado (campos: ${changedFields.join(", ")})`)
+		logWebhookDB(`🔄 Produto ${productId} atualizado (campos: ${changedFields.join(", ")})`)
 	}
 }
 
@@ -220,9 +221,9 @@ export async function updateDailySalesWithAds(date, storeName) {
             WHERE date_sales = $3 AND store = $4
         `
 		await query(updateSql, [JSON.stringify(adsIds), new Date().toISOString(), date, storeNumeric])
-		console.log(`Daily sales atualizado com anúncios: ${date} - ${storeName} (código ${storeNumeric})`)
+		logWebhookDB(`Daily sales atualizado com anúncios: ${date} - ${storeName} (código ${storeNumeric})`)
 	} else {
-		console.log(`Nenhum daily_sales encontrado para ${date} - ${storeNumeric}. Ignorar atualização de ads.`)
+		logWebhookDB(`Nenhum daily_sales encontrado para ${date} - ${storeNumeric}. Ignorar atualização de ads.`)
 	}
 }
 
@@ -257,7 +258,7 @@ export async function upsertAds(record) {
         `
 		values.push(date_ads, plataform, store)
 		await query(updateSql, values)
-		console.log(`Ads atualizado: ${date_ads} / ${plataform} / ${store}`)
+		logWebhookDB(`Ads atualizado: ${date_ads} / ${plataform} / ${store}`)
 	} else {
 		// Inserir novo registro
 		const seqResult = await query("SELECT nextval('ads_id_seq') as new_id")
@@ -268,7 +269,7 @@ export async function upsertAds(record) {
 		const insertSql = `INSERT INTO ${dataBase.ads} (${fields.join(", ")}) VALUES (${placeholders})`
 		const values = fields.map((f) => newRecord[f])
 		await query(insertSql, values)
-		console.log(`Ads inserido: ${date_ads} / ${plataform} / ${store} (id ${newId})`)
+		logWebhookDB(`Ads inserido: ${date_ads} / ${plataform} / ${store} (id ${newId})`)
 	}
 
 	// Após atualizar, sincroniza daily_sales
@@ -297,7 +298,7 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
 	if (selectResult.rows.length === 0) {
 		// Cupom não existe
 		if (isCancelled) {
-			console.log(`Pedido cancelado e cupom ${name} não existe. Nada a fazer.`)
+			logWebhookDB(`Pedido cancelado e cupom ${name} não existe. Nada a fazer.`)
 			return
 		}
 		// Inserir novo cupom
@@ -310,7 +311,7 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
 		const insertSql = `INSERT INTO ${dataBase.coupon} (${fields.join(", ")}) VALUES (${placeholders})`
 		const values = fields.map((f) => recordToInsert[f])
 		await query(insertSql, values)
-		console.log(`Cupom inserido: ${name} em ${date_coupon}`)
+		logWebhookDB(`Cupom inserido: ${name} em ${date_coupon}`)
 		return
 	}
 
@@ -332,14 +333,14 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
 
 	if (isCancelled) {
 		if (!alreadyHasOrder) {
-			console.log(`Pedido cancelado mas order_id ${orderId} não está no cupom ${name}. Nada a fazer.`)
+			logWebhookDB(`Pedido cancelado mas order_id ${orderId} não está no cupom ${name}. Nada a fazer.`)
 			return
 		}
 		const newOrderIds = existingOrderIds.filter((id) => id !== orderId)
 		if (newOrderIds.length === 0) {
 			await query(`DELETE FROM ${dataBase.coupon} WHERE name = $1 AND date_coupon = $2`,
 				[name, date_coupon])
-			console.log(`Cupom ${name} removido (nenhum pedido restante)`)
+			logWebhookDB(`Cupom ${name} removido (nenhum pedido restante)`)
 		} else {
 			const newTotalMoney =
         (parseFloat(existing.total_money) || 0) -
@@ -359,14 +360,14 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
 				name,
 				date_coupon
 			])
-			console.log(`Cupom ${name} atualizado (cancelamento): order_id ${orderId} removido`)
+			logWebhookDB(`Cupom ${name} atualizado (cancelamento): order_id ${orderId} removido`)
 		}
 		return
 	}
 
 	// Pedido NÃO cancelado
 	if (alreadyHasOrder) {
-		console.log(`Cupom ${name} já possui order_id ${orderId}. Nenhuma alteração.`)
+		logWebhookDB(`Cupom ${name} já possui order_id ${orderId}. Nenhuma alteração.`)
 		return
 	}
 
@@ -388,7 +389,7 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
 		name,
 		date_coupon
 	])
-	console.log(`Cupom ${name} atualizado: adicionado order_id ${orderId}`)
+	logWebhookDB(`Cupom ${name} atualizado: adicionado order_id ${orderId}`)
 }
 
 /**
@@ -412,7 +413,7 @@ export async function upsertDailySales(date, store, currentOrder) {
 	const isCancelled = (currentOrder.status === "cancelled")
 
 	if (!row && isCancelled) {
-		console.log(`Pedido cancelado e não há daily_sales para ${date} - ${store}. Ignorar.`)
+		logWebhookDB(`Pedido cancelado e não há daily_sales para ${date} - ${store}. Ignorar.`)
 		return
 	}
 
@@ -438,7 +439,7 @@ export async function upsertDailySales(date, store, currentOrder) {
 		const placeholders = fields.map((_, i) => `$${i+1}`).join(", ")
 		const insertSql = `INSERT INTO ${dataBase.daily_sales} (${fields.join(", ")}) VALUES (${placeholders})`
 		await query(insertSql, fields.map((f) => data[f]))
-		console.log(`✅ Daily sales inserido (novo pedido): ${date} - ${store}`)
+		logWebhookDB(`✅ Daily sales inserido (novo pedido): ${date} - ${store}`)
 		return
 	}
 
@@ -476,7 +477,7 @@ export async function upsertDailySales(date, store, currentOrder) {
 
 		if (newTotalOrders === 0) {
 			await query(`DELETE FROM ${dataBase.daily_sales} WHERE date_sales = $1 AND store = $2`, [date, store])
-			console.log(`🗑️ Daily sales removido (sem pedidos): ${date} - ${store}`)
+			logWebhookDB(`🗑️ Daily sales removido (sem pedidos): ${date} - ${store}`)
 		} else {
 			await query(`
                 UPDATE ${dataBase.daily_sales}
@@ -485,14 +486,14 @@ export async function upsertDailySales(date, store, currentOrder) {
                 WHERE date_sales = $8 AND store = $9
             `, [newTotalOrders, newTotalPaidOrders, newTotalMoney, newTotalPaidMoney,
 				newAov, JSON.stringify(newIdOrders), now, date, store])
-			console.log(`🔄 Daily sales atualizado (cancelamento): ${date} - ${store}, removido pedido ${orderId}`)
+			logWebhookDB(`🔄 Daily sales atualizado (cancelamento): ${date} - ${store}, removido pedido ${orderId}`)
 		}
 		return
 	}
 
 	// Pedido normal já contabilizado
 	if (alreadyExists) {
-		console.log(`Pedido ${orderId} já contabilizado. Ignorar.`)
+		logWebhookDB(`Pedido ${orderId} já contabilizado. Ignorar.`)
 		return
 	}
 
@@ -525,5 +526,5 @@ export async function upsertDailySales(date, store, currentOrder) {
     `, [newTotalOrders, newTotalPaidOrders, newTotalMoney, newTotalPaidMoney,
 		newAov, JSON.stringify(newIdOrders), JSON.stringify(newIdCoupons),
 		JSON.stringify(newIdAds), now, date, store])
-	console.log(`✅ Daily sales atualizado (novo pedido): ${date} - ${store}, adicionado ${orderId}`)
+	logWebhookDB(`✅ Daily sales atualizado (novo pedido): ${date} - ${store}, adicionado ${orderId}`)
 }

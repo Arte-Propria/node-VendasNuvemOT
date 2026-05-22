@@ -49,3 +49,7 @@ export const logAtacado = (message) => {
 export const logStatusPlatform = (message) => {
 	console.log(`STATUS PLATFORM: ${message}`)
 }
+
+export const logWebhookDB = (message) => {
+	console.log(`WEBHOOK DB: ${message}`)
+}
