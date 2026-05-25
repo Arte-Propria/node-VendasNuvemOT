@@ -15,9 +15,10 @@ import { logWebhookDB } from "../utils/logger.js"
 export const createdOrderWebhook = async (req, res) => {
 	try {
 		const { store_id, event, id } = req.body
+		const nuvemData = req.body
 
 		console.log(`Evento: ${event} recebido para a loja ${store_id}, pedido ID: ${id}`)
-
+		console.log("Debug db retorno: ",nuvemData)
 		const stores = {
 			3889735: "outlet",
 			1146504: "artepropria"
@@ -32,6 +33,7 @@ export const createdOrderWebhook = async (req, res) => {
 		const order = await fetchOrder(data)
 
 		await insertOrderWebhook(order, stores[store_id])
+		await processOrderFromNuvemshop(nuvemData)
 		console.log(`Pedido ID: ${id} atualizado`)
 
 		// Atualizar a tabela info_mandae
