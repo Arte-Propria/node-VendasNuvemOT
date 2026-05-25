@@ -294,7 +294,6 @@ export async function processOrderFromNuvemshop(nuvemData) {
 }
 
 // Função para processar um pedido da Tiny (similar)
-
 export async function processOrderFromTiny(tinyResponse) {
 	const delivery = await mapTinyToDelivery(tinyResponse)
 

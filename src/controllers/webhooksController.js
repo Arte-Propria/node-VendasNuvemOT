@@ -4,6 +4,13 @@ import { processEcommerceWebhook, processEcommerceWebhookGetOrders, processEcomm
 import { logEcommerce, logMandae, logWebhookMarketplace } from "../utils/logger.js"
 import { parseStatusMandae, updateMandaeInfo, webhookMandaeInfo } from "../services/mandaeServices.js"
 import { query } from "../db/db.js"
+import {
+	fetchRequest,
+	filterBdByDateRange,
+	processOrderFromTiny,
+	processOrderFromNuvemshop
+} from "../services/segmentacaoServices.js"
+import { logWebhookDB } from "../utils/logger.js"
 
 export const createdOrderWebhook = async (req, res) => {
 	try {
@@ -44,9 +51,13 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
 
+		//webhook para receber dados do tiny para DB
+		await processOrderFromTiny(body)
+
 		logWebhookMarketplace(result.message)
 
 		return res.status(200).send(result)
+		
 	} catch (error) {
 		// logWebhook(`Erro ao processar o webhook: ${error}`)
 		return res.status(200)
