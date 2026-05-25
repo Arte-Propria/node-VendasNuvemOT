@@ -251,7 +251,6 @@ export function mapNuvemshopToDelivery(nuvemData) {
 }
 
 export async function mapTinyToDelivery(tinyData) {
-	console.log("Iniciando mapTinyToDelivery")
 	const pedido = tinyData.retorno.pedido
 
 	const orderNumber = extractOrderNumber(tinyData)
