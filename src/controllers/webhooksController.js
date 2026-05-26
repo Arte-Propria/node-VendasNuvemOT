@@ -29,10 +29,12 @@ export const createdOrderWebhook = async (req, res) => {
 
 		//Receber dados da Nuvemshop
 		const order = await fetchOrder(data)
+		console.log("DEBUG DB Nuvem: ", order)
+		
 
 		await insertOrderWebhook(order, stores[store_id])
 		await processOrderFromNuvemshop(order)
-		
+
 		console.log(`Pedido ID: ${id} atualizado`)
 
 		// Atualizar a tabela info_mandae
