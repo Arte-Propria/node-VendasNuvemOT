@@ -142,53 +142,54 @@ export async function upsertOrderShop(updateRecord, fullRecord) {
 }
 
 export async function upsertProduct(record) {
-	// Remove campos null
+	// Normaliza o código da categoria (maiúsculo, sem espaços nas extremidades)
+	let cod = record.cod_categoria ? record.cod_categoria.trim().toUpperCase() : null
+	if (!cod) throw new Error("cod_categoria é obrigatório para upsert de produto")
+
+	// Remove campos nulos e undefined
 	const cleanRecord = removeNullFields(record)
+	cleanRecord.cod_categoria = cod
 
-	cleanRecord.cod_categoria = (cleanRecord.cod_categoria || "").toUpperCase()
-	const productId = cleanRecord.cod_categoria
-	if (!productId) throw new Error("cod_categoria obrigatório")
-
-	// Verificar existência
+	// 1. Verificar se já existe um produto com este código
 	const selectSql = `SELECT * FROM ${dataBase.product} WHERE cod_categoria = $1`
-	const selectResult = await query(selectSql, [productId])
+	const selectResult = await query(selectSql, [cod])
 
-	if (selectResult.rows.length === 0) {
-		// INSERT apenas com campos não nulos
-		const fields = Object.keys(cleanRecord)
-		const placeholders = fields.map((_, idx) => `$${idx + 1}`).join(", ")
-		const insertSql = `INSERT INTO ${dataBase.product} (${fields.join(", ")}) VALUES (${placeholders})`
-		const values = fields.map((f) => cleanRecord[f])
-		await query(insertSql, values)
-		logWebhookDB(`✅ Produto inserido: ${productId}`)
-	} else {
-		// Comparar apenas diferenças
+	if (selectResult.rows.length > 0) {
+		// Produto existe → atualizar apenas os campos que vieram com valor diferente
 		const existing = selectResult.rows[0]
 		const changedFields = []
 		const updateValues = []
 
 		for (const [key, newValue] of Object.entries(cleanRecord)) {
-			if (!existing.hasOwnProperty(key)) continue
+			if (key === "cod_categoria") continue // não atualiza a chave
 			const oldValue = existing[key]
-			if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+			// Comparação robusta (converte ambos para string quando necessário)
+			const newStr = (newValue === null || newValue === undefined) ? "" : String(newValue)
+			const oldStr = (oldValue === null || oldValue === undefined) ? "" : String(oldValue)
+			if (newStr !== oldStr) {
 				changedFields.push(key)
 				updateValues.push(newValue)
 			}
 		}
 
 		if (changedFields.length === 0) {
-			logWebhookDB(`⏭️ Produto ${productId} sem alterações`)
+			console.log(`Produto ${cod} sem alterações, skip update`)
 			return
 		}
 
-		// UPDATE apenas com campos alterados e não nulos
-		const setClause = changedFields
-			.map((field, idx) => `${field} = $${idx + 1}`)
-			.join(", ")
+		const setClause = changedFields.map((f, idx) => `${f} = $${idx + 1}`).join(", ")
 		const updateSql = `UPDATE ${dataBase.product} SET ${setClause} WHERE cod_categoria = $${changedFields.length + 1}`
-		updateValues.push(productId)
+		updateValues.push(cod)
 		await query(updateSql, updateValues)
-		logWebhookDB(`🔄 Produto ${productId} atualizado (campos: ${changedFields.join(", ")})`)
+		console.log(`Produto ${cod} atualizado (campos: ${changedFields.join(", ")})`)
+	} else {
+		// 2. Não existe → inserir
+		const fields = Object.keys(cleanRecord)
+		const placeholders = fields.map((_, idx) => `$${idx + 1}`).join(", ")
+		const insertSql = `INSERT INTO ${dataBase.product} (${fields.join(", ")}) VALUES (${placeholders})`
+		const values = fields.map((f) => cleanRecord[f])
+		await query(insertSql, values)
+		console.log(`✅ Produto inserido: ${cod}`)
 	}
 }
 
