@@ -1,6 +1,8 @@
 /* eslint-disable camelcase */
 import { fetchOrder, insertOrderWebhook } from "../services/orderServicesNuvem.js"
 import { processEcommerceWebhook, processEcommerceWebhookGetOrders, processEcommerceWebhookManual, processMarketplaceWebhook } from "../services/webhookServices.js"
+import { fetchOrderTiny } from "../services/orderTinyServices.js"
+
 import { logEcommerce, logMandae, logWebhookMarketplace } from "../utils/logger.js"
 import { parseStatusMandae, updateMandaeInfo, webhookMandaeInfo } from "../services/mandaeServices.js"
 import { query } from "../db/db.js"
@@ -56,7 +58,7 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 
 		//webhook para receber dados do tiny para DB
 		//await processOrderFromTiny(body)
-		console.log("DEBUG DB Tiny:",body)
+		console.log("DEBUG DB Tiny:", body.pedido.ecommerce.id)
 
 		logWebhookMarketplace(result.message)
 
