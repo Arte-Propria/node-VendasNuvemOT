@@ -69,9 +69,9 @@ export const filterBdByDateRange = (queryData,
 	try {
 		// Se não houver datas de filtro, retorna todos os dados
 		if (!startDate && !endDate) {
-			console.log("⚠️ Nenhum filtro de data aplicado")
-			console.log("DEBUG startDate:", startDate)
-			console.log("DEBUG endDate:", endDate)
+			//console.log("⚠️ Nenhum filtro de data aplicado")
+			//console.log("DEBUG startDate:", startDate)
+			//console.log("DEBUG endDate:", endDate)
 
 			return queryData
 		}
@@ -87,8 +87,8 @@ export const filterBdByDateRange = (queryData,
 			return []
 		}
 
-		console.log(`📅 Aplicando filtro de data para tabela: ${querySelect}`)
-		console.log(`📆 Período: ${startDate || "Início não definido"} até ${endDate || "Fim não definido"}`)
+		//console.log(`📅 Aplicando filtro de data para tabela: ${querySelect}`)
+		//console.log(`📆 Período: ${startDate || "Início não definido"} até ${endDate || "Fim não definido"}`)
 
 		// Mapeamento dos campos de data para cada tabela
 		const dateFieldMap = {
@@ -197,7 +197,7 @@ export const filterBdByDateRange = (queryData,
 			}
 		})
 
-		console.log(`✅ Filtro aplicado: ${filteredData.length} de ${queryData.length} itens mantidos`)
+		//console.log(`✅ Filtro aplicado: ${filteredData.length} de ${queryData.length} itens mantidos`)
 
 		return filteredData
 	} catch (error) {
@@ -211,7 +211,7 @@ export const filterBdByDateRange = (queryData,
 export async function processOrderFromNuvemshop(nuvemData) {
 	// Mapear
 	const delivery = mapNuvemshopToDelivery(nuvemData)
-
+	/*
 	console.log("delivery recebido, tipos:")
 	console.log(" - orders_shop:",
 		Array.isArray(delivery.orders_shop) ? "array" : typeof delivery.orders_shop)
@@ -223,7 +223,7 @@ export async function processOrderFromNuvemshop(nuvemData) {
 		Array.isArray(delivery.coupons) ? "array" : typeof delivery.coupons)
 	console.log(" - ads:",
 		Array.isArray(delivery.ads) ? "array" : typeof delivery.ads)
-
+*/
 	// Garantir que sejam arrays (caso algo tenha dado errado)
 	const safeDelivery = {
 		orders_shop: Array.isArray(delivery.orders_shop)
@@ -236,27 +236,27 @@ export async function processOrderFromNuvemshop(nuvemData) {
 	}
 
 	// Aplicar transforms e simular upsert
-	console.log("\n--- REGISTROS A SEREM PERSISTIDOS ---")
+	//console.log("\n--- REGISTROS A SEREM PERSISTIDOS ---")
 
 	// Dentro de processOrderFromNuvemshop
 	for (const client of safeDelivery.clients) {
 		const record = dataBaseDb.clients.transform(client)
-		console.log("Client record:", record) // debug
+		//console.log("Client record:", record) // debug
 		await upsertClient(record)
 	}
 	for (const prod of safeDelivery.product) {
 		const record = dataBaseDb.product.transform(prod)
-		console.log("Produto record:", record) // debug
+		//console.log("Produto record:", record) // debug
 		await upsertProduct(record)
 	}
 	for (const order of safeDelivery.orders_shop) {
 		const record = dataBaseDb.orders_shop.transform(order)
-		console.log("Order record:", record) // debug
+		//console.log("Order record:", record) // debug
 		await upsertRecord(dataBase.orders_shop, record, "order_id")
 	}
 	for (const coup of safeDelivery.coupons) {
 		const record = dataBaseDb.coupon.transform(coup)
-		console.log("Coupon record:", record) // debug
+		//console.log("Coupon record:", record) // debug
 		await upsertCoupon(record, nuvemData.status, nuvemData.number)
 	}
 
@@ -288,6 +288,7 @@ export async function processOrderFromNuvemshop(nuvemData) {
 				status: nuvemData.status,
 				ads_ids: adsIds
 			}
+
 			await upsertDailySales(orderDate, storeId, currentOrderData) // storeId é numérico
 		}
 	}
@@ -296,16 +297,23 @@ export async function processOrderFromNuvemshop(nuvemData) {
 // Função para processar um pedido da Tiny (similar)
 export async function processOrderFromTiny(tinyResponse) {
 	const delivery = await mapTinyToDelivery(tinyResponse)
-
+	/*
 	console.log("delivery recebido, tipos:")
-	console.log(" - orders_shop:", Array.isArray(delivery.orders_shop) ? "array" : typeof delivery.orders_shop)
-	console.log(" - clients:", Array.isArray(delivery.clients) ? "array" : typeof delivery.clients)
-	console.log(" - product:", Array.isArray(delivery.product) ? "array" : typeof delivery.product)
-	console.log(" - coupons:", Array.isArray(delivery.coupons) ? "array" : typeof delivery.coupons)
-	console.log(" - ads:", Array.isArray(delivery.ads) ? "array" : typeof delivery.ads)
-
+	console.log(" - orders_shop:",
+		Array.isArray(delivery.orders_shop) ? "array" : typeof delivery.orders_shop)
+	console.log(" - clients:",
+		Array.isArray(delivery.clients) ? "array" : typeof delivery.clients)
+	console.log(" - product:",
+		Array.isArray(delivery.product) ? "array" : typeof delivery.product)
+	console.log(" - coupons:",
+		Array.isArray(delivery.coupons) ? "array" : typeof delivery.coupons)
+	console.log(" - ads:",
+		Array.isArray(delivery.ads) ? "array" : typeof delivery.ads)
+*/
 	const safeDelivery = {
-		orders_shop: Array.isArray(delivery.orders_shop) ? delivery.orders_shop : [],
+		orders_shop: Array.isArray(delivery.orders_shop)
+			? delivery.orders_shop
+			: [],
 		clients: Array.isArray(delivery.clients) ? delivery.clients : [],
 		product: Array.isArray(delivery.product) ? delivery.product : [],
 		coupons: Array.isArray(delivery.coupons) ? delivery.coupons : [],
