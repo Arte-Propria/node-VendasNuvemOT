@@ -12,7 +12,7 @@ import {
 	processOrderFromTiny,
 	processOrderFromNuvemshop
 } from "../services/segmentacaoServices.js"
-
+import {	cleanCpfCnpj  } from "../tools/helpers.js"
 export const createdOrderWebhook = async (req, res) => {
 	try {
 		const { store_id, event, id } = req.body
@@ -56,9 +56,14 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
 
+		const idEcom = body.pedido.ecommerce.id
+		const cpfEcom = cleanCpfCnpj(body.pedido.cliente.cpf_cnpj)
+		
+		const tinyOrder = fetchOrderTiny(idEcom, cpfEcom)
+
 		//webhook para receber dados do tiny para DB
 		//await processOrderFromTiny(body)
-		console.log("DEBUG DB Tiny:", body.pedido.ecommerce.id)
+		console.log("DEBUG DB Tiny:", tinyOrder)
 
 		logWebhookMarketplace(result.message)
 
