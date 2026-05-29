@@ -63,7 +63,7 @@ export const dataBaseDb = {
 	},
 	coupon: {
 		transform: (delivery) => ({
-			id_coupon: delivery.id_coupon,
+			//id_coupon: delivery.id_coupon,
 			date_coupon: delivery.date_coupon,
 			name: delivery.name,
 			quantity: delivery.quantity,

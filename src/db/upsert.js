@@ -287,87 +287,79 @@ export async function upsertAds(record) {
  */
 
 export async function upsertCoupon(couponRecord, orderStatus, orderId) {
-	const { name, date_coupon, total_money, total_discount } = couponRecord
+	const { name, date_coupon, total_money, total_discount, order_ids } = couponRecord
 	if (!name || !date_coupon) throw new Error("name e date_coupon são obrigatórios")
 
-	const selectSql = `SELECT * FROM ${dataBase.coupon} WHERE name = $1 AND date_coupon = $2`
-	const selectResult = await query(selectSql, [name, date_coupon])
+	const isCancelled = orderStatus === "cancelled"
+	const newOrderId = Number(orderId)
+	const newMoney = Number(total_money)
+	const newDiscount = Number(total_discount)
 
-	const isCancelled = (orderStatus === "cancelled")
-
-	// Cupom não existe
-	if (selectResult.rows.length === 0) {
-		if (isCancelled) {
-			console.log(`Pedido cancelado e cupom ${name} não existe. Nada a fazer.`)
-			return
-		}
-		// Inserir novo cupom – gerar id_coupon automaticamente (SERIAL)
-		const newRecord = {
-			id_coupon: null, // deixar o banco gerar se for SERIAL, ou usar sequência
-			date_coupon,
-			name,
-			quantity: 1,
-			total_money: parseFloat(total_money) || 0,
-			total_discount: parseFloat(total_discount) || 0,
-			order_ids: JSON.stringify([orderId])
-		}
-		const fields = Object.keys(newRecord)
-		const placeholders = fields.map((_, idx) => `$${idx+1}`).join(", ")
-		const insertSql = `INSERT INTO ${dataBase.coupon} (${fields.join(", ")}) VALUES (${placeholders}) RETURNING id_coupon`
-		const values = fields.map((f) => newRecord[f])
-		const result = await query(insertSql, values)
-		console.log(`Cupom inserido: ${name} em ${date_coupon} (id ${result.rows[0].id_coupon})`)
-		return
-	}
-
-	// Cupom existe
-	const existing = selectResult.rows[0]
-	let existingOrderIds = []
-	if (typeof existing.order_ids === "string") {
-		try {
-			existingOrderIds = JSON.parse(existing.order_ids) 
-		} catch(e) {
-			existingOrderIds = [] 
-		}
-	} else if (Array.isArray(existing.order_ids)) {
-		existingOrderIds = existing.order_ids
-	}
-	existingOrderIds = existingOrderIds.map((id) => typeof id === "string" ? Number(id) : id)
-	const alreadyHasOrder = existingOrderIds.includes(Number(orderId))
-
+	// Se for cancelado, primeiro buscamos o cupom existente para remover o order_id
 	if (isCancelled) {
-		if (!alreadyHasOrder) {
-			console.log(`Pedido cancelado mas order_id ${orderId} não está no cupom ${name}. Nada a fazer.`)
+		const selectSql = `
+		  SELECT order_ids, total_money, total_discount FROM ${dataBase.coupon}
+		  WHERE name = $1 AND date_coupon = $2
+		`
+		const res = await query(selectSql, [name, date_coupon])
+		if (res.rows.length === 0) {
+			console.log(`Cancelamento: cupom ${name} não existe. Nada a fazer.`)
 			return
 		}
-		const newOrderIds = existingOrderIds.filter((id) => id !== Number(orderId))
+		let orderIds = []
+		try {
+			orderIds = JSON.parse(res.rows[0].order_ids) 
+		} catch(e) {
+			orderIds = [] 
+		}
+		if (!orderIds.includes(newOrderId)) {
+			console.log(`Cancelamento: order_id ${newOrderId} não está no cupom. Ignorar.`)
+			return
+		}
+		const newOrderIds = orderIds.filter((id) => id !== newOrderId)
 		if (newOrderIds.length === 0) {
 			await query(`DELETE FROM ${dataBase.coupon} WHERE name = $1 AND date_coupon = $2`, [name, date_coupon])
-			console.log(`Cupom ${name} removido (nenhum pedido restante)`)
+			console.log(`Cupom ${name} removido (sem pedidos restantes)`)
 		} else {
-			const newTotalMoney = (parseFloat(existing.total_money) || 0) - (parseFloat(total_money) || 0)
-			const newTotalDiscount = (parseFloat(existing.total_discount) || 0) - (parseFloat(total_discount) || 0)
-			await query(`UPDATE ${dataBase.coupon} SET quantity = $1, total_money = $2, total_discount = $3, order_ids = $4
+			const newQuantity = newOrderIds.length
+			const newTotalMoney = Number(res.rows[0].total_money) - newMoney
+			const newTotalDiscount = Number(res.rows[0].total_discount) - newDiscount
+			await query(`UPDATE ${dataBase.coupon}
+                 SET quantity = $1, total_money = $2, total_discount = $3, order_ids = $4
                  WHERE name = $5 AND date_coupon = $6`,
-			[newOrderIds.length, newTotalMoney, newTotalDiscount, JSON.stringify(newOrderIds), name, date_coupon])
-			console.log(`Cupom ${name} atualizado (cancelamento): order_id ${orderId} removido`)
+			[newQuantity, newTotalMoney, newTotalDiscount, JSON.stringify(newOrderIds), name, date_coupon])
+			console.log(`Cupom ${name} atualizado (cancelamento): removido order_id ${newOrderId}`)
 		}
 		return
 	}
 
-	// Pedido normal
-	if (alreadyHasOrder) {
-		console.log(`Cupom ${name} já possui order_id ${orderId}. Nenhuma alteração.`)
-		return
+	// Pedido normal – usar ON CONFLICT
+	const insertSql = `
+        INSERT INTO ${dataBase.coupon} (date_coupon, name, quantity, total_money, total_discount, order_ids)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (name, date_coupon) DO UPDATE
+        SET quantity = ${dataBase.coupon}.quantity + EXCLUDED.quantity,
+            total_money = ${dataBase.coupon}.total_money + EXCLUDED.total_money,
+            total_discount = ${dataBase.coupon}.total_discount + EXCLUDED.total_discount,
+            order_ids = (
+                SELECT jsonb_agg(DISTINCT elem)
+                FROM (
+                    SELECT jsonb_array_elements(${dataBase.coupon}.order_ids) AS elem
+                    UNION ALL
+                    SELECT jsonb_array_elements(EXCLUDED.order_ids)
+                ) AS combined
+            )
+        RETURNING id_coupon
+    `
+	try {
+		const result = await query(insertSql, [
+			date_coupon, name, 1, newMoney, newDiscount, JSON.stringify([newOrderId])
+		])
+		console.log(`Cupom ${name} inserido/atualizado com sucesso. id_coupon: ${result.rows[0]?.id_coupon}`)
+	} catch (error) {
+		console.error(`Erro no upsert do cupom ${name}:`, error)
+		throw error
 	}
-
-	const newOrderIds = [...existingOrderIds, Number(orderId)]
-	const newTotalMoney = (parseFloat(existing.total_money) || 0) + (parseFloat(total_money) || 0)
-	const newTotalDiscount = (parseFloat(existing.total_discount) || 0) + (parseFloat(total_discount) || 0)
-	await query(`UPDATE ${dataBase.coupon} SET quantity = $1, total_money = $2, total_discount = $3, order_ids = $4
-         WHERE name = $5 AND date_coupon = $6`,
-	[newOrderIds.length, newTotalMoney, newTotalDiscount, JSON.stringify(newOrderIds), name, date_coupon])
-	console.log(`Cupom ${name} atualizado: adicionado order_id ${orderId}`)
 }
 
 /**
