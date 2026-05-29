@@ -50,7 +50,7 @@ export const fetchCustomers = async (params = {}) => {
 	const createdAtMaxISO = adjustedCreatedAtMax.toISOString()
 
 	let allCustomers = []
-	console.log("Recuperando dados dos clientes...")
+	//console.log("Recuperando dados dos clientes...")
 
 	// Loop para lidar com a paginação da API
 

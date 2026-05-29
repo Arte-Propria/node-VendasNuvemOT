@@ -56,6 +56,7 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 
 		//webhook para receber dados do tiny para DB
 		//await processOrderFromTiny(body)
+		console.log("DEBUG DB Tiny:",body)
 
 		logWebhookMarketplace(result.message)
 
