@@ -59,11 +59,11 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		const idEcom = body.pedido.ecommerce.id
 		const cpfEcom = cleanCpfCnpj(body.pedido.cliente.cpf_cnpj)
 		
-		const tinyOrder = fetchOrderTiny(idEcom, cpfEcom)
+		//const tinyOrder = fetchOrderTiny(idEcom, cpfEcom)
 
 		//webhook para receber dados do tiny para DB
 		//await processOrderFromTiny(body)
-		console.log("DEBUG DB Tiny:", tinyOrder)
+		//console.log("DEBUG DB Tiny:", tinyOrder)
 
 		logWebhookMarketplace(result.message)
 
