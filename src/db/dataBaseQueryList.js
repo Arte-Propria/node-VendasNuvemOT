@@ -210,7 +210,7 @@ export function mapNuvemshopToDelivery(nuvemData) {
 
 	// Cupons
 	const couponsDelivery = (nuvemData?.coupon || []).map((coupon) => ({
-		id_coupon: coupon.id?.toString() || `cupom_${orderNumber}`,
+		//id_coupon: coupon.id?.toString() || `cupom_${orderNumber}`,
 		date_coupon: toISOString(nuvemData?.created_at),
 		name: coupon.code,
 		quantity: coupon.used || 1,
