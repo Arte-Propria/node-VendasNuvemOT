@@ -60,10 +60,12 @@ export const postDbQueryTiny = async (req, res) => {
 		if (!tinyData) {
 			throw new Error("Corpo da requisição vazio")
 		}
-		const idEcom = tinyData.pedido.ecommerce.id
-		const cpfEcom = cleanCpfCnpj(tinyData.pedido.cliente.cpf_cnpj)
-		const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
-		await processOrderFromTiny(tinyOrder)
+		console.log("Debug TinyData:",tinyData)
+		
+		//const idEcom = tinyData.pedido.ecommerce.id
+		//const cpfEcom = cleanCpfCnpj(tinyData.pedido.cliente.cpf_cnpj)
+		//const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
+		//await processOrderFromTiny(tinyOrder)
 
 		res
 			.status(200)
