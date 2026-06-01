@@ -56,17 +56,6 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
 
-		const idEcom = body.pedido.ecommerce.id
-		const cpfEcom = cleanCpfCnpj(body.pedido.cliente.cpf_cnpj)
-		console.log("DEBUG DB Tiny idEcom:", idEcom)
-		console.log("DEBUG DB Tiny cpfEcom:", cpfEcom)
-
-		//const tinyOrder = fetchOrderTiny(idEcom, cpfEcom)
-
-		//webhook para receber dados do tiny para DB
-		//await processOrderFromTiny(body)
-		//console.log("DEBUG DB Tiny:", tinyOrder)
-
 		logWebhookMarketplace(result.message)
 
 		return res.status(200).send(result)

@@ -9,8 +9,9 @@ import {
 	fetchGoogleAdsByDate
 } from "../db/dataBaseQueryList.js"
 import { upsertAds } from "../db/upsert.js"
-
+import { fetchOrderTiny } from "../services/orderTinyServices.js"
 import { query } from "../db/db.js"
+import { cleanCpfCnpj } from "../tools/helpers.js"
 
 export const getDbQuery = async (req, res) => {
 	try {
@@ -41,14 +42,17 @@ export const postDbQueryNuvemshop = async (req, res) => {
 			throw new Error("Corpo da requisição vazio")
 		}
 
-		await processOrderFromNuvemshop(nuvemData)
+		const idEcom = nuvemData.pedido.ecommerce.id
+		const cpfEcom = cleanCpfCnpj(nuvemData.pedido.cliente.cpf_cnpj)
+		const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
+
+		await processOrderFromNuvemshop(tinyOrder)
 
 		res
 			.status(200)
 			.json({ message: "Pedido processado com sucesso (simulação Nuvemshop)" })
 	} catch (error) {
-		console.error("Erro ao processar:", error)
-		res.status(500).json({ error: error.message, stack: error.stack })
+		return res.status(200)
 	}
 }
 
