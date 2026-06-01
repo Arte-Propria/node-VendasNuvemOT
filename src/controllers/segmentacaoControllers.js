@@ -55,7 +55,7 @@ export const postDbQueryNuvemshop = async (req, res) => {
 export const postDbQueryTiny = async (req, res) => {
 	try {
 		const tinyData = req.body
-		console.log("Recebido pedido Tiny ID:", tinyData?.retorno.pedido.id)
+		//console.log("Recebido pedido Tiny ID:", tinyData?.retorno.pedido.id)
 
 		if (!tinyData) {
 			throw new Error("Corpo da requisição vazio")
