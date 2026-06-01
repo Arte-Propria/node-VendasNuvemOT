@@ -42,11 +42,7 @@ export const postDbQueryNuvemshop = async (req, res) => {
 			throw new Error("Corpo da requisição vazio")
 		}
 
-		const idEcom = nuvemData.pedido.ecommerce.id
-		const cpfEcom = cleanCpfCnpj(nuvemData.pedido.cliente.cpf_cnpj)
-		const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
-
-		await processOrderFromNuvemshop(tinyOrder)
+		await processOrderFromNuvemshop(nuvemData)
 
 		res
 			.status(200)
@@ -64,8 +60,10 @@ export const postDbQueryTiny = async (req, res) => {
 		if (!tinyData) {
 			throw new Error("Corpo da requisição vazio")
 		}
-
-		await processOrderFromTiny(tinyData)
+		const idEcom = tinyData.pedido.ecommerce.id
+		const cpfEcom = cleanCpfCnpj(tinyData.pedido.cliente.cpf_cnpj)
+		const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
+		await processOrderFromTiny(tinyOrder)
 
 		res
 			.status(200)
