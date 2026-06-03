@@ -146,7 +146,7 @@ router.delete("/order/:store/:ownerNote", deleteOrderByOwnerNote) // Adicione a 
 
 // WEBHOOKS
 router.post("/webhooks/order-created", createdOrderWebhook) // Nuvemshop
-router.post("/webhooks/order-marketplace", createOrderMarketplaceWebhook) // Tiny
+//router.post("/webhooks/order-marketplace", createOrderMarketplaceWebhook) // Tiny
 router.post("/webhook/mandae", mandaeWebhook) // Webhook para atualizações da Mandae
 router.post("/webhook/db/nuvemshop", postDbQueryNuvemshop) // Rotas pedidos Nuvemshop via webhook 
 router.post("/webhook/db/tiny", postDbQueryTiny) // Rotas pedidos Nuvemshop via webhook 

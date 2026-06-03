@@ -112,32 +112,44 @@ export async function upsertOrderShop(updateRecord, fullRecord) {
 	const selectResult = await query(selectSql, [orderId])
 
 	if (selectResult.rows.length > 0) {
-		// UPDATE parcial
-		const updateSql = `
-      UPDATE ${dataBase.orders_shop} 
-      SET 
-        products = $1,
-        shipping_option = $2,
-        updated_at = $3,
-        shipping_status = $4
-      WHERE order_id = $5
-		`
-		await query(updateSql, [
-			JSON.stringify(cleanUpdate.products),
-			cleanUpdate.shipping_option,
-			cleanUpdate.updated_at,
-			cleanUpdate.shipping_status,
-			orderId
-		])
-		logWebhookDB(`Pedido ${orderId} atualizado (parcialmente)`)
+		// ---- UPDATE PARCIAL ----
+		// Lista de campos que podem ser atualizados após a criação do pedido
+		const updatableFields = [
+			"products", "shipping_option", "updated_at", "shipping_status",
+			"url_tracking", "markers_order_tiny", "fiscal_note",
+			"estimated_delivery", "shipping_cost"
+		]
+		// Filtra quais campos estão presentes em cleanUpdate
+		const fieldsToUpdate = updatableFields.filter((f) => cleanUpdate[f] !== undefined)
+		if (fieldsToUpdate.length === 0) {
+			console.log(`Nenhum campo atualizável para o pedido ${orderId}.`)
+			return
+		}
+		// Prepara valores e cláusula SET
+		const setClauses = []
+		const values = []
+		fieldsToUpdate.forEach((field, idx) => {
+			setClauses.push(`${field} = $${idx + 1}`)
+			let value = cleanUpdate[field]
+			// Tratamento especial para campos JSON/JSONB
+			if (field === "products" || field === "markers_order_tiny") {
+				value = JSON.stringify(value)
+			}
+			values.push(value)
+		})
+		values.push(orderId) // para a cláusula WHERE
+		const setClause = setClauses.join(", ")
+		const updateSql = `UPDATE ${dataBase.orders_shop} SET ${setClause} WHERE order_id = $${fieldsToUpdate.length + 1}`
+		await query(updateSql, values)
+		console.log(`Pedido ${orderId} atualizado (campos: ${fieldsToUpdate.join(", ")})`)
 	} else {
-		// INSERT completo
+		// ---- INSERT COMPLETO ----
 		const fields = Object.keys(cleanFull)
 		const placeholders = fields.map((_, idx) => `$${idx + 1}`).join(", ")
 		const insertSql = `INSERT INTO ${dataBase.orders_shop} (${fields.join(", ")}) VALUES (${placeholders})`
 		const values = fields.map((f) => cleanFull[f])
 		await query(insertSql, values)
-		logWebhookDB(`Pedido ${orderId} inserido (completo)`)
+		console.log(`Pedido ${orderId} inserido (completo)`)
 	}
 }
 

@@ -9,7 +9,11 @@ import {
 	toIntBool,
 	extractDimensions,
 	extractColor,
-	extractFinishType
+	extractFinishType,
+	calculateEstimatedDeliveryDate,
+	shippingCost,
+	fetchNoteOrderTiny,
+	fetchLinkNote
 } from "../tools/helpers.js"
 import { fetchAnalytics } from "../services/analyticsServices.js"
 import { fetchDataADSMeta } from "../services/dataADSMetaServices.js"
@@ -106,7 +110,17 @@ export const dataBaseDb = {
 			created_at: delivery.created_at,
 			paid_at: delivery.paid_at,
 			updated_at: delivery.updated_at,
-			active: toIntBool(delivery.active) // ← conversão
+			active: toIntBool(delivery.active), // ← conversão
+			shipping_status: delivery.shipping_status,
+			gateway_link: delivery.gateway_link,
+			payment_method: delivery.payment_method,
+			url_tracking: delivery.url_tracking,
+			markers_order_tiny: delivery.markers_order_tiny
+				? JSON.stringify(delivery.markers_order_tiny)
+				: null,
+			fiscal_note: delivery.fiscal_note,
+			estimated_delivery: delivery.estimated_delivery,
+			shipping_cost: delivery.shipping_cost
 		})
 	},
 	product: {
@@ -137,8 +151,8 @@ export const storeMapping = {
 	},
 	// mapeamento inverso: nome amigável para código numérico
 	nameToNumeric: {
-		"outlet": 3889735,
-		"artepropria": 1146504
+		outlet: 3889735,
+		artepropria: 1146504
 	}
 }
 
@@ -235,7 +249,16 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		created_at: now,
 		paid_at: toISOString(nuvemData?.paid_at),
 		updated_at: now,
-		active: nuvemData?.status !== "cancelled"
+		active: nuvemData?.status !== "cancelled",
+		gateway_link: nuvemData?.gateway_link || null,
+		payment_method: nuvemData?.payment_details?.method || null,
+		shipping_status: nuvemData?.shipping_status || null,
+		url_tracking: null, // Nuvemshop não fornece tracking URL diretamente
+		markers_order_tiny: null,
+		fiscal_note: null,
+		estimated_delivery: calculateEstimatedDeliveryDate(nuvemData?.created_at,
+			nuvemData?.shipping_max_days),
+		shipping_cost: shippingCost(nuvemData?.shipping_cost_customer)
 	}
 	console.log("orderDelivery:", orderDelivery)
 
@@ -314,13 +337,44 @@ export async function mapTinyToDelivery(tinyData) {
 	// ----- Cupons -----
 	const couponsDelivery = [] // sempre vazio
 
+	// Buscar marcadores
+	const markers = pedido.marcadores?.map((m) => m.marcador?.descricao) || []
+	// Buscar nota fiscal (assíncrono) – exemplo usando o ID do pedido e CPF do cliente
+	let fiscalNote = null
+	try {
+		const noteId = await fetchNoteOrderTiny(pedido.id)      // supondo função que retorna id da nota
+		if (noteId) fiscalNote = await fetchLinkNote(noteId)     // função que retorna link
+	} catch (e) {
+		console.warn("Erro ao buscar nota fiscal:", e) 
+	}
+
+	// URL de rastreamento
+	const trackingUrl = pedido.url_rastreamento || null
+
+	// Previsão de entrega – Tiny geralmente não tem; pode calcular se houver data prevista
+	let estimatedDelivery = null
+	if (pedido.data_prevista) {
+		const [dia, mes, ano] = pedido.data_prevista.split("/")
+		estimatedDelivery = `${ano}-${mes}-${dia}`
+	}
+
+	// Custo de frete
+	const shippingCostValue = toNumber(pedido.valor_frete)
+
 	// ----- Pedido -----
 	const orderDelivery = {
 		order_id: orderNumber,
 		products: produtosDelivery.map((p) => p.cod_categoria),
 		shipping_option: pedido.forma_envio || pedido.forma_frete || null,
 		updated_at: now,
-		shipping_status: pedido.situacao // ajuste conforme valores reais
+		shipping_status: pedido.situacao, // ajuste conforme valores reais
+		gateway_link: null,
+		payment_method: null,        // Tiny não tem
+		url_tracking: trackingUrl,
+		markers_order_tiny: markers,
+		fiscal_note: fiscalNote,
+		estimated_delivery: estimatedDelivery,
+		shipping_cost: shippingCostValue
 	}
 
 	// ----- Ads (não disponível) -----

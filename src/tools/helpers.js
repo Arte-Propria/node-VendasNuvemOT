@@ -134,3 +134,25 @@ export const extractFinishType = (productName) => {
 	return "-"
 }
 
+// Calcula a data estimada de entrega (created_at + shipping_max_days)
+export const calculateEstimatedDeliveryDate = (createdAt, maxDays) => {
+	if (!createdAt || !maxDays) return null
+	const date = new Date(createdAt)
+	date.setDate(date.getDate() + parseInt(maxDays, 10))
+	return date.toISOString().split("T")[0]
+}
+
+// Converte custo de frete para número
+export const shippingCost = (value) => toNumber(value)
+
+
+// Busca o ID da nota fiscal a partir do número do pedido Tiny
+export async function fetchNoteOrderTiny(orderId) {
+	// chamada à API do Tiny para obter dados da nota fiscal
+	// retorna o id da nota ou null
+}
+
+// Busca o link da nota fiscal a partir do id da nota
+export async function fetchLinkNote(noteId) {
+	// retorna URL pública da nota
+}
