@@ -11,10 +11,10 @@ import {
 	extractColor,
 	extractFinishType,
 	calculateEstimatedDeliveryDate,
-	shippingCost,
-	fetchNoteOrderTiny,
-	fetchLinkNote
+	shippingCost
 } from "../tools/helpers.js"
+import { fetchLinkNote, fetchNoteOrderTiny, fetchOrderTiny } from "../services/orderTinyServices.js"
+
 import { fetchAnalytics } from "../services/analyticsServices.js"
 import { fetchDataADSMeta } from "../services/dataADSMetaServices.js"
 import { query } from "../db/db.js"
@@ -274,6 +274,9 @@ export function mapNuvemshopToDelivery(nuvemData) {
 }
 
 export async function mapTinyToDelivery(tinyData) {
+
+	const pedidoTiny = await fetchOrderTiny(pedido.id)      // supondo função que retorna id da nota
+
 	const pedido = tinyData.retorno.pedido
 
 	const orderNumber = extractOrderNumber(tinyData)

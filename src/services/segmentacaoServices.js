@@ -14,7 +14,8 @@ import {
 	upsertDailySales
 } from "../db/upsert.js"
 import { query } from "../db/db.js"
-import { toNumber } from "../tools/helpers.js"
+import { toNumber, cleanCpfCnpj } from "../tools/helpers.js"
+import { fetchLinkNote, fetchNoteOrderTiny, fetchOrderTiny } from "../services/orderTinyServices.js"
 
 // 1. Função para realizar o MAP dos itens, com base em qual query será acessada
 // o parametro querySelect será usado para:
@@ -296,6 +297,14 @@ export async function processOrderFromNuvemshop(nuvemData) {
 
 // Função para processar um pedido da Tiny (similar)
 export async function processOrderFromTiny(tinyResponse) {
+
+	const idEcom = tinyResponse.pedido.ecommerce.id
+	const cpfEcom = cleanCpfCnpj(tinyResponse.pedido.cliente.cpf_cnpj)
+	const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
+	const note = await fetchNoteOrderTiny(idEcom, cpfEcom)
+	const tinyNoteOrder = await fetchLinkNote(note.id)
+
+		
 	const delivery = await mapTinyToDelivery(tinyResponse)
 	/*
 	console.log("delivery recebido, tipos:")

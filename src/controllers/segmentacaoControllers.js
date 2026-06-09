@@ -9,9 +9,7 @@ import {
 	fetchGoogleAdsByDate
 } from "../db/dataBaseQueryList.js"
 import { upsertAds } from "../db/upsert.js"
-import { fetchOrderTiny } from "../services/orderTinyServices.js"
 import { query } from "../db/db.js"
-import { cleanCpfCnpj } from "../tools/helpers.js"
 
 export const getDbQuery = async (req, res) => {
 	try {
@@ -61,11 +59,9 @@ export const postDbQueryTiny = async (req, res) => {
 			throw new Error("Corpo da requisição vazio")
 		}
 		console.log("Debug TinyData:",tinyData)
-		
-		//const idEcom = tinyData.pedido.ecommerce.id
-		//const cpfEcom = cleanCpfCnpj(tinyData.pedido.cliente.cpf_cnpj)
-		//const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
-		//await processOrderFromTiny(tinyOrder)
+
+
+		await processOrderFromTiny(tinyData)
 
 		res
 			.status(200)
