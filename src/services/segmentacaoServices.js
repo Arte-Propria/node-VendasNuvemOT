@@ -298,11 +298,11 @@ export async function processOrderFromNuvemshop(nuvemData) {
 // Função para processar um pedido da Tiny (similar)
 export async function processOrderFromTiny(tinyResponse) {
 
-	const idEcom = tinyResponse.pedido.ecommerce.id
-	const cpfEcom = cleanCpfCnpj(tinyResponse.pedido.cliente.cpf_cnpj)
-	const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
-	const note = await fetchNoteOrderTiny(idEcom, cpfEcom)
-	const tinyNoteOrder = await fetchLinkNote(note.id)
+	//const idEcom = tinyResponse.pedido.ecommerce.id
+	//const cpfEcom = cleanCpfCnpj(tinyResponse.pedido.cliente.cpf_cnpj)
+	//const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
+	//const note = await fetchNoteOrderTiny(idEcom, cpfEcom)
+	//const tinyNoteOrder = await fetchLinkNote(note.id)
 
 		
 	const delivery = await mapTinyToDelivery(tinyResponse)
