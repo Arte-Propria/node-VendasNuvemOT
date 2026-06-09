@@ -14,7 +14,7 @@ import {
 	shippingCost
 } from "../tools/helpers.js"
 import { fetchLinkNote, fetchNoteOrderTiny, fetchOrderTiny } from "../services/orderTinyServices.js"
-
+import { logWebhookDB } from "../utils/logger.js"
 import { fetchAnalytics } from "../services/analyticsServices.js"
 import { fetchDataADSMeta } from "../services/dataADSMetaServices.js"
 import { query } from "../db/db.js"
@@ -157,14 +157,14 @@ export const storeMapping = {
 }
 
 export function mapNuvemshopToDelivery(nuvemData) {
-	console.log("Iniciando mapNuvemshopToDelivery")
+	logWebhookDB("Iniciando mapNuvemshopToDelivery")
 	const orderNumber = nuvemData?.number
-	console.log("orderNumber:", orderNumber)
+	logWebhookDB("orderNumber:", orderNumber)
 	const now = new Date().toISOString()
 
 	// Cliente
 	const c = nuvemData?.customer || {}
-	console.log("customer data:", c)
+	//logWebhookDB("customer data:", c)
 
 	const clienteId =
     cleanCpfCnpj(c.identification) ||
@@ -190,7 +190,7 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		dt_att_ativo: now,
 		origem_cli: nuvemData?.customer_visit?.utm_parameters?.utm_source || null
 	}
-	console.log("clienteDelivery criado:", clienteDelivery)
+	//logWebhookDB("clienteDelivery criado:", clienteDelivery)
 
 	// Produtos
 	// Em mapNuvemshopToDelivery, substitua a parte de produtos:
@@ -220,7 +220,7 @@ export function mapNuvemshopToDelivery(nuvemData) {
 			preco: parseFloat(prod.price) || 0
 		}
 	})
-	console.log("produtosDelivery:", produtosDelivery)
+	//logWebhookDB("produtosDelivery:", produtosDelivery)
 
 	// Cupons
 	const couponsDelivery = (nuvemData?.coupon || []).map((coupon) => ({
@@ -232,7 +232,7 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		total_discount: toNumber(nuvemData?.discount_coupon),
 		order_ids: [orderNumber]
 	}))
-	console.log("couponsDelivery:", couponsDelivery)
+	//logWebhookDB("couponsDelivery:", couponsDelivery)
 
 	// Pedido
 	const orderDelivery = {
@@ -260,7 +260,7 @@ export function mapNuvemshopToDelivery(nuvemData) {
 			nuvemData?.shipping_max_days),
 		shipping_cost: shippingCost(nuvemData?.shipping_cost_customer)
 	}
-	console.log("orderDelivery:", orderDelivery)
+	//logWebhookDB("orderDelivery:", orderDelivery)
 
 	const result = {
 		orders_shop: [orderDelivery],
@@ -269,7 +269,7 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		product: produtosDelivery,
 		clients: [clienteDelivery]
 	}
-	console.log("result keys:", Object.keys(result))
+	logWebhookDB("result keys:", Object.keys(result))
 	return result
 }
 
@@ -280,7 +280,7 @@ export async function mapTinyToDelivery(tinyData) {
 	const pedido = tinyData.retorno.pedido
 
 	const orderNumber = extractOrderNumber(tinyData)
-	console.log("orderNumber:", orderNumber)
+	logWebhookDB("orderNumber(TINY):", orderNumber)
 
 	if (!orderNumber) throw new Error("Número do pedido não encontrado no Tiny")
 	const now = new Date().toISOString()
