@@ -53,7 +53,7 @@ export const createOrderMarketplaceWebhook = async (req, res) => {
 	try {
 		const { body } = req
 
-		console.log("DEBUG tiny:",body)
+		//console.log("DEBUG tiny:",body)
 
 		// Chamar o serviço para processar o webhook
 		const result = await processMarketplaceWebhook(body)
