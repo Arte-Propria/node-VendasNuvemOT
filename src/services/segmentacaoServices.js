@@ -337,64 +337,70 @@ export async function processOrderFromTiny(tinyResponse) {
 
 	// 3. Pedido
 	const firstOrder = safeDelivery.orders_shop[0]
-	if (firstOrder) {
-		firstOrder.order_id = Number(firstOrder.order_id)
-		console.log(`[processOrderFromTiny] Processando pedido ID: ${firstOrder.order_id}`)
-		const fullRecord = dataBaseDb.orders_shop.transform(firstOrder)
-		const updateRecord = {
-			order_id: firstOrder.order_id,
-			products: firstOrder.products,
-			shipping_option: firstOrder.shipping_option,
-			updated_at: firstOrder.updated_at,
-			shipping_status: firstOrder.shipping_status,
-			url_tracking: firstOrder.url_tracking,
-			markers_order_tiny: firstOrder.markers_order_tiny,
-			fiscal_note: firstOrder.fiscal_note,
-			estimated_delivery: firstOrder.estimated_delivery,
-			shipping_cost: firstOrder.shipping_cost
-		}
-		await upsertOrderShop(updateRecord, fullRecord)
-		console.log(`[processOrderFromTiny] Pedido ${firstOrder.order_id} salvo/atualizado`)
-	} else {
-		console.warn("[processOrderFromTiny] Nenhum pedido encontrado no payload")
-		return
+	if (!firstOrder) {
+		throw new Error("[processOrderFromTiny] Nenhum pedido encontrado no payload")
 	}
+
+	// Normaliza order_id
+	firstOrder.order_id = Number(firstOrder.order_id)
+	console.log(`[processOrderFromTiny] Processando pedido ID: ${firstOrder.order_id}`)
+
+	// Verificação da loja ANTES de qualquer persistência (Opção 2)
+	const pedido = tinyResponse.retorno.pedido
+	const storeNameTiny = pedido.ecommerce?.nomeEcommerce
+	const storeNumeric = storeMapping.tinyNameToNumeric?.[storeNameTiny]
+
+	if (!storeNumeric) {
+		const errorMsg = `[processOrderFromTiny] Loja Tiny não reconhecida: ${storeNameTiny}. Pedido ${firstOrder.order_id} REJEITADO.`
+		console.error(errorMsg)
+		throw new Error(errorMsg)
+	}
+	console.log(`[processOrderFromTiny] Loja mapeada: ${storeNameTiny} -> ${storeNumeric}`)
+
+	// Agora sim, persiste o pedido (insere/atualiza)
+	const fullRecord = dataBaseDb.orders_shop.transform(firstOrder)
+	const updateRecord = {
+		order_id: firstOrder.order_id,
+		products: firstOrder.products,
+		shipping_option: firstOrder.shipping_option,
+		updated_at: firstOrder.updated_at,
+		shipping_status: firstOrder.shipping_status,
+		url_tracking: firstOrder.url_tracking,
+		markers_order_tiny: firstOrder.markers_order_tiny,
+		fiscal_note: firstOrder.fiscal_note,
+		estimated_delivery: firstOrder.estimated_delivery,
+		shipping_cost: firstOrder.shipping_cost
+	}
+	await upsertOrderShop(updateRecord, fullRecord)
+	console.log(`[processOrderFromTiny] Pedido ${firstOrder.order_id} salvo/atualizado`)
 
 	// 4. Tiny não envia cupons – nada a fazer
 
 	// 5. Daily sales
 	console.log("[processOrderFromTiny] Atualizando daily_sales")
-	const pedido = tinyResponse.retorno.pedido
 	const [dia, mes, ano] = pedido.data_pedido.split("/")
 	const orderDate = `${ano}-${mes}-${dia}`
 	console.log(`[processOrderFromTiny] Data do pedido: ${orderDate}`)
 
-	// Mapeamento usando storeMapping.tinyNameToNumeric
-	const storeNameTiny = pedido.ecommerce?.nomeEcommerce // "OUTLETDOSQUADROS"
-	const storeNumeric = storeMapping.tinyNameToNumeric?.[storeNameTiny]
-	if (!storeNumeric) {
-		console.error(`[processOrderFromTiny] Loja Tiny não reconhecida: ${storeNameTiny}. Pedido ${firstOrder.order_id} ignorado para daily_sales.`)
-	} else {
-		console.log(`[processOrderFromTiny] Loja mapeada: ${storeNameTiny} -> ${storeNumeric}`)
-		const storeNameForAds = storeMapping.numericToTinyName[storeNumeric]
-		let adsIds = []
-		if (storeNameForAds) {
-			const adsSql = `SELECT id_ads FROM ${dataBase.ads} WHERE date_ads = $1 AND store = $2`
-			const adsResult = await query(adsSql, [orderDate, storeNameForAds])
-			adsIds = adsResult.rows.map((row) => row.id_ads)
-			console.log(`[processOrderFromTiny] ${adsIds.length} anúncios encontrados para ${orderDate}`)
-		}
-
-		const currentOrderData = {
-			order_id: Number(firstOrder.order_id),
-			payment_status: firstOrder.payment_status || null,
-			total: Number(firstOrder.total),
-			coupons: Array.isArray(firstOrder.coupons) ? firstOrder.coupons : [],
-			status: pedido.situacao === "Cancelado" ? "cancelled" : "open",
-			ads_ids: adsIds
-		}
-		await upsertDailySales(orderDate, storeNumeric, currentOrderData)
-		console.log(`[processOrderFromTiny] Daily sales atualizado para data ${orderDate}, loja ${storeNumeric}`)
+	const storeNameForAds = storeMapping.numericToTinyName[storeNumeric]
+	let adsIds = []
+	if (storeNameForAds) {
+		const adsSql = `SELECT id_ads FROM ${dataBase.ads} WHERE date_ads = $1 AND store = $2`
+		const adsResult = await query(adsSql, [orderDate, storeNameForAds])
+		adsIds = adsResult.rows.map((row) => row.id_ads)
+		console.log(`[processOrderFromTiny] ${adsIds.length} anúncios encontrados para ${orderDate}`)
 	}
+
+	const currentOrderData = {
+		order_id: Number(firstOrder.order_id),
+		payment_status: firstOrder.payment_status || null,
+		total: Number(firstOrder.total),
+		coupons: Array.isArray(firstOrder.coupons) ? firstOrder.coupons : [],
+		status: pedido.situacao === "Cancelado" ? "cancelled" : "open",
+		ads_ids: adsIds
+	}
+
+	await upsertDailySales(orderDate, storeNumeric, currentOrderData)
+	console.log(`[processOrderFromTiny] Daily sales atualizado para data ${orderDate}, loja ${storeNumeric}`)
 	console.log("[processOrderFromTiny] Processamento finalizado")
 }
