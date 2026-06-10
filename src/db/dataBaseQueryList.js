@@ -160,8 +160,10 @@ export const storeMapping = {
 	},
 	//Mapeamentoo para o tiny
 	tinyNameToNumeric: {
-		OUTLETDOSQUADROS: 3889735,
-		ARTEPROPRIA: 1146504
+		"OUTLETDOSQUADROS": 3889735,
+		"ARTEPROPRIA": 1146504,
+		"SITE OUTLET": 3889735,
+		"SITE ARTEPROPRIA": 1146504
 	},
 	//Mapeamentoo para o tiny
 	numericToTinyName: {
@@ -298,7 +300,8 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 
 	// ----- Cliente -----
 	const c = pedido.cliente
-	const clienteId = cleanCpfCnpj(c.cpf_cnpj) || c.email || `temp_${orderNumber}`
+	const clienteId =
+    cleanCpfCnpj(c.cpf_cnpj) || c.email || `temp_${orderNumber}`
 	const clienteDelivery = {
 		id_cli: null,
 		cpf_cnpj_cli: cleanCpfCnpj(c.cpf_cnpj),
@@ -328,7 +331,9 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 		const tipo = extractFinishType(productName)
 		const nomeCategoria = classifyProductCategory(productName)
 		return {
-			cod_categoria: (prodItem.codigo || `tiny_${prodItem.id_produto}`).toUpperCase(),
+			cod_categoria: (
+				prodItem.codigo || `tiny_${prodItem.id_produto}`
+			).toUpperCase(),
 			nome_categoria: nomeCategoria,
 			desc_categoria: prodItem.descricao,
 			grp_categoria: null,
@@ -350,7 +355,9 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 	const couponsDelivery = []
 
 	// ----- Dados adicionais do pedido -----
-	const markers = (pedido.marcadores || []).map((m) => m.marcador?.descricao).filter(Boolean)
+	const markers = (pedido.marcadores || [])
+		.map((m) => m.marcador?.descricao)
+		.filter(Boolean)
 	const trackingUrl = pedido.url_rastreamento || null
 	let estimatedDelivery = null
 	if (pedido.data_prevista) {
