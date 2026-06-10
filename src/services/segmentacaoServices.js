@@ -303,46 +303,49 @@ export async function processOrderFromNuvemshop(nuvemData) {
 export async function processOrderFromTiny(tinyResponse) {
 	console.log("[processOrderFromTiny] Iniciando processamento do pedido Tiny")
 
-	// Extrai o nome do e-commerce diretamente do webhook (sem chamadas externas)
-	const nomeEcommerce = tinyResponse?.pedido?.ecommerce?.nomeEcommerce
+	// Extrai o pedido diretamente do webhook
+	const pedido = tinyResponse?.pedido
+	if (!pedido) {
+		console.error("[processOrderFromTiny] Campo 'pedido' não encontrado no webhook")
+		throw new Error("Webhook Tiny inválido: falta dados do pedido")
+	}
+
+	// Validação da loja (não processa se não for Outlet ou Arte Própria)
+	const nomeEcommerce = pedido.ecommerce?.nomeEcommerce
 	if (!nomeEcommerce) {
-		console.error("[processOrderFromTiny] Campo 'pedido.ecommerce.nomeEcommerce' não encontrado no webhook")
+		console.error("[processOrderFromTiny] Campo 'pedido.ecommerce.nomeEcommerce' não encontrado")
 		throw new Error("Webhook Tiny inválido: falta identificação da loja")
 	}
-	console.log("[processOrderFromTiny] nomeEcommerce Tiny:", nomeEcommerce)
-	
-	const marcadoresEcommerce = tinyResponse?.pedido?.marcadores
-	console.log("[processOrderFromTiny] marcadoresEcommerce Tiny:", marcadoresEcommerce)
-
-	// Verifica se a loja é reconhecida (Outlet ou Arte Própria)
 	const storeNumeric = storeMapping.tinyNameToNumeric?.[nomeEcommerce]
 	if (!storeNumeric) {
 		console.warn(`[processOrderFromTiny] Loja não mapeada: ${nomeEcommerce}. Pedido ignorado.`)
-		// Retorna sem erro, apenas ignora o processamento
 		return { ignored: true, reason: `Loja não reconhecida: ${nomeEcommerce}` }
 	}
 	console.log(`[processOrderFromTiny] Loja reconhecida: ${nomeEcommerce} -> código ${storeNumeric}`)
 
-	const idEcom = tinyResponse.pedido.ecommerce.id
-	const cpfEcom = cleanCpfCnpj(tinyResponse.pedido.cliente.cpf_cnpj)
-	console.log(`[processOrderFromTiny] ID ecommerce: ${idEcom}, CPF: ${cpfEcom}`)
+	// Extrai os marcadores (array com as descrições)
+	const markers = (pedido.marcadores || []).map((m) => m.marcador?.descricao).filter(Boolean)
+	console.log(`[processOrderFromTiny] Marcadores: ${markers.join(", ") || "nenhum"}`)
 
-	// Busca o pedido completo no Tiny
-	const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
-	console.log("[processOrderFromTiny] Pedido completo obtido:", tinyOrder)
+	// Obtém o link da nota fiscal usando o id_nota_fiscal do webhook
+	let fiscalNoteLink = null
+	if (pedido.id_nota_fiscal) {
+		try {
+			fiscalNoteLink = await fetchLinkNote(pedido.id_nota_fiscal)
+			console.log(`[processOrderFromTiny] Nota fiscal obtida: ${fiscalNoteLink}`)
+		} catch (err) {
+			console.warn(`[processOrderFromTiny] Erro ao buscar nota fiscal: ${err.message}`)
+		}
+	} else {
+		console.log("[processOrderFromTiny] Pedido sem nota fiscal")
+	}
 
-	// Busca a nota fiscal
-	const note = await fetchNoteOrderTiny(idEcom, cpfEcom)
-	const tinyNoteOrder = await fetchLinkNote(note.id)
-	console.log("[processOrderFromTiny] Nota fiscal obtida:",
-		tinyNoteOrder ? "sim" : "não")
-
-	const delivery = await mapTinyToDelivery(tinyOrder, tinyNoteOrder)
+	// Cria um objeto compatível com a estrutura esperada por mapTinyToDelivery
+	const tinyDataCompatible = { retorno: { pedido } }
+	const delivery = await mapTinyToDelivery(tinyDataCompatible, fiscalNoteLink)
 
 	const safeDelivery = {
-		orders_shop: Array.isArray(delivery.orders_shop)
-			? delivery.orders_shop
-			: [],
+		orders_shop: Array.isArray(delivery.orders_shop) ? delivery.orders_shop : [],
 		clients: Array.isArray(delivery.clients) ? delivery.clients : [],
 		product: Array.isArray(delivery.product) ? delivery.product : [],
 		coupons: Array.isArray(delivery.coupons) ? delivery.coupons : [],
@@ -350,14 +353,12 @@ export async function processOrderFromTiny(tinyResponse) {
 	}
 
 	// 1. Clientes
-	console.log("[processOrderFromTiny] Inserindo/atualizando clientes")
 	for (const client of safeDelivery.clients) {
 		const record = dataBaseDb.clients.transform(client)
 		await upsertClient(record)
 	}
 
 	// 2. Produtos
-	console.log("[processOrderFromTiny] Inserindo/atualizando produtos")
 	for (const prod of safeDelivery.product) {
 		const record = dataBaseDb.product.transform(prod)
 		await upsertProduct(record)
@@ -366,25 +367,11 @@ export async function processOrderFromTiny(tinyResponse) {
 	// 3. Pedido
 	const firstOrder = safeDelivery.orders_shop[0]
 	if (!firstOrder) {
-		throw new Error("[processOrderFromTiny] Nenhum pedido encontrado no payload")
+		throw new Error("[processOrderFromTiny] Nenhum pedido encontrado após mapeamento")
 	}
-
-	// Normaliza order_id
 	firstOrder.order_id = Number(firstOrder.order_id)
 	console.log(`[processOrderFromTiny] Processando pedido ID: ${firstOrder.order_id}`)
 
-	// Verificação da loja ANTES de qualquer persistência (Opção 2)
-	const pedido = tinyResponse.retorno.pedido
-	const storeNameTiny = pedido.ecommerce?.nomeEcommerce
-
-	if (!storeNumeric) {
-		const errorMsg = `[processOrderFromTiny] Loja Tiny não reconhecida: ${storeNameTiny}. Pedido ${firstOrder.order_id} REJEITADO.`
-		console.error(errorMsg)
-		throw new Error(errorMsg)
-	}
-	console.log(`[processOrderFromTiny] Loja mapeada: ${storeNameTiny} -> ${storeNumeric}`)
-
-	// Agora sim, persiste o pedido (insere/atualiza)
 	const fullRecord = dataBaseDb.orders_shop.transform(firstOrder)
 	const updateRecord = {
 		order_id: firstOrder.order_id,
@@ -393,23 +380,20 @@ export async function processOrderFromTiny(tinyResponse) {
 		updated_at: firstOrder.updated_at,
 		shipping_status: firstOrder.shipping_status,
 		url_tracking: firstOrder.url_tracking,
-		markers_order_tiny: firstOrder.markers_order_tiny,
-		fiscal_note: firstOrder.fiscal_note,
+		markers_order_tiny: markers,      // <-- já extraído do webhook
+		fiscal_note: fiscalNoteLink,      // <-- link obtido
 		estimated_delivery: firstOrder.estimated_delivery,
 		shipping_cost: firstOrder.shipping_cost
 	}
 	await upsertOrderShop(updateRecord, fullRecord)
 	console.log(`[processOrderFromTiny] Pedido ${firstOrder.order_id} salvo/atualizado`)
 
-	// 4. Tiny não envia cupons – nada a fazer
+	// 4. Cupons (nenhum)
 
 	// 5. Daily sales
-	console.log("[processOrderFromTiny] Atualizando daily_sales")
 	const [dia, mes, ano] = pedido.data_pedido.split("/")
 	const orderDate = `${ano}-${mes}-${dia}`
-	console.log(`[processOrderFromTiny] Data do pedido: ${orderDate}`)
-
-	const storeNameForAds = storeMapping.numericToTinyName[storeNumeric]
+	const storeNameForAds = storeMapping.numericToName[storeNumeric]
 	let adsIds = []
 	if (storeNameForAds) {
 		const adsSql = `SELECT id_ads FROM ${dataBase.ads} WHERE date_ads = $1 AND store = $2`
@@ -426,8 +410,8 @@ export async function processOrderFromTiny(tinyResponse) {
 		status: pedido.situacao === "Cancelado" ? "cancelled" : "open",
 		ads_ids: adsIds
 	}
-
 	await upsertDailySales(orderDate, storeNumeric, currentOrderData)
 	console.log(`[processOrderFromTiny] Daily sales atualizado para data ${orderDate}, loja ${storeNumeric}`)
 	console.log("[processOrderFromTiny] Processamento finalizado")
+	return { processed: true, orderId: firstOrder.order_id }
 }
