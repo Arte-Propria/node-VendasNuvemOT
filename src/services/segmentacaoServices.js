@@ -268,7 +268,7 @@ export async function processOrderFromNuvemshop(nuvemData) {
 		const storeId = nuvemData?.store_id?.toString() // "3889735"
 		if (orderDate && storeId) {
 			// Converte código numérico para nome amigável (ex: "outlet")
-			const storeName = storeMapping.numericToName[parseInt(storeId)]
+			const storeName = nuvemData.pedido.ecommerce?.nomeEcommerce?.toLowerCase()
 			if (!storeName) {
 				console.warn(`Store ${storeId} não mapeado. Anúncios não serão vinculados.`)
 			}
@@ -297,99 +297,90 @@ export async function processOrderFromNuvemshop(nuvemData) {
 
 // Função para processar um pedido da Tiny (similar)
 export async function processOrderFromTiny(tinyResponse) {
+	const idEcom = tinyResponse.pedido.ecommerce.id
+	const cpfEcom = cleanCpfCnpj(tinyResponse.pedido.cliente.cpf_cnpj)
 
-	//const idEcom = tinyResponse.pedido.ecommerce.id
-	//const cpfEcom = cleanCpfCnpj(tinyResponse.pedido.cliente.cpf_cnpj)
-	//const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
-	//const note = await fetchNoteOrderTiny(idEcom, cpfEcom)
-	//const tinyNoteOrder = await fetchLinkNote(note.id)
+	// Busca o pedido completo no Tiny
+	const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
+	// Busca a nota fiscal
+	const note = await fetchNoteOrderTiny(idEcom, cpfEcom)
+	const tinyNoteOrder = await fetchLinkNote(note.id)
 
-		
-	const delivery = await mapTinyToDelivery(tinyResponse)
-	/*
-	console.log("delivery recebido, tipos:")
-	console.log(" - orders_shop:",
-		Array.isArray(delivery.orders_shop) ? "array" : typeof delivery.orders_shop)
-	console.log(" - clients:",
-		Array.isArray(delivery.clients) ? "array" : typeof delivery.clients)
-	console.log(" - product:",
-		Array.isArray(delivery.product) ? "array" : typeof delivery.product)
-	console.log(" - coupons:",
-		Array.isArray(delivery.coupons) ? "array" : typeof delivery.coupons)
-	console.log(" - ads:",
-		Array.isArray(delivery.ads) ? "array" : typeof delivery.ads)
-*/
+	// Mapeia usando o link da nota
+	const delivery = await mapTinyToDelivery(tinyOrder, tinyNoteOrder)
+
 	const safeDelivery = {
-		orders_shop: Array.isArray(delivery.orders_shop)
-			? delivery.orders_shop
-			: [],
+		orders_shop: Array.isArray(delivery.orders_shop) ? delivery.orders_shop : [],
 		clients: Array.isArray(delivery.clients) ? delivery.clients : [],
 		product: Array.isArray(delivery.product) ? delivery.product : [],
 		coupons: Array.isArray(delivery.coupons) ? delivery.coupons : [],
 		ads: Array.isArray(delivery.ads) ? delivery.ads : []
 	}
 
-	// 1. Inserir/atualizar clientes
+	// 1. Clientes
 	for (const client of safeDelivery.clients) {
 		const record = dataBaseDb.clients.transform(client)
 		await upsertClient(record)
 	}
 
-	// 2. Inserir/atualizar produtos
+	// 2. Produtos
 	for (const prod of safeDelivery.product) {
 		const record = dataBaseDb.product.transform(prod)
 		await upsertProduct(record)
 	}
 
-	// 3. Inserir/atualizar pedido (orders_shop)
+	// 3. Pedido
 	const firstOrder = safeDelivery.orders_shop[0]
 	if (firstOrder) {
-		// Garantir que order_id seja número
+		// Normaliza order_id para número
 		firstOrder.order_id = Number(firstOrder.order_id)
 		const fullRecord = dataBaseDb.orders_shop.transform(firstOrder)
+		// Campos que podem ser atualizados posteriormente (ex: rastreamento, situação, nota fiscal)
 		const updateRecord = {
 			order_id: firstOrder.order_id,
 			products: firstOrder.products,
 			shipping_option: firstOrder.shipping_option,
 			updated_at: firstOrder.updated_at,
-			shipping_status: firstOrder.shipping_status || null
+			shipping_status: firstOrder.shipping_status,
+			url_tracking: firstOrder.url_tracking,
+			markers_order_tiny: firstOrder.markers_order_tiny,
+			fiscal_note: firstOrder.fiscal_note,
+			estimated_delivery: firstOrder.estimated_delivery,
+			shipping_cost: firstOrder.shipping_cost
 		}
 		await upsertOrderShop(updateRecord, fullRecord)
 	}
 
 	// 4. Tiny não envia cupons – nada a fazer
 
-	// 5. Atualizar daily_sales (após persistir o pedido)
+	// 5. Daily sales
 	if (firstOrder) {
-		const pedido = tinyResponse.retorno.pedido
-		const dataStr = pedido.data_pedido // "26/01/2026"
-		const [dia, mes, ano] = dataStr.split("/")
+		// Extrai a data do pedido (formato dd/mm/aaaa)
+		const pedido = tinyResponse.retorno.pedido // ou tinyOrder.retorno.pedido
+		const [dia, mes, ano] = pedido.data_pedido.split("/")
 		const orderDate = `${ano}-${mes}-${dia}`
 
-		// Mapear loja
-		const storeName = pedido.ecommerce?.nomeEcommerce?.toLowerCase() // "outletdosquadros"
+		// Mapeia a loja
+		const storeName = pedido.ecommerce?.nomeEcommerce?.toLowerCase()
 		let storeNumeric = null
 		if (storeName === "outletdosquadros") storeNumeric = 3889735
 		else if (storeName === "artepropria") storeNumeric = 1146504
-		else {
-			storeNumeric = storeMapping.nameToNumeric[storeName]
-		}
+		else storeNumeric = storeMapping.tinyNameToNumeric?.[storeName]
 
 		if (!storeNumeric) {
-			console.warn(`Loja não mapeada: ${storeName}. Usando store original.`)
-			storeNumeric = storeName // fallback (pode causar erro, mas prossegue)
+			console.warn(`Loja não mapeada: ${storeName}. Usando string original.`)
+			storeNumeric = storeName // fallback
 		}
 
-		// Buscar IDs de anúncios para a data e loja (nome amigável)
+		// Busca IDs de anúncios para esta data e loja (nome amigável)
 		let adsIds = []
-		const storeNameForAds = storeMapping.numericToName[storeNumeric]
+		const storeNameForAds = storeMapping.numericToTinyName?.[storeNumeric]
 		if (storeNameForAds) {
 			const adsSql = `SELECT id_ads FROM ${dataBase.ads} WHERE date_ads = $1 AND store = $2`
 			const adsResult = await query(adsSql, [orderDate, storeNameForAds])
 			adsIds = adsResult.rows.map((row) => row.id_ads)
 		}
 
-		// Dados do pedido atual para daily_sales – forçar order_id como número
 		const currentOrderData = {
 			order_id: Number(firstOrder.order_id),
 			payment_status: firstOrder.payment_status || null,

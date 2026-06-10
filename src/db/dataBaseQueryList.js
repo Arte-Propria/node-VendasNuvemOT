@@ -13,7 +13,11 @@ import {
 	calculateEstimatedDeliveryDate,
 	shippingCost
 } from "../tools/helpers.js"
-import { fetchLinkNote, fetchNoteOrderTiny, fetchOrderTiny } from "../services/orderTinyServices.js"
+import {
+	fetchLinkNote,
+	fetchNoteOrderTiny,
+	fetchOrderTiny
+} from "../services/orderTinyServices.js"
 import { logWebhookDB } from "../utils/logger.js"
 import { fetchAnalytics } from "../services/analyticsServices.js"
 import { fetchDataADSMeta } from "../services/dataADSMetaServices.js"
@@ -153,6 +157,16 @@ export const storeMapping = {
 	nameToNumeric: {
 		outlet: 3889735,
 		artepropria: 1146504
+	},
+	//Mapeamentoo para o tiny
+	tinyNameToNumeric: {
+		OUTLETDOSQUADROS: 3889735,
+		ARTEPROPRIA: 1146504
+	},
+	//Mapeamentoo para o tiny
+	numericToTinyName: {
+		3889735: "OUTLETDOSQUADROS",
+		1146504: "ARTEPROPRIA"
 	}
 }
 
@@ -273,15 +287,9 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	return result
 }
 
-export async function mapTinyToDelivery(tinyData) {
-
-	const pedidoTiny = await fetchOrderTiny(pedido.id)      // supondo função que retorna id da nota
-
+export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 	const pedido = tinyData.retorno.pedido
-
 	const orderNumber = extractOrderNumber(tinyData)
-	logWebhookDB("orderNumber(TINY):", orderNumber)
-
 	if (!orderNumber) throw new Error("Número do pedido não encontrado no Tiny")
 	const now = new Date().toISOString()
 
@@ -295,87 +303,86 @@ export async function mapTinyToDelivery(tinyData) {
 		nome_cli: c.nome,
 		email_cli: c.email,
 		fone_cli: cleanPhone(c.fone),
-		tipo_cli: c.tipo_pessoa, // 'F' ou 'J'
+		tipo_cli: c.tipo_pessoa,
 		bairro_cli: c.bairro,
 		cidade_cli: c.cidade,
 		numero_cli: c.numero,
 		uf_cli: c.uf,
 		cep_cli: c.cep?.replace(/\D/g, ""),
 		endereco_cli: c.endereco,
-		dt_criacao_cli: toISOString(pedido.data_pedido), // formato dd/mm/aaaa – ajuste se necessário
+		dt_criacao_cli: toISOString(pedido.data_pedido),
 		ativo: true,
 		dt_att_ativo: now,
-		origem_cli: null // Tiny não tem origem
+		origem_cli: null
 	}
 
 	// ----- Produtos -----
-	// Em mapTinyToDelivery, itens
 	const produtosDelivery = (pedido.itens || []).map((item) => {
-		const now = new Date().toISOString()
-
 		const prodItem = item.item
 		const productName = prodItem.descricao
 		const dimensao = extractDimensions(productName)
-		const cor = extractColor(productName)
+		const cor = extractColor(productName)?.toUpperCase() || "-"
 		const tipo = extractFinishType(productName)
 		const nomeCategoria = classifyProductCategory(productName)
-
 		return {
 			cod_categoria: (
 				prodItem.codigo || `tiny_${prodItem.id_produto}`
 			).toUpperCase(),
 			nome_categoria: nomeCategoria,
 			desc_categoria: prodItem.descricao,
+			grp_categoria: null,
 			ativo: 1,
 			dim_categoria: dimensao,
 			cor_categoria: cor,
 			tipo_categoria: tipo,
 			dt_att_ativo: now,
 			dt_att_categoria: now,
+			img_categoria: null,
 			custo_categoria: 0,
+			tempo_prod_categoria: null,
 			preco: parseFloat(prodItem.valor_unitario) || 0
 		}
 	})
 
-	// ----- Cupons -----
-	const couponsDelivery = [] // sempre vazio
+	// ----- Cupons (nenhum) -----
+	const couponsDelivery = []
 
-	// Buscar marcadores
-	const markers = pedido.marcadores?.map((m) => m.marcador?.descricao) || []
-	// Buscar nota fiscal (assíncrono) – exemplo usando o ID do pedido e CPF do cliente
-	let fiscalNote = null
-	try {
-		const noteId = await fetchNoteOrderTiny(pedido.id)      // supondo função que retorna id da nota
-		if (noteId) fiscalNote = await fetchLinkNote(noteId)     // função que retorna link
-	} catch (e) {
-		console.warn("Erro ao buscar nota fiscal:", e) 
-	}
-
-	// URL de rastreamento
+	// ----- Dados adicionais do pedido -----
+	const markers = (pedido.marcadores || [])
+		.map((m) => m.marcador?.descricao)
+		.filter(Boolean)
 	const trackingUrl = pedido.url_rastreamento || null
-
-	// Previsão de entrega – Tiny geralmente não tem; pode calcular se houver data prevista
 	let estimatedDelivery = null
 	if (pedido.data_prevista) {
 		const [dia, mes, ano] = pedido.data_prevista.split("/")
 		estimatedDelivery = `${ano}-${mes}-${dia}`
 	}
-
-	// Custo de frete
 	const shippingCostValue = toNumber(pedido.valor_frete)
+	const shippingStatus = pedido.situacao || null
 
-	// ----- Pedido -----
+	// ----- Pedido (todos os campos que a tabela orders_shop espera) -----
 	const orderDelivery = {
-		order_id: orderNumber,
+		order_id: Number(orderNumber),
+		id_cli: clienteId,
+		store: pedido.ecommerce?.nomeEcommerce || null,
+		total: parseFloat(pedido.total_pedido) || 0,
+		subtotal: parseFloat(pedido.total_produtos) || 0,
+		payment_status: null, // Tiny não informa
+		coupons: [], // Tiny não tem cupons
+		coupon_discount: parseFloat(pedido.valor_desconto) || 0,
 		products: produtosDelivery.map((p) => p.cod_categoria),
 		shipping_option: pedido.forma_envio || pedido.forma_frete || null,
+		created_at: now,
+		paid_at: null,
 		updated_at: now,
-		shipping_status: pedido.situacao, // ajuste conforme valores reais
+		active: pedido.situacao !== "Cancelado",
+		// Novas colunas
 		gateway_link: null,
-		payment_method: null,        // Tiny não tem
+		payment_method: null,
+		shipping_status: shippingStatus,
 		url_tracking: trackingUrl,
 		markers_order_tiny: markers,
-		fiscal_note: fiscalNote,
+		fiscal_note: fiscalNoteLink,
 		estimated_delivery: estimatedDelivery,
 		shipping_cost: shippingCostValue
 	}
