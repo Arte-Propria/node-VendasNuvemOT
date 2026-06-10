@@ -310,6 +310,9 @@ export async function processOrderFromTiny(tinyResponse) {
 		throw new Error("Webhook Tiny inválido: falta identificação da loja")
 	}
 	console.log("[processOrderFromTiny] nomeEcommerce Tiny:", nomeEcommerce)
+	
+	const marcadoresEcommerce = tinyResponse?.pedido?.marcadores
+	console.log("[processOrderFromTiny] marcadoresEcommerce Tiny:", marcadoresEcommerce)
 
 	// Verifica se a loja é reconhecida (Outlet ou Arte Própria)
 	const storeNumeric = storeMapping.tinyNameToNumeric?.[nomeEcommerce]

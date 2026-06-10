@@ -269,7 +269,7 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		gateway_link: nuvemData?.gateway_link || null,
 		payment_method: nuvemData?.payment_details?.method || null,
 		shipping_status: nuvemData?.shipping_status || null,
-		url_tracking: null, // Nuvemshop não fornece tracking URL diretamente
+		url_tracking: nuvemData?.shipping_tracking_url || null, 
 		markers_order_tiny: null,
 		fiscal_note: null,
 		estimated_delivery: calculateEstimatedDeliveryDate(nuvemData?.created_at,
