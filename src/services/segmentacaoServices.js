@@ -268,7 +268,7 @@ export async function processOrderFromNuvemshop(nuvemData) {
 		const storeId = nuvemData?.store_id?.toString() // "3889735"
 		if (orderDate && storeId) {
 			// Converte código numérico para nome amigável (ex: "outlet")
-			const storeName = nuvemData.pedido.ecommerce?.nomeEcommerce?.toLowerCase()
+			const storeName = storeMapping.numericToName[parseInt(storeId)]
 			if (!storeName) {
 				console.warn(`Store ${storeId} não mapeado. Anúncios não serão vinculados.`)
 			}
