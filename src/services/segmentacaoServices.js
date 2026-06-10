@@ -302,7 +302,6 @@ export async function processOrderFromNuvemshop(nuvemData) {
 // Função para processar um pedido da Tiny (similar)
 export async function processOrderFromTiny(tinyResponse) {
 	console.log("[processOrderFromTiny] Iniciando processamento do pedido Tiny")
-	console.log("[processOrderFromTiny] Pedido Tiny:", tinyResponse)
 
 	// Extrai o nome do e-commerce diretamente do webhook (sem chamadas externas)
 	const nomeEcommerce = tinyResponse?.pedido?.ecommerce?.nomeEcommerce
@@ -310,6 +309,7 @@ export async function processOrderFromTiny(tinyResponse) {
 		console.error("[processOrderFromTiny] Campo 'pedido.ecommerce.nomeEcommerce' não encontrado no webhook")
 		throw new Error("Webhook Tiny inválido: falta identificação da loja")
 	}
+	console.log("[processOrderFromTiny] nomeEcommerce Tiny:", nomeEcommerce)
 
 	// Verifica se a loja é reconhecida (Outlet ou Arte Própria)
 	const storeNumeric = storeMapping.tinyNameToNumeric?.[nomeEcommerce]
