@@ -298,13 +298,15 @@ export async function processOrderFromNuvemshop(nuvemData) {
 // Função para processar um pedido da Tiny (similar)
 export async function processOrderFromTiny(tinyResponse) {
 	console.log("[processOrderFromTiny] Iniciando processamento do pedido Tiny")
+	console.log("[processOrderFromTiny] Pedido Tiny:",tinyResponse)
+	
 	const idEcom = tinyResponse.pedido.ecommerce.id
 	const cpfEcom = cleanCpfCnpj(tinyResponse.pedido.cliente.cpf_cnpj)
 	console.log(`[processOrderFromTiny] ID ecommerce: ${idEcom}, CPF: ${cpfEcom}`)
 
 	// Busca o pedido completo no Tiny
 	const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
-	console.log("[processOrderFromTiny] Pedido completo obtido")
+	console.log("[processOrderFromTiny] Pedido completo obtido:",tinyOrder)
 
 	// Busca a nota fiscal
 	const note = await fetchNoteOrderTiny(idEcom, cpfEcom)
