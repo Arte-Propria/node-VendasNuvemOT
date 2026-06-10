@@ -376,7 +376,6 @@ export async function processOrderFromTiny(tinyResponse) {
 	const updateRecord = {
 		order_id: firstOrder.order_id,
 		products: firstOrder.products,
-		shipping_option: firstOrder.shipping_option,
 		updated_at: firstOrder.updated_at,
 		shipping_status: firstOrder.shipping_status,
 		url_tracking: firstOrder.url_tracking,

@@ -380,7 +380,7 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 		coupons: [],
 		coupon_discount: parseFloat(pedido.valor_desconto) || 0,
 		products: produtosDelivery.map((p) => p.cod_categoria),
-		shipping_option: pedido.forma_envio || pedido.forma_frete || null,
+		shipping_option: null,
 		created_at: now,
 		paid_at: null,
 		updated_at: now,
