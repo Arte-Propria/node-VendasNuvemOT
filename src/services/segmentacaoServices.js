@@ -297,16 +297,20 @@ export async function processOrderFromNuvemshop(nuvemData) {
 
 // Função para processar um pedido da Tiny (similar)
 export async function processOrderFromTiny(tinyResponse) {
+	console.log("[processOrderFromTiny] Iniciando processamento do pedido Tiny")
 	const idEcom = tinyResponse.pedido.ecommerce.id
 	const cpfEcom = cleanCpfCnpj(tinyResponse.pedido.cliente.cpf_cnpj)
+	console.log(`[processOrderFromTiny] ID ecommerce: ${idEcom}, CPF: ${cpfEcom}`)
 
 	// Busca o pedido completo no Tiny
 	const tinyOrder = await fetchOrderTiny(idEcom, cpfEcom)
+	console.log("[processOrderFromTiny] Pedido completo obtido")
+
 	// Busca a nota fiscal
 	const note = await fetchNoteOrderTiny(idEcom, cpfEcom)
 	const tinyNoteOrder = await fetchLinkNote(note.id)
+	console.log("[processOrderFromTiny] Nota fiscal obtida:", tinyNoteOrder ? "sim" : "não")
 
-	// Mapeia usando o link da nota
 	const delivery = await mapTinyToDelivery(tinyOrder, tinyNoteOrder)
 
 	const safeDelivery = {
@@ -318,12 +322,14 @@ export async function processOrderFromTiny(tinyResponse) {
 	}
 
 	// 1. Clientes
+	console.log("[processOrderFromTiny] Inserindo/atualizando clientes")
 	for (const client of safeDelivery.clients) {
 		const record = dataBaseDb.clients.transform(client)
 		await upsertClient(record)
 	}
 
 	// 2. Produtos
+	console.log("[processOrderFromTiny] Inserindo/atualizando produtos")
 	for (const prod of safeDelivery.product) {
 		const record = dataBaseDb.product.transform(prod)
 		await upsertProduct(record)
@@ -332,10 +338,9 @@ export async function processOrderFromTiny(tinyResponse) {
 	// 3. Pedido
 	const firstOrder = safeDelivery.orders_shop[0]
 	if (firstOrder) {
-		// Normaliza order_id para número
 		firstOrder.order_id = Number(firstOrder.order_id)
+		console.log(`[processOrderFromTiny] Processando pedido ID: ${firstOrder.order_id}`)
 		const fullRecord = dataBaseDb.orders_shop.transform(firstOrder)
-		// Campos que podem ser atualizados posteriormente (ex: rastreamento, situação, nota fiscal)
 		const updateRecord = {
 			order_id: firstOrder.order_id,
 			products: firstOrder.products,
@@ -349,36 +354,35 @@ export async function processOrderFromTiny(tinyResponse) {
 			shipping_cost: firstOrder.shipping_cost
 		}
 		await upsertOrderShop(updateRecord, fullRecord)
+		console.log(`[processOrderFromTiny] Pedido ${firstOrder.order_id} salvo/atualizado`)
+	} else {
+		console.warn("[processOrderFromTiny] Nenhum pedido encontrado no payload")
+		return
 	}
 
 	// 4. Tiny não envia cupons – nada a fazer
 
 	// 5. Daily sales
-	if (firstOrder) {
-		// Extrai a data do pedido (formato dd/mm/aaaa)
-		const pedido = tinyResponse.retorno.pedido // ou tinyOrder.retorno.pedido
-		const [dia, mes, ano] = pedido.data_pedido.split("/")
-		const orderDate = `${ano}-${mes}-${dia}`
+	console.log("[processOrderFromTiny] Atualizando daily_sales")
+	const pedido = tinyResponse.retorno.pedido
+	const [dia, mes, ano] = pedido.data_pedido.split("/")
+	const orderDate = `${ano}-${mes}-${dia}`
+	console.log(`[processOrderFromTiny] Data do pedido: ${orderDate}`)
 
-		// Mapeia a loja
-		const storeName = pedido.ecommerce?.nomeEcommerce?.toLowerCase()
-		let storeNumeric = null
-		if (storeName === "outletdosquadros") storeNumeric = 3889735
-		else if (storeName === "artepropria") storeNumeric = 1146504
-		else storeNumeric = storeMapping.tinyNameToNumeric?.[storeName]
-
-		if (!storeNumeric) {
-			console.warn(`Loja não mapeada: ${storeName}. Usando string original.`)
-			storeNumeric = storeName // fallback
-		}
-
-		// Busca IDs de anúncios para esta data e loja (nome amigável)
+	// Mapeamento usando storeMapping.tinyNameToNumeric
+	const storeNameTiny = pedido.ecommerce?.nomeEcommerce // "OUTLETDOSQUADROS"
+	const storeNumeric = storeMapping.tinyNameToNumeric?.[storeNameTiny]
+	if (!storeNumeric) {
+		console.error(`[processOrderFromTiny] Loja Tiny não reconhecida: ${storeNameTiny}. Pedido ${firstOrder.order_id} ignorado para daily_sales.`)
+	} else {
+		console.log(`[processOrderFromTiny] Loja mapeada: ${storeNameTiny} -> ${storeNumeric}`)
+		const storeNameForAds = storeMapping.numericToTinyName[storeNumeric]
 		let adsIds = []
-		const storeNameForAds = storeMapping.numericToTinyName?.[storeNumeric]
 		if (storeNameForAds) {
 			const adsSql = `SELECT id_ads FROM ${dataBase.ads} WHERE date_ads = $1 AND store = $2`
 			const adsResult = await query(adsSql, [orderDate, storeNameForAds])
 			adsIds = adsResult.rows.map((row) => row.id_ads)
+			console.log(`[processOrderFromTiny] ${adsIds.length} anúncios encontrados para ${orderDate}`)
 		}
 
 		const currentOrderData = {
@@ -389,9 +393,8 @@ export async function processOrderFromTiny(tinyResponse) {
 			status: pedido.situacao === "Cancelado" ? "cancelled" : "open",
 			ads_ids: adsIds
 		}
-
 		await upsertDailySales(orderDate, storeNumeric, currentOrderData)
-	} else {
-		console.warn("⚠️ Nenhum pedido encontrado no payload do Tiny.")
+		console.log(`[processOrderFromTiny] Daily sales atualizado para data ${orderDate}, loja ${storeNumeric}`)
 	}
+	console.log("[processOrderFromTiny] Processamento finalizado")
 }

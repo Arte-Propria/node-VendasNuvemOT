@@ -288,15 +288,17 @@ export function mapNuvemshopToDelivery(nuvemData) {
 }
 
 export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
+	console.log("[mapTinyToDelivery] Iniciando mapeamento do pedido Tiny")
 	const pedido = tinyData.retorno.pedido
 	const orderNumber = extractOrderNumber(tinyData)
 	if (!orderNumber) throw new Error("Número do pedido não encontrado no Tiny")
+	console.log(`[mapTinyToDelivery] orderNumber: ${orderNumber}`)
+
 	const now = new Date().toISOString()
 
 	// ----- Cliente -----
 	const c = pedido.cliente
-	const clienteId =
-    cleanCpfCnpj(c.cpf_cnpj) || c.email || `temp_${orderNumber}`
+	const clienteId = cleanCpfCnpj(c.cpf_cnpj) || c.email || `temp_${orderNumber}`
 	const clienteDelivery = {
 		id_cli: null,
 		cpf_cnpj_cli: cleanCpfCnpj(c.cpf_cnpj),
@@ -315,6 +317,7 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 		dt_att_ativo: now,
 		origem_cli: null
 	}
+	console.log(`[mapTinyToDelivery] Cliente: ${clienteId} - ${c.nome}`)
 
 	// ----- Produtos -----
 	const produtosDelivery = (pedido.itens || []).map((item) => {
@@ -325,9 +328,7 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 		const tipo = extractFinishType(productName)
 		const nomeCategoria = classifyProductCategory(productName)
 		return {
-			cod_categoria: (
-				prodItem.codigo || `tiny_${prodItem.id_produto}`
-			).toUpperCase(),
+			cod_categoria: (prodItem.codigo || `tiny_${prodItem.id_produto}`).toUpperCase(),
 			nome_categoria: nomeCategoria,
 			desc_categoria: prodItem.descricao,
 			grp_categoria: null,
@@ -343,22 +344,23 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 			preco: parseFloat(prodItem.valor_unitario) || 0
 		}
 	})
+	console.log(`[mapTinyToDelivery] ${produtosDelivery.length} produtos mapeados`)
 
 	// ----- Cupons (nenhum) -----
 	const couponsDelivery = []
 
 	// ----- Dados adicionais do pedido -----
-	const markers = (pedido.marcadores || [])
-		.map((m) => m.marcador?.descricao)
-		.filter(Boolean)
+	const markers = (pedido.marcadores || []).map((m) => m.marcador?.descricao).filter(Boolean)
 	const trackingUrl = pedido.url_rastreamento || null
 	let estimatedDelivery = null
 	if (pedido.data_prevista) {
 		const [dia, mes, ano] = pedido.data_prevista.split("/")
 		estimatedDelivery = `${ano}-${mes}-${dia}`
+		console.log(`[mapTinyToDelivery] Data prevista calculada: ${estimatedDelivery}`)
 	}
 	const shippingCostValue = toNumber(pedido.valor_frete)
 	const shippingStatus = pedido.situacao || null
+	console.log(`[mapTinyToDelivery] Status do pedido: ${shippingStatus}, frete: ${shippingCostValue}`)
 
 	// ----- Pedido (todos os campos que a tabela orders_shop espera) -----
 	const orderDelivery = {
@@ -367,8 +369,8 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 		store: pedido.ecommerce?.nomeEcommerce || null,
 		total: parseFloat(pedido.total_pedido) || 0,
 		subtotal: parseFloat(pedido.total_produtos) || 0,
-		payment_status: null, // Tiny não informa
-		coupons: [], // Tiny não tem cupons
+		payment_status: null,
+		coupons: [],
 		coupon_discount: parseFloat(pedido.valor_desconto) || 0,
 		products: produtosDelivery.map((p) => p.cod_categoria),
 		shipping_option: pedido.forma_envio || pedido.forma_frete || null,
@@ -376,7 +378,6 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 		paid_at: null,
 		updated_at: now,
 		active: pedido.situacao !== "Cancelado",
-		// Novas colunas
 		gateway_link: null,
 		payment_method: null,
 		shipping_status: shippingStatus,
@@ -386,13 +387,11 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 		estimated_delivery: estimatedDelivery,
 		shipping_cost: shippingCostValue
 	}
-
-	// ----- Ads (não disponível) -----
-	const adsDelivery = []
+	console.log(`[mapTinyToDelivery] Pedido ${orderDelivery.order_id} mapeado. Nota fiscal: ${fiscalNoteLink ? "presente" : "não disponível"}`)
 
 	return {
 		orders_shop: [orderDelivery],
-		ads: adsDelivery,
+		ads: [],
 		coupons: couponsDelivery,
 		product: produtosDelivery,
 		clients: [clienteDelivery]
