@@ -76,7 +76,13 @@ import {
 	executeFullBatchUpdate
 } from "../controllers/mandaeControllers.js"
 import { testWebhook } from "../controllers/galeria9Controllers.js"
-import { getDbQuery, postDbQueryNuvemshop, postDbQueryTiny, postDbQueryAds } from "../controllers/segmentacaoControllers.js"
+import {
+	getDbQuery,
+	postDbQueryNuvemshop,
+	postDbQueryTiny,
+	postDbQueryAds,
+	syncOrders
+} from "../controllers/segmentacaoControllers.js"
 import { getNuvemshopCallback } from "../controllers/authNuvemshop.js"
 import { getStatusPlatform } from "../controllers/statusPlatformController.js"
 import { generateTagsIA } from "../controllers/generateTagsControllers.js"
@@ -121,7 +127,8 @@ router.get("/analytics/:store/:createdAtMin/:createdAtMax", getAnalytics)
 // Rotas TikTok
 router.get("/tiktok/auth", getTikTokAuth)
 router.get("/ads/tiktok/:store/:createdAtMin/:createdAtMax", getTikTokAds)
-router.get("/creatives/tiktok/:store/:createdAtMin/:createdAtMax", getTikTokCreatives)
+router.get("/creatives/tiktok/:store/:createdAtMin/:createdAtMax",
+	getTikTokCreatives)
 
 // Autenticação Shopee
 router.get("/shopee/auth", getShopeeAuth)
@@ -148,9 +155,10 @@ router.delete("/order/:store/:ownerNote", deleteOrderByOwnerNote) // Adicione a 
 router.post("/webhooks/order-created", createdOrderWebhook) // Nuvemshop
 router.post("/webhooks/order-marketplace", createOrderMarketplaceWebhook) // Tiny
 router.post("/webhook/mandae", mandaeWebhook) // Webhook para atualizações da Mandae
-router.post("/webhook/db/nuvemshop", postDbQueryNuvemshop) // Rotas pedidos Nuvemshop via webhook 
-router.post("/webhook/db/tiny", postDbQueryTiny) // Rotas pedidos tiny via webhook 
+router.post("/webhook/db/nuvemshop", postDbQueryNuvemshop) // Rotas pedidos Nuvemshop via webhook
+router.post("/webhook/db/tiny", postDbQueryTiny) // Rotas pedidos tiny via webhook
 router.post("/webhook/db/:ads/:store/:date", postDbQueryAds) // atualizar ads db via cron job
+router.post("/sync/orders/:store", syncOrders) // Endpoint para disparar sincronização manual: POST /sync/orders/:store
 
 // TINY ESINTEGRADA
 // router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
@@ -162,8 +170,10 @@ router.get("/tiny/note/:id/:cpf", getNoteOrderTiny)
 
 // -- Conferencia de sku
 router.get("/comparar/:store/:dataInicial/:dataFinal", compararPedidos)
-router.get("/comparar_tiny/:store/:dataInicial/:dataFinal", compararPedidosTiny)
-router.get("/comparar_nuvem/:store/:dataInicial/:dataFinal", compararPedidoNuvem)
+router.get("/comparar_tiny/:store/:dataInicial/:dataFinal",
+	compararPedidosTiny)
+router.get("/comparar_nuvem/:store/:dataInicial/:dataFinal",
+	compararPedidoNuvem)
 
 // Rotas Mandae
 router.get("/mandae", getOMandaeInfo)
@@ -173,16 +183,20 @@ router.get("/debug/:cod_ped", executeBatchUpdate)
 router.get("/batch-update", executeFullBatchUpdate)
 
 // Rotas de reembolsos
-router.get("/refunds/:store/:refundType/:createdAtMin/:createdAtMax", getRefunds)
+router.get("/refunds/:store/:refundType/:createdAtMin/:createdAtMax",
+	getRefunds)
 router.post("/refunds/:store", createRefund)
 router.delete("/refunds/:store/:id", deleteRefund)
 
 // Rotas Marketplace
-router.get("/marketplace/orders/:marketplace/:createdAtMin/:createdAtMax", getOrdersByMarketplace)
-router.get("/marketplace/orders/:createdAtMin/:createdAtMax", getOrdersAllMarketplace)
+router.get("/marketplace/orders/:marketplace/:createdAtMin/:createdAtMax",
+	getOrdersByMarketplace)
+router.get("/marketplace/orders/:createdAtMin/:createdAtMax",
+	getOrdersAllMarketplace)
 router.get("/update-orders-by-date/marketplace", updateOrdersMarketplaceByDate) // Atualiza os pedidos do marketplace por data
 // Rotas PCP
-router.get("/pcp/orders/:createdAtMin/:createdAtMax", getOrdersAllMarketplaceOptimized)
+router.get("/pcp/orders/:createdAtMin/:createdAtMax",
+	getOrdersAllMarketplaceOptimized)
 router.post("/pcp/ads/marketplace", createAdsMarketplace)
 router.get("/pcp/ads/marketplace", getAdsMarketplace)
 
@@ -194,7 +208,7 @@ router.get("/chatfunnel/:store/categories", getCategoriesChatFunnel)
 // Rotas ChatFunnel
 router.get("/tracking/:id", testarBuscaRastreioIsolada)
 
-// Rotas galeria9 teste 
+// Rotas galeria9 teste
 router.get("/teste/galeria9", testWebhook)
 
 // Rotas teste Db query
@@ -207,6 +221,5 @@ router.get("/apps/nuvemshop/callback", getNuvemshopCallback)
 router.get("/status/platform/:platform", getStatusPlatform)
 
 router.get("/generate-tags/ia/:store/:date/:idMax/:idMin", generateTagsIA)
-
 
 export default router

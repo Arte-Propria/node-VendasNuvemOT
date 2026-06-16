@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node scripts/rebuildDailySales.mjs --store=both > /tmp/rebuild_dry.out 2>&1)",
+      "Bash(node _q22.mjs)",
+      "Bash(node scripts/rebuildDailySales.mjs --store=both --apply)",
+      "Bash(node --check src/db/upsert.js)",
+      "Bash(node --check scripts/rebuildDailySales.mjs)",
+      "Bash(node _test_recompute.mjs)",
+      "Bash(node --check src/services/dailySalesRecalc.js)",
+      "Bash(node scripts/rebuildDailySales.mjs --store=both --start=2026-01-26 --end=2026-01-26 --verbose)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

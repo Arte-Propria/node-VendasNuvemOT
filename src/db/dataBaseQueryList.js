@@ -11,7 +11,8 @@ import {
 	extractColor,
 	extractFinishType,
 	calculateEstimatedDeliveryDate,
-	shippingCost
+	shippingCost,
+	toLocalDateBR
 } from "../tools/helpers.js"
 import {
 	fetchLinkNote,
@@ -160,8 +161,8 @@ export const storeMapping = {
 	},
 	//Mapeamentoo para o tiny
 	tinyNameToNumeric: {
-		"OUTLETDOSQUADROS": 3889735,
-		"ARTEPROPRIA": 1146504,
+		OUTLETDOSQUADROS: 3889735,
+		ARTEPROPRIA: 1146504,
 		"SITE OUTLET": 3889735,
 		"SITE ARTEPROPRIA": 1146504
 	},
@@ -213,7 +214,13 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	const produtosDelivery = (nuvemData?.products || []).map((prod) => {
 		const productName = prod.name_without_variants || prod.name
 		const dimensao = extractDimensions(productName)
-		const cor = extractColor(productName)?.toUpperCase() || "-"
+		// Cor: a variante (ex.: "Caramelo") não está em name_without_variants. Usa a
+		// variante estruturada (variant_values) e, em fallback, o parêntese do nome completo.
+		const variantColor =
+      Array.isArray(prod.variant_values) && prod.variant_values.length ? prod.variant_values.join(" ").trim() : null
+		const cor = ( variantColor ||
+        extractColor(prod.name) ||
+        extractColor(productName))?.toUpperCase() || "-"
 		const tipo = extractFinishType(productName)
 		const now = new Date().toISOString()
 
@@ -239,13 +246,20 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	//logWebhookDB("produtosDelivery:", produtosDelivery)
 
 	// Cupons
-	const couponsDelivery = (nuvemData?.coupon || []).map((coupon) => ({
+	// B6: date_coupon como data pura (YYYY-MM-DD) para casar com o lookup do daily_sales
+	//     e garantir a agregação por dia no ON CONFLICT (name, date_coupon).
+	//     Usa o dia de negócio (BRT, UTC-3) — mesmo critério do daily_sales.
+	const couponDate = toLocalDateBR(nuvemData?.created_at)
+	// B5: discount_coupon é o desconto TOTAL do pedido — atribuído só ao 1º cupom para
+	//     não multiplicar o desconto quando houver vários cupons no mesmo pedido.
+	const couponsDelivery = (nuvemData?.coupon || []).map((coupon, idx) => ({
 		//id_coupon: coupon.id?.toString() || `cupom_${orderNumber}`,
-		date_coupon: toISOString(nuvemData?.created_at),
+		date_coupon: couponDate,
 		name: coupon.code,
-		quantity: coupon.used || 1,
+		// 1 uso por pedido (coupon.used é o total global do cupom na loja, não deste pedido)
+		quantity: 1,
 		total_money: toNumber(coupon.value),
-		total_discount: toNumber(nuvemData?.discount_coupon),
+		total_discount: idx === 0 ? toNumber(nuvemData?.discount_coupon) : 0,
 		order_ids: [orderNumber]
 	}))
 	//logWebhookDB("couponsDelivery:", couponsDelivery)
@@ -254,7 +268,8 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	const orderDelivery = {
 		order_id: orderNumber,
 		id_cli: clienteId,
-		store: nuvemData?.store_id || null,
+		// Q1: store numérico canônico (mesmo formato do fluxo Tiny)
+		store: nuvemData?.store_id ? Number(nuvemData.store_id) : null,
 		total: toNumber(nuvemData?.total),
 		subtotal: toNumber(nuvemData?.subtotal),
 		payment_status: nuvemData?.payment_status || null,
@@ -262,14 +277,15 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		coupon_discount: toNumber(nuvemData?.discount_coupon),
 		products: produtosDelivery.map((p) => p.cod_categoria),
 		shipping_option: nuvemData?.shipping_option || null,
-		created_at: now,
+		// C4: preserva a data real de criação do pedido (fallback para agora)
+		created_at: toISOString(nuvemData?.created_at) || now,
 		paid_at: toISOString(nuvemData?.paid_at),
 		updated_at: now,
 		active: nuvemData?.status !== "cancelled",
 		gateway_link: nuvemData?.gateway_link || null,
 		payment_method: nuvemData?.payment_details?.method || null,
 		shipping_status: nuvemData?.shipping_status || null,
-		url_tracking: nuvemData?.shipping_tracking_url || null, 
+		url_tracking: nuvemData?.shipping_tracking_url || null,
 		markers_order_tiny: null,
 		fiscal_note: null,
 		estimated_delivery: calculateEstimatedDeliveryDate(nuvemData?.created_at,
@@ -373,7 +389,12 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 	const orderDelivery = {
 		order_id: Number(orderNumber),
 		id_cli: clienteId,
-		store: pedido.ecommerce?.nomeEcommerce || null,
+		// Q1: persiste o código numérico canônico da loja (igual ao Nuvemshop),
+		//     com fallback para o nome do ecommerce caso não esteja mapeado.
+		store:
+      storeMapping.tinyNameToNumeric?.[pedido.ecommerce?.nomeEcommerce] ||
+      pedido.ecommerce?.nomeEcommerce ||
+      null,
 		total: parseFloat(pedido.total_pedido) || 0,
 		subtotal: parseFloat(pedido.total_produtos) || 0,
 		payment_status: null,
@@ -381,7 +402,8 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 		coupon_discount: parseFloat(pedido.valor_desconto) || 0,
 		products: produtosDelivery.map((p) => p.cod_categoria),
 		shipping_option: null,
-		created_at: now,
+		// C4: usa a data do pedido (dd/mm/aaaa → ISO); created_at não é atualizável depois
+		created_at: toISOString(pedido.data_pedido) || now,
 		paid_at: null,
 		updated_at: now,
 		active: pedido.situacao !== "Cancelado",

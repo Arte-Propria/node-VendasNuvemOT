@@ -14,22 +14,23 @@ import {
 	upsertDailySales
 } from "../db/upsert.js"
 import { query } from "../db/db.js"
-import { toNumber, cleanCpfCnpj } from "../tools/helpers.js"
+import { toNumber, cleanCpfCnpj, toLocalDateBR } from "../tools/helpers.js"
 import {
 	fetchLinkNote,
 	fetchNoteOrderTiny,
 	fetchOrderTiny
 } from "../services/orderTinyServices.js"
+import axios from "axios"
 
 // 1. Função para realizar o MAP dos itens, com base em qual query será acessada
 // o parametro querySelect será usado para:
 // - fazer o fetch;
 // - usando switch case, o querySelect vai definir qual caso será usado para a requisição
-export const fetchRequest = async (queryData, querySelect) => {
+export const fetchRequest = async (queryResult, querySelect) => {
 	let allRequests = []
 
 	try {
-		const response = queryData
+		const response = queryResult
 
 		const result = response.rows.map((delivery) => {
 			// o objeto dataBase possui o nome de cada banco de dados
@@ -102,7 +103,7 @@ export const filterBdByDateRange = (queryData,
 			[dataBase.coupon]: "date_coupon",
 			[dataBase.daily_sales]: "date_sales",
 			[dataBase.orders_shop]: "created_at",
-			[dataBase.product]: "lastDate"
+			[dataBase.product]: "dt_att_categoria"
 		}
 
 		// Obter o campo de data correto para a tabela
@@ -243,11 +244,12 @@ export async function processOrderFromNuvemshop(nuvemData) {
 	// Aplicar transforms e simular upsert
 	//console.log("\n--- REGISTROS A SEREM PERSISTIDOS ---")
 
-	// Dentro de processOrderFromNuvemshop
+	// C3: captura o id_cli serial do cliente para vincular ao pedido (FK real)
+	let clientId = null
 	for (const client of safeDelivery.clients) {
 		const record = dataBaseDb.clients.transform(client)
 		//console.log("Client record:", record) // debug
-		await upsertClient(record)
+		clientId = await upsertClient(record)
 	}
 	for (const prod of safeDelivery.product) {
 		const record = dataBaseDb.product.transform(prod)
@@ -255,6 +257,8 @@ export async function processOrderFromNuvemshop(nuvemData) {
 		await upsertProduct(record)
 	}
 	for (const order of safeDelivery.orders_shop) {
+		// C3: usa o id_cli serial; se não houver cliente resolvido, mantém o fallback do map
+		if (clientId != null) order.id_cli = clientId
 		const record = dataBaseDb.orders_shop.transform(order)
 		//console.log("Order record:", record) // debug
 		await upsertRecord(dataBase.orders_shop, record, "order_id")
@@ -268,7 +272,7 @@ export async function processOrderFromNuvemshop(nuvemData) {
 	// Dentro de processOrderFromNuvemshop, após o upsert do pedido
 	const firstOrder = safeDelivery.orders_shop[0]
 	if (firstOrder) {
-		const orderDate = nuvemData?.created_at?.split("T")[0]
+		const orderDate = toLocalDateBR(nuvemData?.created_at) // dia de negócio (BRT, UTC-3)
 		const storeId = nuvemData?.store_id?.toString() // "3889735"
 		if (orderDate && storeId) {
 			// Converte código numérico para nome amigável (ex: "outlet")
@@ -294,7 +298,8 @@ export async function processOrderFromNuvemshop(nuvemData) {
 				ads_ids: adsIds
 			}
 
-			await upsertDailySales(orderDate, storeId, currentOrderData) // storeId é numérico
+			// Q1: store numérico canônico (mesmo formato usado no fluxo Tiny)
+			await upsertDailySales(orderDate, parseInt(storeId, 10), currentOrderData)
 		}
 	}
 }
@@ -352,10 +357,11 @@ export async function processOrderFromTiny(tinyResponse) {
 		ads: Array.isArray(delivery.ads) ? delivery.ads : []
 	}
 
-	// 1. Clientes
+	// 1. Clientes — captura o id_cli serial para vincular ao pedido (C3)
+	let clientId = null
 	for (const client of safeDelivery.clients) {
 		const record = dataBaseDb.clients.transform(client)
-		await upsertClient(record)
+		clientId = await upsertClient(record)
 	}
 
 	// 2. Produtos
@@ -370,6 +376,7 @@ export async function processOrderFromTiny(tinyResponse) {
 		throw new Error("[processOrderFromTiny] Nenhum pedido encontrado após mapeamento")
 	}
 	firstOrder.order_id = Number(firstOrder.order_id)
+	if (clientId != null) firstOrder.id_cli = clientId // C3: FK real para clientes.id_cli
 	console.log(`[processOrderFromTiny] Processando pedido ID: ${firstOrder.order_id}`)
 
 	const fullRecord = dataBaseDb.orders_shop.transform(firstOrder)
@@ -382,7 +389,8 @@ export async function processOrderFromTiny(tinyResponse) {
 		markers_order_tiny: markers,      // <-- já extraído do webhook
 		fiscal_note: fiscalNoteLink,      // <-- link obtido
 		estimated_delivery: firstOrder.estimated_delivery,
-		shipping_cost: firstOrder.shipping_cost
+		shipping_cost: firstOrder.shipping_cost,
+		active: firstOrder.active ? 1 : 0  // B4: reflete cancelamento no pedido já existente
 	}
 	await upsertOrderShop(updateRecord, fullRecord)
 	console.log(`[processOrderFromTiny] Pedido ${firstOrder.order_id} salvo/atualizado`)
@@ -413,4 +421,69 @@ export async function processOrderFromTiny(tinyResponse) {
 	console.log(`[processOrderFromTiny] Daily sales atualizado para data ${orderDate}, loja ${storeNumeric}`)
 	console.log("[processOrderFromTiny] Processamento finalizado")
 	return { processed: true, orderId: firstOrder.order_id }
+}
+
+/**
+ * Sincroniza pedidos de uma loja Nuvemshop a partir do endpoint interno.
+ * @param {number|string} store - ID da loja (ex: 3889735)
+ * @param {Object} options - Opções de controle
+ * @param {number} options.delayMs - Atraso entre requisições de pedidos (ms)
+ * @param {boolean} options.skipExisting - Se true, pula pedidos já existentes no banco
+ * @returns {Promise<Object>} Resumo da sincronização
+ */
+export async function syncNuvemshopOrders(storeName, options = { delayMs: 100, skipExisting: true }) {
+	console.log(`[syncNuvemshopOrders] Iniciando sincronização para loja ${storeName}`)
+	const baseUrl = process.env.API_BASE_URL || "https://node-vendasnuvemot.onrender.com"
+	const url = `${baseUrl}/db/orders/${storeName}`  // usa o nome diretamente
+
+	let orders = []
+	try {
+		const response = await axios.get(url)
+		orders = response.data
+		console.log(`[syncNuvemshopOrders] Obtidos ${orders.length} pedidos da API`)
+	} catch (error) {
+		console.error("[syncNuvemshopOrders] Erro ao buscar pedidos:", error.message)
+		throw new Error(`Falha ao obter pedidos: ${error.message}`)
+	}
+
+	const results = {
+		total: orders.length,
+		processed: 0,
+		skipped: 0,
+		errors: []
+	}
+
+	for (const order of orders) {
+		const orderId = order.number || order.order_id
+		if (!orderId) {
+			results.errors.push({ order: order, error: "order_id não encontrado" })
+			continue
+		}
+
+		if (options.skipExisting) {
+			const checkSql = `SELECT order_id FROM ${dataBase.orders_shop} WHERE order_id = $1`
+			const existing = await query(checkSql, [orderId])
+			if (existing.rows.length > 0) {
+				console.log(`[syncNuvemshopOrders] Pedido ${orderId} já existe, ignorado.`)
+				results.skipped++
+				continue
+			}
+		}
+
+		try {
+			await processOrderFromNuvemshop(order)
+			console.log(`[syncNuvemshopOrders] Pedido ${orderId} processado com sucesso.`)
+			results.processed++
+		} catch (err) {
+			console.error(`[syncNuvemshopOrders] Erro ao processar pedido ${orderId}:`, err.message)
+			results.errors.push({ orderId, error: err.message })
+		}
+
+		if (options.delayMs > 0) {
+			await new Promise((resolve) => setTimeout(resolve, options.delayMs))
+		}
+	}
+
+	console.log(`[syncNuvemshopOrders] Sincronização concluída. Processados: ${results.processed}, Ignorados: ${results.skipped}, Erros: ${results.errors.length}`)
+	return results
 }

@@ -2,7 +2,8 @@ import {
 	fetchRequest,
 	filterBdByDateRange,
 	processOrderFromTiny,
-	processOrderFromNuvemshop
+	processOrderFromNuvemshop,
+	syncNuvemshopOrders
 } from "../services/segmentacaoServices.js"
 import {
 	fetchMetaAdsByDate,
@@ -46,7 +47,9 @@ export const postDbQueryNuvemshop = async (req, res) => {
 			.status(200)
 			.json({ message: "Pedido processado com sucesso (simulação Nuvemshop)" })
 	} catch (error) {
-		return res.status(200)
+		// Q6: não engolir o erro — registra e responde com status apropriado
+		console.error("Erro ao processar pedido Nuvemshop:", error)
+		return res.status(500).json({ error: error.message })
 	}
 }
 
@@ -105,6 +108,27 @@ export const postDbQueryAds = async (req, res) => {
 		})
 	} catch (error) {
 		console.error("Erro no Google webhook:", error)
+		res.status(500).json({ error: error.message })
+	}
+}
+
+export const syncOrders = async (req, res) => {
+	try {
+		const { store } = req.params // 'outlet' ou 'artepropria'
+		// Validação básica
+		if (store !== "outlet" && store !== "artepropria") {
+			return res.status(400).json({ error: "Loja inválida. Use \"outlet\" ou \"artepropria\"." })
+		}
+
+		const options = {
+			delayMs: req.query.delay ? parseInt(req.query.delay, 10) : 100,
+			skipExisting: req.query.skipExisting !== "false"
+		}
+
+		const result = await syncNuvemshopOrders(store, options)
+		res.status(200).json(result)
+	} catch (error) {
+		console.error("Erro na sincronização:", error)
 		res.status(500).json({ error: error.message })
 	}
 }

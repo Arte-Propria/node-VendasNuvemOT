@@ -44,6 +44,18 @@ export const toISOString = (dateStr) => {
 	return new Date(dateStr).toISOString()
 }
 
+/**
+ * Retorna a data (YYYY-MM-DD) de um instante no fuso de negócio (Brasil).
+ * Usa America/Sao_Paulo para respeitar o histórico de horário de verão (extinto em 2019),
+ * evitando que vendas da madrugada (UTC) caiam no dia errado em daily_sales/cupom.
+ */
+export const toLocalDateBR = (input) => {
+	if (!input) return null
+	const d = input instanceof Date ? input : new Date(input)
+	if (isNaN(d.getTime())) return null
+	return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })
+}
+
 // Extrai o número do pedido (identificador único) dos dados da Tiny
 export const extractOrderNumber = (tinyData) => {
 	const pedido = tinyData.retorno.pedido
@@ -75,6 +87,23 @@ export const removeNullFields = (obj) => {
 		}
 	}
 	return cleanObj
+}
+
+/**
+ * Parse seguro de um campo que pode vir como array já parseado (JSONB pelo driver pg)
+ * ou como string JSON (coluna TEXT). Retorna sempre um array (vazio em caso de falha).
+ */
+export const parseJsonArray = (value) => {
+	if (Array.isArray(value)) return value
+	if (typeof value === "string") {
+		try {
+			const parsed = JSON.parse(value)
+			return Array.isArray(parsed) ? parsed : []
+		} catch (e) {
+			return []
+		}
+	}
+	return []
 }
 
 // ==================== extração de atributos do nome do produto ====================

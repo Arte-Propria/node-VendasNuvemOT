@@ -1,44 +1,78 @@
-import { removeNullFields,toNumber } from "../tools/helpers.js"
+import { removeNullFields, toNumber, parseJsonArray } from "../tools/helpers.js"
 import { query } from "../db/db.js"
 import { dataBase, storeMapping } from "./dataBaseQueryList.js"
 import { logWebhookDB } from "../utils/logger.js"
 
+// Q2: só permitimos operar nas tabelas conhecidas e validamos os identificadores SQL,
+// já que tableName/campos são interpolados na query (defesa contra injeção caso algum
+// dia cheguem de input externo).
+const ALLOWED_TABLES = new Set(Object.values(dataBase))
+const IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+
+function assertValidIdentifier(name) {
+	if (!IDENTIFIER_REGEX.test(name)) {
+		throw new Error(`Identificador SQL inválido: ${name}`)
+	}
+}
+
 // Função genérica para upsert (insert or update) baseada em um campo de referência
 export async function upsertRecord(tableName, record, referenceField) {
+	if (!ALLOWED_TABLES.has(tableName)) {
+		throw new Error(`Tabela não permitida em upsertRecord: ${tableName}`)
+	}
+	assertValidIdentifier(referenceField)
+
 	const cleanRecord = removeNullFields(record)
+	Object.keys(cleanRecord).forEach(assertValidIdentifier)
 
 	const referenceValue = cleanRecord[referenceField]
 	if (!referenceValue) {
 		throw new Error(`Campo de referência ${referenceField} não encontrado no registro`)
 	}
 
-	// 1. Verificar se o registro já existe
-	const selectSql = `SELECT * FROM ${tableName} WHERE ${referenceField} = $1`
-	const selectResult = await query(selectSql, [referenceValue])
+	// Q5: corrida SELECT→INSERT — em conflito de unique (23505) tentamos de novo;
+	// na 2ª volta o registro já existe e cai no UPDATE.
+	const maxRetries = 3
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			// 1. Verificar se o registro já existe
+			const selectSql = `SELECT 1 FROM ${tableName} WHERE ${referenceField} = $1`
+			const selectResult = await query(selectSql, [referenceValue])
 
-	if (selectResult.rows.length > 0) {
-		// 2. Registro existe: fazer UPDATE
-		const fields = Object.keys(cleanRecord)
-		const setClause = fields
-			.map((field, index) => `${field} = $${index + 1}`)
-			.join(", ")
-		// O campo de referência é incluído no SET, mas também está no WHERE; isso é ok,
-		// mas para evitar alterar a chave, podemos removê-lo do SET (opcional).
-		// Neste exemplo, mantemos tudo, mas você pode ajustar.
-		const values = fields.map((field) => cleanRecord[field])
-		const updateSql = `UPDATE ${tableName} SET ${setClause} WHERE ${referenceField} = $${fields.length + 1}`
-		// Adiciona o valor da referência no final dos parâmetros
-		await query(updateSql, [...values, referenceValue])
-		logWebhookDB(`Registro atualizado em ${tableName} com ${referenceField} = ${referenceValue}`)
-	} else {
-		// 3. Registro não existe: fazer INSERT
-		const fields = Object.keys(cleanRecord)
-		const placeholders = fields.map((_, index) => `$${index + 1}`).join(", ")
-		const insertSql = `INSERT INTO ${tableName} (${fields.join(", ")}) VALUES (${placeholders})`
-		const values = fields.map((field) => cleanRecord[field])
-		await query(insertSql, values)
-		logWebhookDB(`Registro inserido em ${tableName} com ${referenceField} = ${referenceValue}`)
+			if (selectResult.rows.length > 0) {
+				// 2. Registro existe: UPDATE (sem alterar a própria chave de referência)
+				const fields = Object.keys(cleanRecord).filter((f) => f !== referenceField)
+				if (fields.length === 0) {
+					logWebhookDB(`Registro em ${tableName} (${referenceField}=${referenceValue}) sem campos para atualizar`)
+					return
+				}
+				const setClause = fields
+					.map((field, index) => `${field} = $${index + 1}`)
+					.join(", ")
+				const values = fields.map((field) => cleanRecord[field])
+				const updateSql = `UPDATE ${tableName} SET ${setClause} WHERE ${referenceField} = $${fields.length + 1}`
+				await query(updateSql, [...values, referenceValue])
+				logWebhookDB(`Registro atualizado em ${tableName} com ${referenceField} = ${referenceValue}`)
+			} else {
+				// 3. Registro não existe: INSERT
+				const fields = Object.keys(cleanRecord)
+				const placeholders = fields.map((_, index) => `$${index + 1}`).join(", ")
+				const insertSql = `INSERT INTO ${tableName} (${fields.join(", ")}) VALUES (${placeholders})`
+				const values = fields.map((field) => cleanRecord[field])
+				await query(insertSql, values)
+				logWebhookDB(`Registro inserido em ${tableName} com ${referenceField} = ${referenceValue}`)
+			}
+			return
+		} catch (error) {
+			if (error.code === "23505" && attempt < maxRetries) {
+				logWebhookDB(`Conflito de chave em ${tableName} (${referenceField}=${referenceValue}), tentativa ${attempt}/${maxRetries}...`)
+				await new Promise((resolve) => setTimeout(resolve, 100 * attempt))
+				continue
+			}
+			throw error
+		}
 	}
+	throw new Error(`Falha ao upsert em ${tableName} após ${maxRetries} tentativas`)
 }
 
 /**
@@ -117,7 +151,7 @@ export async function upsertOrderShop(updateRecord, fullRecord) {
 		const updatableFields = [
 			"products", "shipping_option", "updated_at", "shipping_status",
 			"url_tracking", "markers_order_tiny", "fiscal_note",
-			"estimated_delivery", "shipping_cost"
+			"estimated_delivery", "shipping_cost", "active"
 		]
 		// Filtra quais campos estão presentes em cleanUpdate
 		const fieldsToUpdate = updatableFields.filter((f) => cleanUpdate[f] !== undefined)
@@ -172,13 +206,24 @@ export async function upsertProduct(record) {
 		const changedFields = []
 		const updateValues = []
 
+		// B3: timestamps mudam a cada chamada → não entram na detecção de mudança;
+		// campos numéricos são comparados como número ("0" vs "0.00" não é mudança real).
+		const timestampFields = new Set(["dt_att_ativo", "dt_att_categoria"])
+		const numericFields = new Set(["custo_categoria", "preco", "ativo", "tempo_prod_categoria"])
+
 		for (const [key, newValue] of Object.entries(cleanRecord)) {
 			if (key === "cod_categoria") continue // não atualiza a chave
+			if (timestampFields.has(key)) continue // tratados abaixo, só se houver mudança real
 			const oldValue = existing[key]
-			// Comparação robusta (converte ambos para string quando necessário)
-			const newStr = (newValue === null || newValue === undefined) ? "" : String(newValue)
-			const oldStr = (oldValue === null || oldValue === undefined) ? "" : String(oldValue)
-			if (newStr !== oldStr) {
+			let changed
+			if (numericFields.has(key)) {
+				changed = toNumber(newValue) !== toNumber(oldValue)
+			} else {
+				const newStr = (newValue === null || newValue === undefined) ? "" : String(newValue)
+				const oldStr = (oldValue === null || oldValue === undefined) ? "" : String(oldValue)
+				changed = newStr !== oldStr
+			}
+			if (changed) {
 				changedFields.push(key)
 				updateValues.push(newValue)
 			}
@@ -187,6 +232,17 @@ export async function upsertProduct(record) {
 		if (changedFields.length === 0) {
 			console.log(`Produto ${cod} sem alterações, skip update`)
 			return
+		}
+
+		// Houve mudança real → atualiza também a data de modificação da categoria
+		if (cleanRecord.dt_att_categoria !== undefined) {
+			changedFields.push("dt_att_categoria")
+			updateValues.push(cleanRecord.dt_att_categoria)
+		}
+		// Se o status "ativo" mudou, atualiza também a data desse status
+		if (changedFields.includes("ativo") && cleanRecord.dt_att_ativo !== undefined) {
+			changedFields.push("dt_att_ativo")
+			updateValues.push(cleanRecord.dt_att_ativo)
 		}
 
 		const setClause = changedFields.map((f, idx) => `${f} = $${idx + 1}`).join(", ")
@@ -248,41 +304,55 @@ export async function upsertAds(record) {
 	if (!date_ads || !plataform || !store)
 		throw new Error("date_ads, plataform e store são obrigatórios")
 
-	// Busca existente por (data, plataforma, loja)
-	const selectSql = `SELECT id_ads FROM ${dataBase.ads} WHERE date_ads = $1 AND plataform = $2 AND store = $3`
-	const selectResult = await query(selectSql, [date_ads, plataform, store])
+	// Q5: corrida na chave (date_ads, plataform, store) — em conflito de unique tenta de novo
+	const maxRetries = 3
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			// Busca existente por (data, plataforma, loja)
+			const selectSql = `SELECT id_ads FROM ${dataBase.ads} WHERE date_ads = $1 AND plataform = $2 AND store = $3`
+			const selectResult = await query(selectSql, [date_ads, plataform, store])
 
-	if (selectResult.rows.length > 0) {
-		// Atualiza apenas os campos de funding e active (NÃO atualiza 'store')
-		const fields = [
-			"funding_ecom", "funding_store", "funding_general",
-			"funding_chatbot", "funding_insta", "funding_mirror",
-			"funding_painting", "active"
-		]
-		const setClause = fields.map((f, idx) => `${f} = $${idx + 1}`).join(", ")
-		const values = fields.map((f) => (record[f] !== undefined ? record[f] : 0))
-		// Inclui as condições WHERE com data, plataforma e loja
-		const updateSql = `
+			if (selectResult.rows.length > 0) {
+				// Atualiza apenas os campos de funding e active (NÃO atualiza 'store')
+				const fields = [
+					"funding_ecom", "funding_store", "funding_general",
+					"funding_chatbot", "funding_insta", "funding_mirror",
+					"funding_painting", "active"
+				]
+				const setClause = fields.map((f, idx) => `${f} = $${idx + 1}`).join(", ")
+				const values = fields.map((f) => (record[f] !== undefined ? record[f] : 0))
+				// Inclui as condições WHERE com data, plataforma e loja
+				const updateSql = `
             UPDATE ${dataBase.ads}
             SET ${setClause}
             WHERE date_ads = $${fields.length + 1}
               AND plataform = $${fields.length + 2}
               AND store = $${fields.length + 3}
         `
-		values.push(date_ads, plataform, store)
-		await query(updateSql, values)
-		logWebhookDB(`Ads atualizado: ${date_ads} / ${plataform} / ${store}`)
-	} else {
-		// Inserir novo registro
-		const seqResult = await query("SELECT nextval('ads_id_seq') as new_id")
-		const newId = seqResult.rows[0].new_id
-		const newRecord = { ...record, id_ads: newId }
-		const fields = Object.keys(newRecord)
-		const placeholders = fields.map((_, idx) => `$${idx + 1}`).join(", ")
-		const insertSql = `INSERT INTO ${dataBase.ads} (${fields.join(", ")}) VALUES (${placeholders})`
-		const values = fields.map((f) => newRecord[f])
-		await query(insertSql, values)
-		logWebhookDB(`Ads inserido: ${date_ads} / ${plataform} / ${store} (id ${newId})`)
+				values.push(date_ads, plataform, store)
+				await query(updateSql, values)
+				logWebhookDB(`Ads atualizado: ${date_ads} / ${plataform} / ${store}`)
+			} else {
+				// Inserir novo registro
+				const seqResult = await query("SELECT nextval('ads_id_seq') as new_id")
+				const newId = seqResult.rows[0].new_id
+				const newRecord = { ...record, id_ads: newId }
+				const fields = Object.keys(newRecord)
+				const placeholders = fields.map((_, idx) => `$${idx + 1}`).join(", ")
+				const insertSql = `INSERT INTO ${dataBase.ads} (${fields.join(", ")}) VALUES (${placeholders})`
+				const values = fields.map((f) => newRecord[f])
+				await query(insertSql, values)
+				logWebhookDB(`Ads inserido: ${date_ads} / ${plataform} / ${store} (id ${newId})`)
+			}
+			break
+		} catch (error) {
+			if (error.code === "23505" && attempt < maxRetries) {
+				logWebhookDB(`Conflito ao upsert ads ${date_ads}/${plataform}/${store}, tentativa ${attempt}/${maxRetries}...`)
+				await new Promise((resolve) => setTimeout(resolve, 100 * attempt))
+				continue
+			}
+			throw error
+		}
 	}
 
 	// Após atualizar, sincroniza daily_sales
@@ -318,12 +388,8 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
 			console.log(`Cancelamento: cupom ${name} não existe. Nada a fazer.`)
 			return
 		}
-		let orderIds = []
-		try {
-			orderIds = JSON.parse(res.rows[0].order_ids) 
-		} catch(e) {
-			orderIds = [] 
-		}
+		// C1: order_ids é JSONB → o driver pg pode retornar array já parseado (ou string em TEXT)
+		const orderIds = parseJsonArray(res.rows[0].order_ids)
 		if (!orderIds.includes(newOrderId)) {
 			console.log(`Cancelamento: order_id ${newOrderId} não está no cupom. Ignorar.`)
 			return
@@ -345,7 +411,9 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
 		return
 	}
 
-	// Pedido normal – usar ON CONFLICT
+	// Pedido normal – usar ON CONFLICT.
+	// B2: só acumula valores/quantidade se este order_id ainda NÃO estiver contabilizado
+	// (WHERE NOT order_ids @> [orderId]) → reenvio do mesmo pedido vira no-op (idempotente).
 	const insertSql = `
         INSERT INTO ${dataBase.coupon} (date_coupon, name, quantity, total_money, total_discount, order_ids)
         VALUES ($1, $2, $3, $4, $5, $6)
@@ -361,13 +429,18 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
                     SELECT jsonb_array_elements(EXCLUDED.order_ids)
                 ) AS combined
             )
+        WHERE NOT (${dataBase.coupon}.order_ids @> EXCLUDED.order_ids)
         RETURNING id_coupon
     `
 	try {
 		const result = await query(insertSql, [
 			date_coupon, name, 1, newMoney, newDiscount, JSON.stringify([newOrderId])
 		])
-		console.log(`Cupom ${name} inserido/atualizado com sucesso. id_coupon: ${result.rows[0]?.id_coupon}`)
+		if (result.rows.length === 0) {
+			console.log(`Cupom ${name}: pedido ${newOrderId} já contabilizado, sem alteração (idempotente).`)
+		} else {
+			console.log(`Cupom ${name} inserido/atualizado. id_coupon: ${result.rows[0].id_coupon}`)
+		}
 	} catch (error) {
 		console.error(`Erro no upsert do cupom ${name}:`, error)
 		throw error
@@ -375,13 +448,69 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
 }
 
 /**
- * Atualiza a tabela daily_sales de forma incremental:
- * - Se não existe linha para (date, store), cria com os dados do pedido atual.
- * - Se existe e pedido ainda não contabilizado, soma valores e adiciona order_id.
- * - Se pedido cancelado e já contabilizado, subtrai valores e remove order_id.
- * @param {string} date - data 'YYYY-MM-DD'
+ * Resolve os IDs numéricos (id_coupon) a partir dos nomes/códigos de cupom para uma data.
+ * C2: garante que daily_sales.id_coupons guarde SEMPRE IDs numéricos (tanto na inserção
+ * quanto no update), e não os códigos do cupom.
+ */
+async function resolveCouponIds(couponNames, date) {
+	const ids = []
+	for (const name of (couponNames || [])) {
+		const res = await query(
+			`SELECT id_coupon FROM ${dataBase.coupon} WHERE name = $1 AND date_coupon = $2`,
+			[name, date]
+		)
+		if (res.rows.length) ids.push(res.rows[0].id_coupon)
+	}
+	return ids
+}
+
+/**
+ * Recalcula os totais de daily_sales (date, store) a partir de orders_shop, sobre um conjunto
+ * conhecido de order_ids. É idempotente e reflete o estado ATUAL de cada pedido — capturando
+ * transições pending→paid, cancelamentos (active=0) e reenvios de webhook, sem deltas frágeis.
+ * Regra Bruto/Pago: BRUTO = todos os pedidos; PAGO = payment_status='paid' E active=1.
+ */
+async function recomputeDailyTotalsFromOrders(date, store, orderIds, idCoupons, idAds, now) {
+	const ids = [...new Set((orderIds || []).map(Number))].filter((x) => !Number.isNaN(x))
+	if (ids.length === 0) {
+		await query(`DELETE FROM ${dataBase.daily_sales} WHERE date_sales = $1 AND store = $2`, [date, store])
+		logWebhookDB(`🗑️ Daily sales removido (sem pedidos): ${date} - ${store}`)
+		return
+	}
+	const res = await query(
+		`SELECT order_id, total, payment_status, active FROM ${dataBase.orders_shop} WHERE order_id = ANY($1)`,
+		[ids]
+	)
+	const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100
+	let totalMoney = 0, paidMoney = 0, paidOrders = 0
+	const presentIds = []
+	for (const r of res.rows) {
+		const t = toNumber(r.total)
+		totalMoney += t                                  // bruto: todos os pedidos
+		presentIds.push(Number(r.order_id))
+		if (r.payment_status === "paid" && Number(r.active) === 1) { paidMoney += t; paidOrders++ }
+	}
+	const totalOrders = presentIds.length
+	const aov = totalOrders ? round2(totalMoney / totalOrders) : 0
+	await query(`
+        UPDATE ${dataBase.daily_sales}
+        SET total_orders = $1, total_paid_orders = $2, total_money = $3, total_paid_money = $4,
+            aov = $5, id_orders = $6, id_coupons = $7, id_ads = $8, updated_at = $9
+        WHERE date_sales = $10 AND store = $11
+    `, [totalOrders, paidOrders, round2(totalMoney), round2(paidMoney), aov,
+		JSON.stringify(presentIds), JSON.stringify(idCoupons || []), JSON.stringify(idAds || []),
+		now, date, store])
+}
+
+/**
+ * Atualiza daily_sales a cada pedido recebido (semântica "Bruto / Pago", dia de negócio BRT):
+ * - Linha inexistente: cria a partir do pedido atual.
+ * - Linha existente: RECALCULA o dia a partir de orders_shop sobre o conjunto de order_ids
+ *   (idempotente; captura pending→paid, cancelamentos e reenvios).
+ * BRUTO = todos os pedidos (inclui cancelado/pendente); PAGO = pago E não cancelado (active=1).
+ * @param {string} date - data 'YYYY-MM-DD' (dia de negócio BRT)
  * @param {string} store - identificador da loja
- * @param {Object} currentOrder - { order_id, payment_status, total, coupons, status }
+ * @param {Object} currentOrder - { order_id, payment_status, total, coupons, status, ads_ids }
  */
 export async function upsertDailySales(date, store, currentOrder) {
 	if (!date || !store || !currentOrder) {
@@ -394,24 +523,25 @@ export async function upsertDailySales(date, store, currentOrder) {
 	const now = new Date().toISOString()
 	const isCancelled = (currentOrder.status === "cancelled")
 
-	if (!row && isCancelled) {
-		logWebhookDB(`Pedido cancelado e não há daily_sales para ${date} - ${store}. Ignorar.`)
-		return
-	}
+	// Semântica "Bruto / Pago": o pedido conta no BRUTO sempre; no PAGO só se pago e não cancelado.
+	const isPaidContribution = currentOrder.payment_status === "paid" && !isCancelled
+	// Cupons/anúncios a incorporar (cancelado não traz cupom)
+	const incomingCouponIds = isCancelled ? [] : await resolveCouponIds(currentOrder.coupons, date)
+	const incomingAds = currentOrder.ads_ids || []
 
 	// Inserção de novo registro
 	if (!row) {
 		const data = {
 			date_sales: date,
 			total_orders: 1,
-			total_paid_orders: currentOrder.payment_status === "paid" ? 1 : 0,
+			total_paid_orders: isPaidContribution ? 1 : 0,
 			total_money: toNumber(currentOrder.total),
-			total_paid_money: currentOrder.payment_status === "paid" ? toNumber(currentOrder.total) : 0,
+			total_paid_money: isPaidContribution ? toNumber(currentOrder.total) : 0,
 			aov: toNumber(currentOrder.total),
-			id_ads: JSON.stringify(currentOrder.ads_ids || []),
+			id_ads: JSON.stringify(incomingAds),
 			store: store,
 			id_orders: JSON.stringify([currentOrder.order_id]),
-			id_coupons: JSON.stringify(currentOrder.coupons || []),
+			id_coupons: JSON.stringify(incomingCouponIds),
 			active: 1,
 			dt_att_active: now.split("T")[0],
 			created_at: now,
@@ -425,88 +555,18 @@ export async function upsertDailySales(date, store, currentOrder) {
 		return
 	}
 
-	// Linha existe – processar atualização
-	let id_orders = []
-	let id_coupons = []
-	let id_ads = []
-	try {
-		id_orders = typeof row.id_orders === "string" ? JSON.parse(row.id_orders) : row.id_orders 
-	} catch(e) {
-		id_orders = [] 
-	}
-	try {
-		id_coupons = typeof row.id_coupons === "string" ? JSON.parse(row.id_coupons) : row.id_coupons 
-	} catch(e) {
-		id_coupons = [] 
-	}
-	try {
-		id_ads = typeof row.id_ads === "string" ? JSON.parse(row.id_ads) : row.id_ads 
-	} catch(e) {
-		id_ads = [] 
-	}
+	// Linha existe – RECALCULA o dia a partir de orders_shop sobre o conjunto de pedidos.
+	// (orders_shop já foi atualizado com o pedido atual antes desta chamada.)
+	// Idempotente: captura pending→paid, cancelamentos (active=0) e reenvios de webhook.
+	const id_orders = parseJsonArray(row.id_orders).map(Number)
+	const id_coupons = parseJsonArray(row.id_coupons)
+	const id_ads = parseJsonArray(row.id_ads)
 
-	const orderId = currentOrder.order_id
-	const alreadyExists = id_orders.includes(orderId)
+	const orderId = Number(currentOrder.order_id)
+	const newIds = [...new Set([...id_orders, orderId])]
+	const newCoupons = [...new Set([...id_coupons, ...incomingCouponIds])]
+	const newAds = [...new Set([...id_ads, ...incomingAds])]
 
-	// Cancelamento
-	if (isCancelled && alreadyExists) {
-		const newIdOrders = id_orders.filter((id) => id !== orderId)
-		const newTotalOrders = row.total_orders - 1
-		const newTotalMoney = toNumber(row.total_money) - toNumber(currentOrder.total)
-		const newTotalPaidOrders = (currentOrder.payment_status === "paid") ? row.total_paid_orders - 1 : row.total_paid_orders
-		const newTotalPaidMoney = (currentOrder.payment_status === "paid") ? toNumber(row.total_paid_money) - toNumber(currentOrder.total) : row.total_paid_money
-		const newAov = newTotalOrders > 0 ? newTotalMoney / newTotalOrders : 0
-
-		if (newTotalOrders === 0) {
-			await query(`DELETE FROM ${dataBase.daily_sales} WHERE date_sales = $1 AND store = $2`, [date, store])
-			logWebhookDB(`🗑️ Daily sales removido (sem pedidos): ${date} - ${store}`)
-		} else {
-			await query(`
-                UPDATE ${dataBase.daily_sales}
-                SET total_orders = $1, total_paid_orders = $2, total_money = $3,
-                    total_paid_money = $4, aov = $5, id_orders = $6, updated_at = $7
-                WHERE date_sales = $8 AND store = $9
-            `, [newTotalOrders, newTotalPaidOrders, newTotalMoney, newTotalPaidMoney,
-				newAov, JSON.stringify(newIdOrders), now, date, store])
-			logWebhookDB(`🔄 Daily sales atualizado (cancelamento): ${date} - ${store}, removido pedido ${orderId}`)
-		}
-		return
-	}
-
-	// Pedido normal já contabilizado
-	if (alreadyExists) {
-		logWebhookDB(`Pedido ${orderId} já contabilizado. Ignorar.`)
-		return
-	}
-
-	// Pedido normal não contabilizado – adicionar
-	const newIdOrders = [...id_orders, orderId]
-	const newTotalOrders = row.total_orders + 1
-	const newTotalMoney = toNumber(row.total_money) + toNumber(currentOrder.total)
-	const newTotalPaidOrders = (currentOrder.payment_status === "paid") ? row.total_paid_orders + 1 : row.total_paid_orders
-	const newTotalPaidMoney = (currentOrder.payment_status === "paid") ? toNumber(row.total_paid_money) + toNumber(currentOrder.total) : row.total_paid_money
-	const newAov = newTotalMoney / newTotalOrders
-
-	// Mesclar cupons (buscar IDs numéricos)
-	let numericCouponIds = []
-	for (const name of (currentOrder.coupons || [])) {
-		const couponSql = `SELECT id_coupon FROM ${dataBase.coupon} WHERE name = $1 AND date_coupon = $2`
-		const couponRes = await query(couponSql, [name, date])
-		if (couponRes.rows.length) numericCouponIds.push(couponRes.rows[0].id_coupon)
-	}
-	const newIdCoupons = [...new Set([...id_coupons, ...numericCouponIds])]
-
-	// Mesclar anúncios
-	const newIdAds = [...new Set([...id_ads, ...(currentOrder.ads_ids || [])])]
-
-	await query(`
-        UPDATE ${dataBase.daily_sales}
-        SET total_orders = $1, total_paid_orders = $2, total_money = $3,
-            total_paid_money = $4, aov = $5, id_orders = $6, id_coupons = $7,
-            id_ads = $8, updated_at = $9
-        WHERE date_sales = $10 AND store = $11
-    `, [newTotalOrders, newTotalPaidOrders, newTotalMoney, newTotalPaidMoney,
-		newAov, JSON.stringify(newIdOrders), JSON.stringify(newIdCoupons),
-		JSON.stringify(newIdAds), now, date, store])
-	logWebhookDB(`✅ Daily sales atualizado (novo pedido): ${date} - ${store}, adicionado ${orderId}`)
+	await recomputeDailyTotalsFromOrders(date, store, newIds, newCoupons, newAds, now)
+	logWebhookDB(`🔄 Daily sales recalculado de orders_shop: ${date} - ${store} (gatilho: pedido ${orderId})`)
 }
