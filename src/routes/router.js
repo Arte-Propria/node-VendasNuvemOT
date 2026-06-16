@@ -78,6 +78,9 @@ import {
 import { testWebhook } from "../controllers/galeria9Controllers.js"
 import {
 	getDbQuery,
+	getCouponById,
+	getClientById,
+	getProductBySku,
 	postDbQueryNuvemshop,
 	postDbQueryTiny,
 	postDbQueryAds,
@@ -212,7 +215,10 @@ router.get("/tracking/:id", testarBuscaRastreioIsolada)
 router.get("/teste/galeria9", testWebhook)
 
 // Rotas teste Db query
-router.get("/dbquery/:querySelect/:startDate/:endDate", getDbQuery)
+router.get("/db/query/:querySelect/:startDate/:endDate", getDbQuery)
+router.get("/db/coupon/:id", getCouponById)
+router.get("/db/client/:id", getClientById)
+router.get("/db/product/:sku", getProductBySku)
 
 // Rotas de teste de aplicativo Nuvemshop
 router.get("/apps/nuvemshop/callback", getNuvemshopCallback)
