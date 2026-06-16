@@ -16,30 +16,39 @@ import { query } from "../db/db.js"
 export const getDbQuery = async (req, res) => {
 	try {
 		const { querySelect, startDate, endDate } = req.params
-		const { store } = req.query // <-- novo parâmetro via query string
+		const { store } = req.query
 
+		// Tabelas que possuem coluna 'store'
+		const tablesWithStore = ["orders_shop", "daily_sales", "ads"]
+
+		// Mapeamento de nomes amigáveis para IDs
 		let storeValue = store
 		if (store === "outlet") {
 			storeValue = 3889735
 		} else if (store === "artepropria") {
 			storeValue = 1146504
+		} else if (store !== undefined && !isNaN(store) && store !== "") {
+			storeValue = Number(store) // converte string numérica para número
 		}
-		// Se for numérico, mantém
 
-		// Monta a consulta SQL base
+		// Validação: se store foi informado, mas tabela não tem a coluna
+		if (storeValue !== undefined && !tablesWithStore.includes(querySelect)) {
+			return res.status(400).json({
+				error: `Filtro 'store' não suportado para a tabela '${querySelect}'. Tabelas permitidas: ${tablesWithStore.join(", ")}`
+			})
+		}
+
+		// Monta a consulta SQL
 		let sql = `SELECT * FROM ${querySelect}`
 		const params = []
 
-		// Aplica filtro por store se fornecido
-		if (storeValue) {
+		if (storeValue !== undefined) {
 			sql += " WHERE store = $1"
 			params.push(storeValue)
 		}
 
 		const result = await query(sql, params)
-
 		const queryData = await fetchRequest(result, querySelect)
-
 		const filterDataByDate = await filterBdByDateRange(queryData, querySelect, {
 			startDate,
 			endDate
