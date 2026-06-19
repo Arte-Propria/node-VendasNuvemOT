@@ -7,35 +7,72 @@ import {
 } from "../services/segmentacaoServices.js"
 import {
 	dataBase,
+	dataBaseDb,
 	fetchMetaAdsByDate,
 	fetchGoogleAdsByDate
 } from "../db/dataBaseQueryList.js"
 import { upsertAds } from "../db/upsert.js"
 import { query } from "../db/db.js"
 
+// Allowlist de tabelas consultáveis: querySelect é interpolado direto no SQL
+// (`SELECT * FROM ${querySelect}`), então só aceitamos os nomes físicos conhecidos
+// (defesa contra injeção / tabela inválida). Mesmo conjunto usado em upsert.js.
+const ALLOWED_QUERY_TABLES = new Set(Object.values(dataBase))
+
 export const getDbQuery = async (req, res) => {
 	try {
-		const { querySelect, startDate, endDate } = req.params
-		const { store } = req.query
+		const { querySelect, startDate, endDate, store } = req.params
 
-		// Tabelas que possuem coluna 'store'
-		const tablesWithStore = ["orders_shop", "daily_sales", "ads"]
-
-		// Mapeamento de nomes amigáveis para IDs
-		let storeValue = store
-		if (store === "outlet") {
-			storeValue = 3889735
-		} else if (store === "artepropria") {
-			storeValue = 1146504
-		} else if (store !== undefined && !isNaN(store) && store !== "") {
-			storeValue = Number(store) // converte string numérica para número
+		// Valida a tabela ANTES de qualquer interpolação no SQL.
+		if (!ALLOWED_QUERY_TABLES.has(querySelect)) {
+			return res.status(400).json({
+				error: `Tabela inválida: '${querySelect}'. Permitidas: ${[...ALLOWED_QUERY_TABLES].join(", ")}`
+			})
 		}
 
-		// Validação: se store foi informado, mas tabela não tem a coluna
-		if (storeValue !== undefined && !tablesWithStore.includes(querySelect)) {
+		// A coluna `store` tem REPRESENTAÇÃO diferente por tabela:
+		//  - orders_shop / daily_sales → código numérico (ex.: 3889735)
+		//  - ads / coupon              → nome amigável ("outlet"/"artepropria")
+		// Por isso o valor do filtro precisa ser convertido para o formato da tabela-alvo.
+		const STORE_TO_NUMERIC = { outlet: 3889735, artepropria: 1146504 }
+		const NUMERIC_TO_NAME = { 3889735: "outlet", 1146504: "artepropria" }
+		const storeColumnType = { orders_shop: "numeric", daily_sales: "numeric", ads: "name", coupon: "name" }
+
+		// Normaliza a entrada; string vazia / só espaços conta como ausência de filtro.
+		const storeParam = store !== undefined ? String(store).trim() : undefined
+		const hasStoreFilter = storeParam !== undefined && storeParam !== ""
+
+		// Validação: store só é suportado nas tabelas que possuem a coluna mapeada
+		if (hasStoreFilter && !storeColumnType[querySelect]) {
 			return res.status(400).json({
-				error: `Filtro 'store' não suportado para a tabela '${querySelect}'. Tabelas permitidas: ${tablesWithStore.join(", ")}`
+				error: `Filtro 'store' não suportado para a tabela '${querySelect}'. Tabelas permitidas: ${Object.keys(storeColumnType).join(", ")}`
 			})
+		}
+
+		// Resolve o valor de store na representação correta para a tabela-alvo,
+		// aceitando tanto o nome amigável quanto o código numérico na entrada.
+		let storeValue
+		if (hasStoreFilter) {
+			let name = null
+			let numeric = null
+			if (storeParam === "outlet" || storeParam === "artepropria") {
+				name = storeParam
+				numeric = STORE_TO_NUMERIC[storeParam]
+			} else if (/^\d+$/.test(storeParam)) {
+				// Apenas dígitos: trata como código numérico (evita coerções frouxas
+				// de isNaN, ex.: "0x10", "1e3" ou espaços virando número).
+				numeric = Number(storeParam)
+				name = NUMERIC_TO_NAME[numeric] || null
+			} else {
+				name = storeParam // nome desconhecido: usa como veio
+			}
+			storeValue = storeColumnType[querySelect] === "name" ? name : numeric
+
+			// Filtro pedido mas não resolvível para a representação desta tabela
+			// (ex.: ads/coupon com um código numérico sem nome conhecido) → sem resultados.
+			if (storeValue === null || storeValue === undefined) {
+				return res.status(200).json([])
+			}
 		}
 
 		// Monta a consulta SQL
@@ -134,6 +171,46 @@ export const getProductBySku = async (req, res) => {
 	} catch (err) {
 		console.error("Erro ao buscar produto:", err)
 		return res.status(500).json({ error: "Erro ao buscar produto" })
+	}
+}
+
+/**
+ * Endpoint genérico de busca por ID:  GET /db/:table/:id
+ * Mapeia cada tabela lógica para o nome físico, sua chave primária e o transform.
+ */
+const ID_TABLE_MAP = {
+	orders_shop: { table: dataBase.orders_shop, pk: "order_id", transform: dataBaseDb.orders_shop?.transform },
+	clients: { table: dataBase.clients, pk: "id_cli", transform: dataBaseDb.clients?.transform },
+	product: { table: dataBase.product, pk: "cod_categoria", transform: dataBaseDb.product?.transform },
+	coupon: { table: dataBase.coupon, pk: "id_coupon", transform: dataBaseDb.coupon?.transform },
+	ads: { table: dataBase.ads, pk: "id_ads", transform: dataBaseDb.ads?.transform },
+	daily_sales: { table: dataBase.daily_sales, pk: "id_sales", transform: dataBaseDb.daily_sales?.transform }
+}
+
+export const getItemById = async (req, res) => {
+	const { table, id } = req.params
+	try {
+		const config = ID_TABLE_MAP[table]
+		if (!config) {
+			return res.status(400).json({
+				error: `Tabela inválida. Permitidas: ${Object.keys(ID_TABLE_MAP).join(", ")}`
+			})
+		}
+
+		// product usa SKU em maiúsculas como chave; demais usam o valor cru
+		const idValue = config.pk === "cod_categoria" ? String(id).toUpperCase().trim() : id
+
+		const sql = `SELECT * FROM ${config.table} WHERE ${config.pk} = $1`
+		const result = await query(sql, [idValue])
+		if (result.rows.length === 0) {
+			return res.status(404).json({ error: "Registro não encontrado" })
+		}
+
+		const data = config.transform ? config.transform(result.rows[0]) : result.rows[0]
+		return res.status(200).json(data)
+	} catch (err) {
+		console.error(`Erro ao buscar ${table} por ID:`, err)
+		return res.status(500).json({ error: "Erro interno" })
 	}
 }
 

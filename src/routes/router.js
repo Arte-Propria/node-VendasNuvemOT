@@ -78,6 +78,7 @@ import {
 import { testWebhook } from "../controllers/galeria9Controllers.js"
 import {
 	getDbQuery,
+	getItemById,
 	getCouponById,
 	getClientById,
 	getProductBySku,
@@ -162,6 +163,10 @@ router.post("/webhook/db/nuvemshop", postDbQueryNuvemshop) // Rotas pedidos Nuve
 router.post("/webhook/db/tiny", postDbQueryTiny) // Rotas pedidos tiny via webhook
 router.post("/webhook/db/:ads/:store/:date", postDbQueryAds) // atualizar ads db via cron job
 router.post("/sync/orders/:store", syncOrders) // Endpoint para disparar sincronização manual: POST /sync/orders/:store
+// Endpoint genérico de busca por ID (orders_shop, clients, product, coupon, ads, daily_sales)
+// Registrado por último para não sobrepor as rotas específicas acima.
+router.get("/db/:table/:id", getItemById)
+
 
 // TINY ESINTEGRADA
 // router.post("/webhooks/order-ecommerce", createOrderEcommerceWebhook)
@@ -215,10 +220,11 @@ router.get("/tracking/:id", testarBuscaRastreioIsolada)
 router.get("/teste/galeria9", testWebhook)
 
 // Rotas teste Db query
-router.get("/db/query/:querySelect/:startDate/:endDate", getDbQuery)
+router.get("/db/query/:querySelect/:store/:startDate/:endDate", getDbQuery)
 router.get("/db/coupon/:id", getCouponById)
 router.get("/db/client/:id", getClientById)
 router.get("/db/product/:sku", getProductBySku)
+
 
 // Rotas de teste de aplicativo Nuvemshop
 router.get("/apps/nuvemshop/callback", getNuvemshopCallback)

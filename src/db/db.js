@@ -23,3 +23,7 @@ const pool = new Pool({
 })
 
 export const query = (text, params) => pool.query(text, params)
+
+// Exporta o pool para fluxos que precisam de uma conexão dedicada (ex.: transações
+// BEGIN/COMMIT com pool.connect()), já que query() pode usar conexões distintas.
+export { pool }

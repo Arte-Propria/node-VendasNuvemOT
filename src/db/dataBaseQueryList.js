@@ -12,7 +12,7 @@ import {
 	extractFinishType,
 	calculateEstimatedDeliveryDate,
 	shippingCost,
-	toLocalDateBR
+	toBusinessDateBR
 } from "../tools/helpers.js"
 import {
 	fetchLinkNote,
@@ -78,7 +78,8 @@ export const dataBaseDb = {
 			quantity: delivery.quantity,
 			total_money: delivery.total_money,
 			total_discount: delivery.total_discount,
-			order_ids: delivery.order_ids
+			order_ids: delivery.order_ids,
+			store: delivery.store
 		})
 	},
 	daily_sales: {
@@ -248,19 +249,23 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	// Cupons
 	// B6: date_coupon como data pura (YYYY-MM-DD) para casar com o lookup do daily_sales
 	//     e garantir a agregação por dia no ON CONFLICT (name, date_coupon).
-	//     Usa o dia de negócio (BRT, UTC-3) — mesmo critério do daily_sales.
-	const couponDate = toLocalDateBR(nuvemData?.created_at)
-	// B5: discount_coupon é o desconto TOTAL do pedido — atribuído só ao 1º cupom para
-	//     não multiplicar o desconto quando houver vários cupons no mesmo pedido.
-	const couponsDelivery = (nuvemData?.coupon || []).map((coupon, idx) => ({
+	//     Dia de negócio BRT com corte às 03:00 (mesmo critério do daily_sales).
+	const couponDate = toBusinessDateBR(nuvemData?.created_at)
+	// Nome amigável da loja (ex.: "outlet"/"artepropria") para rastrear a origem do cupom.
+	const couponStore = storeMapping.numericToName[Number(nuvemData?.store_id)] || null
+	const couponsDelivery = (nuvemData?.coupon || []).map((coupon) => ({
 		//id_coupon: coupon.id?.toString() || `cupom_${orderNumber}`,
 		date_coupon: couponDate,
 		name: coupon.code,
 		// 1 uso por pedido (coupon.used é o total global do cupom na loja, não deste pedido)
 		quantity: 1,
-		total_money: toNumber(coupon.value),
-		total_discount: idx === 0 ? toNumber(nuvemData?.discount_coupon) : 0,
-		order_ids: [orderNumber]
+		// total_money = valor total da VENDA que usou o cupom (não o valor do cupom).
+		total_money: toNumber(nuvemData?.total),
+		// total_discount = VALOR do cupom (campo `value` da Nuvemshop, ex.: 10.00 para 10%).
+		// Propriedade fixa do cupom — NÃO é a soma dos descontos aplicados.
+		total_discount: toNumber(coupon.value),
+		order_ids: [orderNumber],
+		store: couponStore
 	}))
 	//logWebhookDB("couponsDelivery:", couponsDelivery)
 

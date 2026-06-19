@@ -369,13 +369,16 @@ export async function upsertAds(record) {
  */
 
 export async function upsertCoupon(couponRecord, orderStatus, orderId) {
-	const { name, date_coupon, total_money, total_discount, order_ids } = couponRecord
+	const { name, date_coupon, total_money, total_discount, store } = couponRecord
 	if (!name || !date_coupon) throw new Error("name e date_coupon são obrigatórios")
 
 	const isCancelled = orderStatus === "cancelled"
 	const newOrderId = Number(orderId)
-	const newMoney = Number(total_money)
-	const newDiscount = Number(total_discount)
+	// total_money = valor total da venda (acumula por pedido);
+	// total_discount = VALOR do cupom (propriedade fixa, ex.: 10.00 → não acumula).
+	const newMoney = Number(total_money) || 0
+	const newDiscount = Number(total_discount) || 0
+	const newStore = store ?? null
 
 	// Se for cancelado, primeiro buscamos o cupom existente para remover o order_id
 	if (isCancelled) {
@@ -401,7 +404,8 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
 		} else {
 			const newQuantity = newOrderIds.length
 			const newTotalMoney = Number(res.rows[0].total_money) - newMoney
-			const newTotalDiscount = Number(res.rows[0].total_discount) - newDiscount
+			// total_discount é o valor (fixo) do cupom → permanece inalterado no cancelamento.
+			const newTotalDiscount = Number(res.rows[0].total_discount)
 			await query(`UPDATE ${dataBase.coupon}
                  SET quantity = $1, total_money = $2, total_discount = $3, order_ids = $4
                  WHERE name = $5 AND date_coupon = $6`,
@@ -415,12 +419,13 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
 	// B2: só acumula valores/quantidade se este order_id ainda NÃO estiver contabilizado
 	// (WHERE NOT order_ids @> [orderId]) → reenvio do mesmo pedido vira no-op (idempotente).
 	const insertSql = `
-        INSERT INTO ${dataBase.coupon} (date_coupon, name, quantity, total_money, total_discount, order_ids)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO ${dataBase.coupon} (date_coupon, name, quantity, total_money, total_discount, order_ids, store)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (name, date_coupon) DO UPDATE
         SET quantity = ${dataBase.coupon}.quantity + EXCLUDED.quantity,
             total_money = ${dataBase.coupon}.total_money + EXCLUDED.total_money,
-            total_discount = ${dataBase.coupon}.total_discount + EXCLUDED.total_discount,
+            total_discount = EXCLUDED.total_discount,
+            store = COALESCE(${dataBase.coupon}.store, EXCLUDED.store),
             order_ids = (
                 SELECT jsonb_agg(DISTINCT elem)
                 FROM (
@@ -434,7 +439,7 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
     `
 	try {
 		const result = await query(insertSql, [
-			date_coupon, name, 1, newMoney, newDiscount, JSON.stringify([newOrderId])
+			date_coupon, name, 1, newMoney, newDiscount, JSON.stringify([newOrderId]), newStore
 		])
 		if (result.rows.length === 0) {
 			console.log(`Cupom ${name}: pedido ${newOrderId} já contabilizado, sem alteração (idempotente).`)

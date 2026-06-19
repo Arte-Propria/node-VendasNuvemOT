@@ -56,6 +56,20 @@ export const toLocalDateBR = (input) => {
 	return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })
 }
 
+/**
+ * Dia de NEGÓCIO (BRT) com corte às 03:00 da manhã: pedidos feitos entre 00:00 e 03:00
+ * (horário de São Paulo) contam para o dia anterior. Implementado subtraindo 3h do
+ * instante (created_at) antes de converter para a data no fuso America/Sao_Paulo.
+ * Ex.: 2026-06-16T03:58Z → -3h = 00:58Z → BRT 2026-06-15T21:58 → "2026-06-15".
+ */
+export const toBusinessDateBR = (input) => {
+	if (!input) return null
+	const d = input instanceof Date ? input : new Date(input)
+	if (isNaN(d.getTime())) return null
+	const shifted = new Date(d.getTime() - 3 * 60 * 60 * 1000) // -3h (corte do dia de negócio)
+	return shifted.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })
+}
+
 // Extrai o número do pedido (identificador único) dos dados da Tiny
 export const extractOrderNumber = (tinyData) => {
 	const pedido = tinyData.retorno.pedido

@@ -14,7 +14,7 @@ import {
 	upsertDailySales
 } from "../db/upsert.js"
 import { query } from "../db/db.js"
-import { toNumber, cleanCpfCnpj, toLocalDateBR } from "../tools/helpers.js"
+import { toNumber, cleanCpfCnpj, toBusinessDateBR } from "../tools/helpers.js"
 import {
 	fetchLinkNote,
 	fetchNoteOrderTiny,
@@ -114,6 +114,13 @@ export const filterBdByDateRange = (queryData,
 			return queryData
 		}
 
+		// Tabelas cujo campo de data é um TIMESTAMP UTC (com hora) e precisa ser comparado
+		// pelo DIA DE NEGÓCIO (corte 03:00 BRT). As demais (daily_sales.date_sales,
+		// coupon.date_coupon, ads.date_ads) já guardam a data pura ajustada (business date),
+		// então são comparadas diretamente como YYYY-MM-DD.
+		const businessTimestampTables = new Set([dataBase.orders_shop])
+		const needsBusinessDate = businessTimestampTables.has(querySelect)
+
 		// Validar campo existe nos dados
 		const sampleItem = queryData[0]
 		if (!sampleItem || !sampleItem.hasOwnProperty(dateField)) {
@@ -185,7 +192,13 @@ export const filterBdByDateRange = (queryData,
 					return false // Ou true se quiser incluir itens sem data
 				}
 
-				const itemDate = parseDate(itemDateValue)
+				// Para orders_shop, converte o timestamp UTC para o dia de negócio (corte
+				// 03:00 BRT) antes de comparar, alinhando o filtro a daily_sales/coupon.
+				const comparableValue = needsBusinessDate
+					? toBusinessDateBR(itemDateValue)
+					: itemDateValue
+
+				const itemDate = parseDate(comparableValue)
 
 				if (!itemDate || isNaN(itemDate.getTime())) {
 					console.warn("⚠️ Data inválida no item:", item)
@@ -272,7 +285,7 @@ export async function processOrderFromNuvemshop(nuvemData) {
 	// Dentro de processOrderFromNuvemshop, após o upsert do pedido
 	const firstOrder = safeDelivery.orders_shop[0]
 	if (firstOrder) {
-		const orderDate = toLocalDateBR(nuvemData?.created_at) // dia de negócio (BRT, UTC-3)
+		const orderDate = toBusinessDateBR(nuvemData?.created_at) // dia de negócio BRT, corte às 03:00
 		const storeId = nuvemData?.store_id?.toString() // "3889735"
 		if (orderDate && storeId) {
 			// Converte código numérico para nome amigável (ex: "outlet")
