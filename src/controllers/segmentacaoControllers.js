@@ -197,6 +197,40 @@ export const getItemById = async (req, res) => {
 			})
 		}
 
+		// clients: id_cli é um SERIAL (int4). Porém orders_shop.id_cli às vezes guarda
+		// o CPF/CNPJ (fallback do map quando o cliente não tem id serial resolvido).
+		// Resolvemos então por id_cli (apenas quando o valor cabe em int4) E, em
+		// fallback, por cpf_cnpj_cli (texto — preserva zeros à esquerda e evita o
+		// "integer out of range" que um CPF de 11 dígitos causaria em id_cli).
+		// Alinha com o spec: "por id_cli (se numérico) ou cpf_cnpj_cli (se textual)".
+		if (table === "clients") {
+			const raw = String(id).trim()
+			const onlyDigits = /^\d+$/.test(raw)
+			// Serial plausível: cabe em int4 e não tem zero à esquerda (CPF/CNPJ podem ter).
+			const looksSerial =
+				onlyDigits && raw.length <= 9 && !raw.startsWith("0") && Number(raw) <= 2147483647
+
+			let result = null
+			if (looksSerial) {
+				result = await query(
+					`SELECT * FROM ${config.table} WHERE id_cli = $1`,
+					[Number(raw)]
+				)
+			}
+			// CPF/CNPJ (ou serial sem correspondência) → busca por cpf_cnpj_cli (texto).
+			if (!result || result.rows.length === 0) {
+				result = await query(
+					`SELECT * FROM ${config.table} WHERE cpf_cnpj_cli = $1`,
+					[raw]
+				)
+			}
+			if (result.rows.length === 0) {
+				return res.status(404).json({ error: "Registro não encontrado" })
+			}
+			const data = config.transform ? config.transform(result.rows[0]) : result.rows[0]
+			return res.status(200).json(data)
+		}
+
 		// product usa SKU em maiúsculas como chave; demais usam o valor cru
 		const idValue = config.pk === "cod_categoria" ? String(id).toUpperCase().trim() : id
 

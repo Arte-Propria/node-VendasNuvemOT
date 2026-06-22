@@ -41,7 +41,13 @@ export async function upsertRecord(tableName, record, referenceField) {
 
 			if (selectResult.rows.length > 0) {
 				// 2. Registro existe: UPDATE (sem alterar a própria chave de referência)
-				const fields = Object.keys(cleanRecord).filter((f) => f !== referenceField)
+				// `created_at` é IMUTÁVEL após a inserção (C4): se for atualizado num
+				// re-sync (ex.: webhook de mudança de status), a data REAL do pedido é
+				// reescrita pela data de sync — exatamente a corrupção observada em
+				// orders_shop (pedidos antigos com created_at recente). Por isso o
+				// excluímos do SET; só vale o valor gravado na inserção original.
+				const IMMUTABLE_ON_UPDATE = new Set([referenceField, "created_at"])
+				const fields = Object.keys(cleanRecord).filter((f) => !IMMUTABLE_ON_UPDATE.has(f))
 				if (fields.length === 0) {
 					logWebhookDB(`Registro em ${tableName} (${referenceField}=${referenceValue}) sem campos para atualizar`)
 					return
