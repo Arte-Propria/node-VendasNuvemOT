@@ -365,7 +365,10 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 			dt_att_ativo: now,
 			dt_att_categoria: now,
 			img_categoria: null,
-			custo_categoria: 0,
+			// O Tiny NÃO fornece custo. Enviar 0 aqui faria a upsertProduct
+			// sobrescrever o custo real (da Nuvemshop) por 0. Com null, o
+			// removeNullFields descarta o campo e o custo existente é preservado.
+			custo_categoria: null,
 			tempo_prod_categoria: null,
 			preco: parseFloat(prodItem.valor_unitario) || 0
 		}

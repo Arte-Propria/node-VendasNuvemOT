@@ -223,7 +223,17 @@ export async function upsertProduct(record) {
 			const oldValue = existing[key]
 			let changed
 			if (numericFields.has(key)) {
-				changed = toNumber(newValue) !== toNumber(oldValue)
+				const newNum = toNumber(newValue)
+				const oldNum = toNumber(oldValue)
+				// Guard: nunca deixar um 0 sobrescrever custo/preço já existente (>0).
+				// Origens sem o dado (ex.: Tiny não tem custo) mandam 0 e zerariam
+				// o valor real. custo_categoria e preco são distintos e tratados
+				// independentemente; cada um só é preservado contra o próprio 0.
+				if ((key === "custo_categoria" || key === "preco") && newNum === 0 && oldNum > 0) {
+					changed = false
+				} else {
+					changed = newNum !== oldNum
+				}
 			} else {
 				const newStr = (newValue === null || newValue === undefined) ? "" : String(newValue)
 				const oldStr = (oldValue === null || oldValue === undefined) ? "" : String(oldValue)
