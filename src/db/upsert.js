@@ -380,7 +380,8 @@ export async function upsertAds(record) {
 					"total_visits",
 					"users_by_device",
 					"carts",
-					"begin_checkout"
+					"begin_checkout",
+					"impressions"
 				]
 				const setClause = fields
 					.map((f, idx) => `${f} = $${idx + 1}`)
