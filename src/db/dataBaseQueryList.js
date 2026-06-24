@@ -218,10 +218,15 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		// Cor: a variante (ex.: "Caramelo") não está em name_without_variants. Usa a
 		// variante estruturada (variant_values) e, em fallback, o parêntese do nome completo.
 		const variantColor =
-      Array.isArray(prod.variant_values) && prod.variant_values.length ? prod.variant_values.join(" ").trim() : null
-		const cor = ( variantColor ||
+      Array.isArray(prod.variant_values) && prod.variant_values.length
+      	? prod.variant_values.join(" ").trim()
+      	: null
+		const cor =
+      (
+      	variantColor ||
         extractColor(prod.name) ||
-        extractColor(productName))?.toUpperCase() || "-"
+        extractColor(productName)
+      )?.toUpperCase() || "-"
 		const tipo = extractFinishType(productName)
 		const now = new Date().toISOString()
 
@@ -252,7 +257,8 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	//     Dia de negócio BRT com corte às 03:00 (mesmo critério do daily_sales).
 	const couponDate = toBusinessDateBR(nuvemData?.created_at)
 	// Nome amigável da loja (ex.: "outlet"/"artepropria") para rastrear a origem do cupom.
-	const couponStore = storeMapping.numericToName[Number(nuvemData?.store_id)] || null
+	const couponStore =
+    storeMapping.numericToName[Number(nuvemData?.store_id)] || null
 	const couponsDelivery = (nuvemData?.coupon || []).map((coupon) => ({
 		//id_coupon: coupon.id?.toString() || `cupom_${orderNumber}`,
 		date_coupon: couponDate,
@@ -447,6 +453,7 @@ export const fetchMetaAdsByDate = async (store, date) => {
 	return {
 		date_ads: date,
 		plataform: "Meta",
+		funding_all: data.totalCost?.all || 0,
 		funding_ecom: data.totalCost?.ecom || 0,
 		funding_painting: data.totalCost?.quadros || 0,
 		funding_mirror: data.totalCost?.espelhos || 0,
@@ -455,7 +462,12 @@ export const fetchMetaAdsByDate = async (store, date) => {
 		funding_general: data.totalCost?.geral || 0,
 		funding_store: 0, // Meta não tem store específico
 		active: 1,
-		store: store
+		store: store,
+		total_visits: 0,
+		users_by_device: { mobile: 0, desktop: 0, tablet: 0 },
+		carts: 0,
+		begin_checkout: 0,
+		impressions: data?.impressions
 	}
 }
 
@@ -469,6 +481,7 @@ export const fetchGoogleAdsByDate = async (store, date) => {
 	return {
 		date_ads: date,
 		plataform: "Google",
+		funding_all: result.totalCost?.all || 0,
 		funding_ecom: result.totalCost?.ecom || 0,
 		funding_painting: result.totalCost?.quadros || 0,
 		funding_mirror: result.totalCost?.espelhos || 0,
@@ -477,7 +490,12 @@ export const fetchGoogleAdsByDate = async (store, date) => {
 		funding_chatbot: 0, // Google não separa chatbot
 		funding_insta: 0, // Google não separa Instagram
 		active: 1,
-		store: store
+		store: store,
+		total_visits: result?.totalVisits || 0,
+		users_by_device: result?.usersByDevice || 0,
+		carts: result?.carts || 0,
+		begin_checkout: result?.beginCheckout || 0,
+		impressions: 0 //Google não gera impressões
 	}
 }
 
