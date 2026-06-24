@@ -85,7 +85,8 @@ import {
 	postDbQueryNuvemshop,
 	postDbQueryTiny,
 	postDbQueryAds,
-	syncOrders
+	syncOrders,
+	postDbQueryPeriod
 } from "../controllers/segmentacaoControllers.js"
 import { getNuvemshopCallback } from "../controllers/authNuvemshop.js"
 import { getStatusPlatform } from "../controllers/statusPlatformController.js"
@@ -166,6 +167,8 @@ router.post("/sync/orders/:store", syncOrders) // Endpoint para disparar sincron
 // Endpoint genérico de busca por ID (orders_shop, clients, product, coupon, ads, daily_sales)
 // Registrado por último para não sobrepor as rotas específicas acima.
 router.get("/db/:table/:id", getItemById)
+//
+router.post("/webhook/db-run/:startDate/:endDate", postDbQueryPeriod) // atualizar ads db via cron job
 
 
 // TINY ESINTEGRADA

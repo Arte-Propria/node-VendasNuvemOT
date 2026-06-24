@@ -3,7 +3,8 @@ import {
 	filterBdByDateRange,
 	processOrderFromTiny,
 	processOrderFromNuvemshop,
-	syncNuvemshopOrders
+	syncNuvemshopOrders,
+	chamarAdsWebhooksPeriodo
 } from "../services/segmentacaoServices.js"
 import {
 	dataBase,
@@ -36,7 +37,12 @@ export const getDbQuery = async (req, res) => {
 		// Por isso o valor do filtro precisa ser convertido para o formato da tabela-alvo.
 		const STORE_TO_NUMERIC = { outlet: 3889735, artepropria: 1146504 }
 		const NUMERIC_TO_NAME = { 3889735: "outlet", 1146504: "artepropria" }
-		const storeColumnType = { orders_shop: "numeric", daily_sales: "numeric", ads: "name", coupon: "name" }
+		const storeColumnType = {
+			orders_shop: "numeric",
+			daily_sales: "numeric",
+			ads: "name",
+			coupon: "name"
+		}
 
 		// Normaliza a entrada; string vazia / só espaços conta como ausência de filtro.
 		const storeParam = store !== undefined ? String(store).trim() : undefined
@@ -179,12 +185,36 @@ export const getProductBySku = async (req, res) => {
  * Mapeia cada tabela lógica para o nome físico, sua chave primária e o transform.
  */
 const ID_TABLE_MAP = {
-	orders_shop: { table: dataBase.orders_shop, pk: "order_id", transform: dataBaseDb.orders_shop?.transform },
-	clients: { table: dataBase.clients, pk: "id_cli", transform: dataBaseDb.clients?.transform },
-	product: { table: dataBase.product, pk: "cod_categoria", transform: dataBaseDb.product?.transform },
-	coupon: { table: dataBase.coupon, pk: "id_coupon", transform: dataBaseDb.coupon?.transform },
-	ads: { table: dataBase.ads, pk: "id_ads", transform: dataBaseDb.ads?.transform },
-	daily_sales: { table: dataBase.daily_sales, pk: "id_sales", transform: dataBaseDb.daily_sales?.transform }
+	orders_shop: {
+		table: dataBase.orders_shop,
+		pk: "order_id",
+		transform: dataBaseDb.orders_shop?.transform
+	},
+	clients: {
+		table: dataBase.clients,
+		pk: "id_cli",
+		transform: dataBaseDb.clients?.transform
+	},
+	product: {
+		table: dataBase.product,
+		pk: "cod_categoria",
+		transform: dataBaseDb.product?.transform
+	},
+	coupon: {
+		table: dataBase.coupon,
+		pk: "id_coupon",
+		transform: dataBaseDb.coupon?.transform
+	},
+	ads: {
+		table: dataBase.ads,
+		pk: "id_ads",
+		transform: dataBaseDb.ads?.transform
+	},
+	daily_sales: {
+		table: dataBase.daily_sales,
+		pk: "id_sales",
+		transform: dataBaseDb.daily_sales?.transform
+	}
 }
 
 export const getItemById = async (req, res) => {
@@ -208,31 +238,33 @@ export const getItemById = async (req, res) => {
 			const onlyDigits = /^\d+$/.test(raw)
 			// Serial plausível: cabe em int4 e não tem zero à esquerda (CPF/CNPJ podem ter).
 			const looksSerial =
-				onlyDigits && raw.length <= 9 && !raw.startsWith("0") && Number(raw) <= 2147483647
+        onlyDigits &&
+        raw.length <= 9 &&
+        !raw.startsWith("0") &&
+        Number(raw) <= 2147483647
 
 			let result = null
 			if (looksSerial) {
-				result = await query(
-					`SELECT * FROM ${config.table} WHERE id_cli = $1`,
-					[Number(raw)]
-				)
+				result = await query(`SELECT * FROM ${config.table} WHERE id_cli = $1`,
+					[Number(raw)])
 			}
 			// CPF/CNPJ (ou serial sem correspondência) → busca por cpf_cnpj_cli (texto).
 			if (!result || result.rows.length === 0) {
-				result = await query(
-					`SELECT * FROM ${config.table} WHERE cpf_cnpj_cli = $1`,
-					[raw]
-				)
+				result = await query(`SELECT * FROM ${config.table} WHERE cpf_cnpj_cli = $1`,
+					[raw])
 			}
 			if (result.rows.length === 0) {
 				return res.status(404).json({ error: "Registro não encontrado" })
 			}
-			const data = config.transform ? config.transform(result.rows[0]) : result.rows[0]
+			const data = config.transform
+				? config.transform(result.rows[0])
+				: result.rows[0]
 			return res.status(200).json(data)
 		}
 
 		// product usa SKU em maiúsculas como chave; demais usam o valor cru
-		const idValue = config.pk === "cod_categoria" ? String(id).toUpperCase().trim() : id
+		const idValue =
+      config.pk === "cod_categoria" ? String(id).toUpperCase().trim() : id
 
 		const sql = `SELECT * FROM ${config.table} WHERE ${config.pk} = $1`
 		const result = await query(sql, [idValue])
@@ -240,7 +272,9 @@ export const getItemById = async (req, res) => {
 			return res.status(404).json({ error: "Registro não encontrado" })
 		}
 
-		const data = config.transform ? config.transform(result.rows[0]) : result.rows[0]
+		const data = config.transform
+			? config.transform(result.rows[0])
+			: result.rows[0]
 		return res.status(200).json(data)
 	} catch (err) {
 		console.error(`Erro ao buscar ${table} por ID:`, err)
@@ -347,5 +381,39 @@ export const syncOrders = async (req, res) => {
 	} catch (error) {
 		console.error("Erro na sincronização:", error)
 		res.status(500).json({ error: error.message })
+	}
+}
+
+export const postDbQueryPeriod = async (req, res) => {
+	try {
+		const { startDate, endDate } = req.params
+
+		// Validação básica das datas
+		if (!startDate || !endDate) {
+			return res
+				.status(400)
+				.json({ error: "startDate e endDate são obrigatórios" })
+		}
+		if (
+			!/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(endDate)
+		) {
+			return res
+				.status(400)
+				.json({ error: "Formato de data inválido. Use YYYY-MM-DD" })
+		}
+
+		// Executa a sincronização (pode demorar, por isso é melhor executar em background)
+		// Se você quiser executar em background e retornar imediatamente, use setImmediate ou fila.
+		// Aqui vamos aguardar a conclusão (pode timeout para períodos grandes)
+		const result = await chamarAdsWebhooksPeriodo(startDate, endDate)
+
+		return res.status(200).json({
+			message: "Processamento concluído com sucesso",
+			...result
+		})
+	} catch (error) {
+		console.error("Erro na sincronização por período:", error)
+		return res.status(500).json({ error: error.message })
 	}
 }

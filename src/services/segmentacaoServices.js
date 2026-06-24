@@ -446,7 +446,7 @@ export async function processOrderFromTiny(tinyResponse) {
  */
 export async function syncNuvemshopOrders(storeName, options = { delayMs: 100, skipExisting: true }) {
 	console.log(`[syncNuvemshopOrders] Iniciando sincronização para loja ${storeName}`)
-	const baseUrl = process.env.API_BASE_URL || "https://node-vendasnuvemot.onrender.com"
+	const baseUrl = "https://node-vendasnuvemot.onrender.com"
 	const url = `${baseUrl}/db/orders/${storeName}`  // usa o nome diretamente
 
 	let orders = []
@@ -499,4 +499,70 @@ export async function syncNuvemshopOrders(storeName, options = { delayMs: 100, s
 
 	console.log(`[syncNuvemshopOrders] Sincronização concluída. Processados: ${results.processed}, Ignorados: ${results.skipped}, Erros: ${results.errors.length}`)
 	return results
+}
+
+/**
+ * Função auxiliar que cria uma pausa assíncrona.
+ * @param {number} ms - Milissegundos a aguardar.
+ * @returns {Promise<void>}
+ */
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Função principal: chama os webhooks para todas as datas em um intervalo.
+ * @param {string} startDate - Data inicial no formato 'YYYY-MM-DD'
+ * @param {string} endDate - Data final no formato 'YYYY-MM-DD'
+ * @returns {Promise<void>}
+ */
+export async function chamarAdsWebhooksPeriodo(startDate, endDate) {
+	// Converte strings para objetos Date
+	const start = new Date(startDate)
+	const end = new Date(endDate)
+
+	// Validação das datas
+	if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+		throw new Error("Datas inválidas. Use o formato YYYY-MM-DD")
+	}
+	if (start > end) {
+		throw new Error("A data inicial deve ser anterior ou igual à data final")
+	}
+
+	const pausaMs = 10000 // 3 segundos entre cada requisição
+	const adsList = ["meta", "google"]
+	const storeList = ["outlet", "artepropria"]
+
+	let currentDate = new Date(start)
+	let totalRequests = 0
+
+	console.log(`🔄 Iniciando processamento do período de ${startDate} até ${endDate}`)
+
+	while (currentDate <= end) {
+		const dataFormatada = currentDate.toISOString().split("T")[0]
+		console.log(`\n📅 Processando data: ${dataFormatada}`)
+
+		// Itera sobre todas as combinações de ads e store
+		for (const ads of adsList) {
+			for (const store of storeList) {
+				const url = `https://node-vendasnuvemot.onrender.com/webhook/db/${ads}/${store}/${dataFormatada}`
+				try {
+					const resposta = await fetch(url, {
+						method: "POST"
+					})
+					const status = resposta.status
+					console.log(`✅ ${ads} | ${store} | ${dataFormatada} - Status: ${status}`)
+					totalRequests++
+				} catch (erro) {
+					console.log(`❌ Erro ao chamar ${url}: ${erro.message}`)
+				}
+				await sleep(pausaMs) // Pausa antes da próxima requisição
+			}
+		}
+
+		// Avança para o próximo dia
+		currentDate.setDate(currentDate.getDate() + 1)
+	}
+
+	console.log(`\n✅ Processamento concluído. Total de requisições: ${totalRequests}`)
 }
