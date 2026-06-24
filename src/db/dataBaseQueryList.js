@@ -47,7 +47,15 @@ export const dataBaseDb = {
 			funding_mirror: delivery.funding_mirror,
 			funding_painting: delivery.funding_painting,
 			active: toIntBool(delivery.active), // ← conversão
-			store: delivery.store
+			store: delivery.store,
+			// Colunas de analytics/conversão (Google) + total de verba e impressões (Meta).
+			// Permitem que o AnalyticsContext do frontend venha da base nova.
+			funding_all: delivery.funding_all,
+			total_visits: delivery.total_visits,
+			users_by_device: delivery.users_by_device,
+			carts: delivery.carts,
+			begin_checkout: delivery.begin_checkout,
+			impressions: delivery.impressions
 		})
 	},
 	clients: {
