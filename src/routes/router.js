@@ -82,6 +82,7 @@ import {
 	getCouponById,
 	getClientById,
 	getProductBySku,
+	getProductSales,
 	postDbQueryNuvemshop,
 	postDbQueryTiny,
 	postDbQueryAds,
@@ -116,6 +117,10 @@ router.get("/orders/:store/:cpf", getOrdersBot)
 
 // Rota para cadastrar produto
 router.post("/product/:store", postProduct)
+
+// Total histórico de unidades vendidas por SKU (all-time), por loja.
+// Registrada ANTES do genérico "/db/:table/:id" para não ser capturada por ele.
+router.get("/db/product-sales/:store", getProductSales)
 
 // Rota para buscar todos os pedidos de uma loja específica
 router.get("/db/orders/:store", getOrdersByStore)

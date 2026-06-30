@@ -180,6 +180,70 @@ export const getProductBySku = async (req, res) => {
 	}
 }
 
+// Desfaz até 3 níveis de codificação JSON em string e garante array.
+// orders_shop.products chega como JSON string (às vezes duplamente codificada),
+// mesma situação tratada por parseJsonbFields no front (src/api/db.ts).
+const parseProductsField = (value) => {
+	let v = value
+	let guard = 0
+	while (typeof v === "string" && guard < 3) {
+		try {
+			v = JSON.parse(v)
+		} catch {
+			return []
+		}
+		guard += 1
+	}
+	return Array.isArray(v) ? v : []
+}
+
+// Total HISTÓRICO de unidades vendidas por SKU (all-time), por loja.
+// GET /db/product-sales/:store → [{ sku, units }]
+// Replica a agregação do front (Products): conta +1 por SKU no array `products`
+// de cada pedido PAGO (payment_status === "paid" && payment_method !== "other"),
+// porém sobre TODOS os pedidos, sem filtro de data. Faturamento/nome continuam
+// derivados no front a partir do catálogo.
+export const getProductSales = async (req, res) => {
+	try {
+		const { store } = req.params
+
+		// store tem representação numérica em orders_shop (mesmo mapa de getDbQuery).
+		const STORE_TO_NUMERIC = { outlet: 3889735, artepropria: 1146504 }
+		const storeParam = store !== undefined ? String(store).trim() : ""
+		let storeValue
+		if (storeParam === "outlet" || storeParam === "artepropria") {
+			storeValue = STORE_TO_NUMERIC[storeParam]
+		} else if (/^\d+$/.test(storeParam)) {
+			storeValue = Number(storeParam)
+		} else {
+			// Loja não resolvível → sem resultados.
+			return res.status(200).json([])
+		}
+
+		const sql =
+			"SELECT products, payment_status, payment_method FROM orders_shop WHERE store = $1"
+		const result = await query(sql, [storeValue])
+
+		const unitsBySku = new Map()
+		for (const row of result.rows) {
+			// Pagos, excluindo método "other" (parcerias) — igual ao front.
+			if (row.payment_status !== "paid" || row.payment_method === "other") {
+				continue
+			}
+			const skus = parseProductsField(row.products)
+			for (const sku of skus) {
+				unitsBySku.set(sku, (unitsBySku.get(sku) || 0) + 1)
+			}
+		}
+
+		const payload = [...unitsBySku].map(([sku, units]) => ({ sku, units }))
+		return res.status(200).json(payload)
+	} catch (err) {
+		console.error("Erro ao buscar vendas por produto:", err)
+		return res.status(500).json({ error: "Erro ao buscar vendas por produto" })
+	}
+}
+
 /**
  * Endpoint genérico de busca por ID:  GET /db/:table/:id
  * Mapeia cada tabela lógica para o nome físico, sua chave primária e o transform.
