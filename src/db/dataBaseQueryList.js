@@ -135,7 +135,8 @@ export const dataBaseDb = {
 				: null,
 			fiscal_note: delivery.fiscal_note,
 			estimated_delivery: delivery.estimated_delivery,
-			shipping_cost: delivery.shipping_cost
+			shipping_cost: delivery.shipping_cost,
+			order_tracking_link: delivery.order_tracking_link ?? null
 		})
 	},
 	product: {
@@ -180,6 +181,11 @@ export const storeMapping = {
 	numericToTinyName: {
 		3889735: "OUTLETDOSQUADROS",
 		1146504: "ARTEPROPRIA"
+	},
+	// dominio público de cada loja (para montar o link de acompanhamento do pedido)
+	numericToUrl: {
+		3889735: "https://www.outletdosquadros.com.br",
+		1146504: "https://www.artepropria.com.br"
 	}
 }
 
@@ -316,6 +322,12 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	}))
 	//logWebhookDB("couponsDelivery:", couponsDelivery)
 
+	// Link de acompanhamento/sucesso do pedido: dominio da loja + id e token do pedido Nuvemshop.
+	const storeBaseUrl = storeMapping.numericToUrl[Number(nuvemData?.store_id)] || null
+	const orderTrackingLink = storeBaseUrl && nuvemData?.id && nuvemData?.token
+		? `${storeBaseUrl}/checkout/v3/success/${nuvemData.id}/${nuvemData.token}`
+		: null
+
 	// Pedido
 	const orderDelivery = {
 		order_id: orderNumber,
@@ -343,7 +355,8 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		fiscal_note: null,
 		estimated_delivery: calculateEstimatedDeliveryDate(nuvemData?.created_at,
 			nuvemData?.shipping_max_days),
-		shipping_cost: shippingCost(nuvemData?.shipping_cost_customer)
+		shipping_cost: shippingCost(nuvemData?.shipping_cost_customer),
+		order_tracking_link: orderTrackingLink
 	}
 	//logWebhookDB("orderDelivery:", orderDelivery)
 
