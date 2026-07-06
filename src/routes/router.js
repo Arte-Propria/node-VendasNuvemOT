@@ -14,7 +14,7 @@ import { getDataADSMeta } from "../controllers/dataADSMetaControllers.js"
 import { createOrder } from "../controllers/createOrderController.js"
 import { postProduct } from "../controllers/createProductController.js"
 import { getCategories } from "../controllers/categoriesControllers.js"
-import { deleteOrderByOwnerNote } from "../controllers/deleteOrderController.js"
+import { deleteOrderByOwnerNote, deleteOrdersByDate } from "../controllers/deleteOrderController.js"
 import {
 	createdOrderWebhook,
 	createOrderMarketplaceWebhook,
@@ -127,6 +127,11 @@ router.get("/db/orders/:store", getOrdersByStore)
 
 // Rota para buscar pedidos por data
 router.get("/db/orders/:store/:createdAtMin/:createdAtMax", getOrdersByDate)
+
+// Exclui TODOS os pedidos de uma loja em um dia de negócio (BRT, corte 03:00),
+// em transação única: dump (pedidos_<loja>), orders_shop, daily_sales, coupon.
+// Dry-run por padrão; só exclui com ?apply=true.
+router.delete("/db/orders/:store/:date", deleteOrdersByDate)
 
 // Meta ADS
 router.get("/ads/meta/:store/:createdAtMin/:createdAtMax", getDataADSMeta)

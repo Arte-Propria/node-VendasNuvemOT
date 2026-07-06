@@ -125,6 +125,7 @@ export const dataBaseDb = {
 			paid_at: delivery.paid_at,
 			updated_at: delivery.updated_at,
 			active: toIntBool(delivery.active), // ← conversão
+			storefront: delivery.storefront,
 			shipping_status: delivery.shipping_status,
 			gateway_link: delivery.gateway_link,
 			payment_method: delivery.payment_method,
@@ -184,7 +185,9 @@ export const storeMapping = {
 
 export function mapNuvemshopToDelivery(nuvemData) {
 	logWebhookDB("Iniciando mapNuvemshopToDelivery")
-	const orderNumber = nuvemData?.number
+	// Usa sempre o identificador real do pedido. Antes, pedidos "Loja Fisica"
+	// recebiam order_id = "Loja Fisica" (literal) e colidiam entre si em orders_shop.
+	const orderNumber = nuvemData?.number || nuvemData?.order_id || nuvemData?.id
 	logWebhookDB("orderNumber:", orderNumber)
 	const now = new Date().toISOString()
 
@@ -192,18 +195,48 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	const c = nuvemData?.customer || {}
 	//logWebhookDB("customer data:", c)
 
+	// mapaLojas: cada loja física recebe um CPF fictício próprio, para os pedidos
+	// físicos não colapsarem todos no mesmo cliente (99999999999).
+	const mapaLojas = {
+		MOEMA: "12311111111",
+		TURIASSU: "45611111111",
+		ANALIA: "78911111111",
+		GABRIEL: "45688888888",
+		CHATBOT: "45699999999"
+	}
+
+	// Pedido de loja física? (storefront "Loja" ou "Loja Fisica")
+	const isLojaFisica =
+    nuvemData?.storefront === "Loja" || nuvemData?.storefront === "Loja Fisica"
+
+	// Filial: billing_business_name; fallback CHATBOT (mesma regra do ChartLojas do front).
+	let lojaFisica = null
+	if (isLojaFisica) {
+		lojaFisica = nuvemData?.billing_business_name || null
+		if (!lojaFisica && nuvemData?.billing_name === "Cliente Loja Física") {
+			lojaFisica = "CHATBOT"
+		}
+	}
+	const cpfLojaFisica = lojaFisica ? mapaLojas[lojaFisica] || null : null
+
+	// CPF final: filial física tem prioridade; senão, o CPF do próprio pedido.
+	const cpfFinal = cpfLojaFisica || cleanCpfCnpj(c.identification)
+
 	const clienteId =
+    cpfLojaFisica ||
     cleanCpfCnpj(c.identification) ||
     c.email ||
     `temp_${orderNumber || Date.now()}`
 	// Em mapNuvemshopToDelivery
 	const clienteDelivery = {
 		id_cli: null, // será gerado pela sequência
-		cpf_cnpj_cli: cleanCpfCnpj(c.identification),
-		nome_cli: c.name || nuvemData?.contact_name,
+		cpf_cnpj_cli: cpfFinal,
+		nome_cli: cpfLojaFisica
+			? `LOJA FÍSICA - ${lojaFisica}`
+			: c.name || nuvemData?.contact_name,
 		email_cli: c.email || nuvemData?.contact_email,
 		fone_cli: cleanPhone(c.phone || nuvemData?.contact_phone),
-		tipo_cli: c.identification && c.identification.length > 11 ? "J" : "F",
+		tipo_cli: cpfFinal && cpfFinal.length > 11 ? "J" : "F",
 		bairro_cli: c.billing_locality || c.default_address?.locality,
 		cidade_cli: c.billing_city || c.default_address?.city,
 		numero_cli: c.billing_number || c.default_address?.number,
@@ -301,6 +334,7 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		paid_at: toISOString(nuvemData?.paid_at),
 		updated_at: now,
 		active: nuvemData?.status !== "cancelled",
+		storefront: nuvemData?.storefront || null,
 		gateway_link: nuvemData?.gateway_link || null,
 		payment_method: nuvemData?.payment_details?.method || null,
 		shipping_status: nuvemData?.shipping_status || null,
@@ -429,6 +463,7 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 		paid_at: null,
 		updated_at: now,
 		active: pedido.situacao !== "Cancelado",
+		storefront: null,
 		gateway_link: null,
 		payment_method: null,
 		shipping_status: shippingStatus,
