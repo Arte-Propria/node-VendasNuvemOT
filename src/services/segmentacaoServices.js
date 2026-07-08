@@ -14,7 +14,7 @@ import {
 	upsertDailySales
 } from "../db/upsert.js"
 import { query } from "../db/db.js"
-import { toNumber, cleanCpfCnpj, toBusinessDateBR } from "../tools/helpers.js"
+import { toNumber, cleanCpfCnpj, toBusinessDateBR, toLocalDateBR } from "../tools/helpers.js"
 import {
 	fetchLinkNote,
 	fetchNoteOrderTiny,
@@ -115,11 +115,12 @@ export const filterBdByDateRange = (queryData,
 		}
 
 		// Tabelas cujo campo de data é um TIMESTAMP UTC (com hora) e precisa ser comparado
-		// pelo DIA DE NEGÓCIO (corte 03:00 BRT). As demais (daily_sales.date_sales,
-		// coupon.date_coupon, ads.date_ads) já guardam a data pura ajustada (business date),
-		// então são comparadas diretamente como YYYY-MM-DD.
-		const businessTimestampTables = new Set([dataBase.orders_shop])
-		const needsBusinessDate = businessTimestampTables.has(querySelect)
+		// pelo DIA-CALENDÁRIO de São Paulo (sem corte 03:00). A lista de pedidos deve mostrar
+		// o pedido no dia REAL em que foi feito; pedidos da madrugada NÃO migram para o dia
+		// anterior. As demais (daily_sales.date_sales, coupon.date_coupon, ads.date_ads) já
+		// guardam a data pura e são comparadas diretamente como YYYY-MM-DD.
+		const spDateTimestampTables = new Set([dataBase.orders_shop])
+		const needsSpDate = spDateTimestampTables.has(querySelect)
 
 		// Validar campo existe nos dados
 		const sampleItem = queryData[0]
@@ -192,10 +193,11 @@ export const filterBdByDateRange = (queryData,
 					return false // Ou true se quiser incluir itens sem data
 				}
 
-				// Para orders_shop, converte o timestamp UTC para o dia de negócio (corte
-				// 03:00 BRT) antes de comparar, alinhando o filtro a daily_sales/coupon.
-				const comparableValue = needsBusinessDate
-					? toBusinessDateBR(itemDateValue)
+				// Para orders_shop, converte o timestamp UTC para o dia-calendário de São
+				// Paulo (sem corte 03:00) antes de comparar, para que o pedido caia no dia
+				// REAL em que foi feito.
+				const comparableValue = needsSpDate
+					? toLocalDateBR(itemDateValue)
 					: itemDateValue
 
 				const itemDate = parseDate(comparableValue)
