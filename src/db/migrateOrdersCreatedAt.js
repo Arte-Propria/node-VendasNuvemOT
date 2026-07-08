@@ -15,7 +15,11 @@
  *   - Dry-run é o padrão; nada é alterado sem --apply.
  *   - --apply roda em BEGIN/COMMIT numa conexão dedicada (rollback em erro).
  *   - Idempotente: só toca linhas onde created_at DIFERE do legado.
- *   - Junção por order_id como TEXTO (tipos podem diferir entre tabelas).
+ *   - Junção NUMÉRICA por order_id (orders_shop.order_id=numeric,
+ *     pedidos_*.order_id=bigint — casam por cast implícito). NÃO usar ::text
+ *     dos dois lados: anula índice/estatística e gera plano patológico que
+ *     PENDURA a query mesmo em tabelas pequenas.
+ *   - statement_timeout protege contra travamento indefinido.
  *   - Lojas e nomes de tabela são CONSTANTES fixas (sem injeção).
  */
 import { pool } from "./db.js"
@@ -30,8 +34,8 @@ const APPLY = process.argv.includes("--apply")
 const countSql = (legacyTable, storeId) => `
   SELECT COUNT(*)::int AS n
   FROM orders_shop os
-  JOIN ${legacyTable} p ON os.order_id::text = p.order_id::text
-  WHERE os.store::text = '${storeId}'
+  JOIN ${legacyTable} p ON os.order_id = p.order_id
+  WHERE os.store = '${storeId}'
     AND os.created_at IS DISTINCT FROM p.created_at
 `
 
@@ -40,8 +44,8 @@ const sampleSql = (legacyTable, storeId) => `
          os.created_at AS created_atual,
          p.created_at  AS created_real
   FROM orders_shop os
-  JOIN ${legacyTable} p ON os.order_id::text = p.order_id::text
-  WHERE os.store::text = '${storeId}'
+  JOIN ${legacyTable} p ON os.order_id = p.order_id
+  WHERE os.store = '${storeId}'
     AND os.created_at IS DISTINCT FROM p.created_at
   ORDER BY p.created_at
   LIMIT 5
@@ -51,8 +55,8 @@ const updateSql = (legacyTable, storeId) => `
   UPDATE orders_shop os
   SET created_at = p.created_at
   FROM ${legacyTable} p
-  WHERE os.order_id::text = p.order_id::text
-    AND os.store::text = '${storeId}'
+  WHERE os.order_id = p.order_id
+    AND os.store = '${storeId}'
     AND os.created_at IS DISTINCT FROM p.created_at
 `
 
@@ -60,6 +64,8 @@ async function main() {
 	const client = await pool.connect()
 	console.log(`\n=== Migração orders_shop.created_at — modo: ${APPLY ? "APLICAR" : "DRY-RUN (somente leitura)"} ===\n`)
 	try {
+		// Defesa: nenhuma query pode pendurar indefinidamente.
+		await client.query("SET statement_timeout = '30s'")
 		// 1) Relatório (sempre — somente leitura)
 		let totalToFix = 0
 		for (const { name, storeId, legacyTable } of STORES) {

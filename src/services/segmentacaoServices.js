@@ -14,7 +14,7 @@ import {
 	upsertDailySales
 } from "../db/upsert.js"
 import { query } from "../db/db.js"
-import { toNumber, cleanCpfCnpj, toBusinessDateBR, toLocalDateBR } from "../tools/helpers.js"
+import { toNumber, cleanCpfCnpj, toBusinessDateBR, toLocalDateBR, toISOString } from "../tools/helpers.js"
 import {
 	fetchLinkNote,
 	fetchNoteOrderTiny,
@@ -277,6 +277,20 @@ export async function processOrderFromNuvemshop(nuvemData) {
 		const record = dataBaseDb.orders_shop.transform(order)
 		//console.log("Order record:", record) // debug
 		await upsertRecord(dataBase.orders_shop, record, "order_id")
+
+		// C4-fix: created_at é imutável no upsert genérico (protege contra re-syncs que
+		// gravariam a data de sync). Mas a Nuvemshop é a fonte de verdade da hora real do
+		// pedido (mesmo valor de pedidos_outlet). Quando o Tiny insere primeiro, grava
+		// meia-noite; aqui reafirmamos a hora real — apenas se ela realmente veio da
+		// Nuvemshop (evita o fallback `|| now` sobrescrever um valor bom).
+		if (nuvemData?.created_at) {
+			const realCreatedAt = toISOString(nuvemData.created_at)
+			await query(
+				`UPDATE ${dataBase.orders_shop} SET created_at = $1
+				   WHERE order_id = $2 AND created_at IS DISTINCT FROM $1`,
+				[realCreatedAt, order.order_id]
+			)
+		}
 	}
 	for (const coup of safeDelivery.coupons) {
 		const record = dataBaseDb.coupon.transform(coup)
