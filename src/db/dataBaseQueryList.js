@@ -120,6 +120,10 @@ export const dataBaseDb = {
 			coupons: JSON.stringify(delivery.coupons),
 			coupon_discount: delivery.coupon_discount,
 			products: JSON.stringify(delivery.products),
+			products_detail:
+				delivery.products_detail != null
+					? JSON.stringify(delivery.products_detail)
+					: null,
 			shipping_option: delivery.shipping_option,
 			created_at: delivery.created_at,
 			paid_at: delivery.paid_at,
@@ -298,6 +302,18 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	})
 	//logWebhookDB("produtosDelivery:", produtosDelivery)
 
+	// products_detail: linha a linha do pedido, preservando os campos que a tela
+	// legada de Produtos usava (product_id, price histórico, variant_values, name,
+	// image). orders_shop.products continua sendo só SKUs; este campo é aditivo.
+	const produtosDetail = (nuvemData?.products || []).map((prod) => ({
+		product_id: prod.product_id ?? null,
+		sku: (prod.sku || `nuvem_${prod.id}`).toUpperCase(),
+		name: prod.name || null,
+		price: parseFloat(prod.price) || 0,
+		image: prod.image?.src || null,
+		variant_values: Array.isArray(prod.variant_values) ? prod.variant_values : []
+	}))
+
 	// Cupons
 	// B6: date_coupon como data pura (YYYY-MM-DD) para casar com o lookup do daily_sales
 	//     e garantir a agregação por dia no ON CONFLICT (name, date_coupon).
@@ -340,6 +356,7 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		coupons: (nuvemData?.coupon || []).map((c) => c.code),
 		coupon_discount: toNumber(nuvemData?.discount_coupon),
 		products: produtosDelivery.map((p) => p.cod_categoria),
+		products_detail: produtosDetail,
 		shipping_option: nuvemData?.shipping_option || null,
 		// C4: preserva a data real de criação do pedido (fallback para agora)
 		created_at: toISOString(nuvemData?.created_at) || now,
@@ -436,6 +453,21 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 	})
 	console.log(`[mapTinyToDelivery] ${produtosDelivery.length} produtos mapeados`)
 
+	// products_detail (aditivo). O Tiny não fornece product_id nem variant_values;
+	// degrada para o SKU/descrição do item — o backfill a partir de pedidos_* cobre
+	// os pedidos históricos que também existem no ecommerce Nuvemshop.
+	const produtosDetail = (pedido.itens || []).map((item) => {
+		const prodItem = item.item
+		return {
+			product_id: null,
+			sku: (prodItem.codigo || `tiny_${prodItem.id_produto}`).toUpperCase(),
+			name: prodItem.descricao || null,
+			price: parseFloat(prodItem.valor_unitario) || 0,
+			image: null,
+			variant_values: []
+		}
+	})
+
 	// ----- Cupons (nenhum) -----
 	const couponsDelivery = []
 
@@ -470,6 +502,7 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 		coupons: [],
 		coupon_discount: parseFloat(pedido.valor_desconto) || 0,
 		products: produtosDelivery.map((p) => p.cod_categoria),
+		products_detail: produtosDetail,
 		shipping_option: null,
 		// C4: usa a data do pedido (dd/mm/aaaa → ISO); created_at não é atualizável depois
 		created_at: toISOString(pedido.data_pedido) || now,

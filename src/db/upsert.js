@@ -162,6 +162,7 @@ export async function upsertOrderShop(updateRecord, fullRecord) {
 		// Lista de campos que podem ser atualizados após a criação do pedido
 		const updatableFields = [
 			"products",
+			"products_detail",
 			"shipping_option",
 			"updated_at",
 			"shipping_status",
@@ -185,7 +186,11 @@ export async function upsertOrderShop(updateRecord, fullRecord) {
 			setClauses.push(`${field} = $${idx + 1}`)
 			let value = cleanUpdate[field]
 			// Tratamento especial para campos JSON/JSONB
-			if (field === "products" || field === "markers_order_tiny") {
+			if (
+				field === "products" ||
+				field === "products_detail" ||
+				field === "markers_order_tiny"
+			) {
 				value = JSON.stringify(value)
 			}
 			values.push(value)

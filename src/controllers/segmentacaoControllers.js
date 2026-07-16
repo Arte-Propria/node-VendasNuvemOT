@@ -197,18 +197,48 @@ const parseProductsField = (value) => {
 	return Array.isArray(v) ? v : []
 }
 
-// Total HISTÓRICO de unidades vendidas por SKU (all-time), por loja.
-// GET /db/product-sales/:store → [{ sku, units }]
-// Replica a agregação do front (Products): conta +1 por SKU no array `products`
-// de cada pedido PAGO (payment_status === "paid" && payment_method !== "other"),
-// porém sobre TODOS os pedidos, sem filtro de data. Faturamento/nome continuam
-// derivados no front a partir do catálogo.
+// Extrai o "número" curto do SKU para exibição, replicando exatamente a lógica
+// da tela LEGADA de Produtos (por loja). Ex.: outlet Quadro "OT|109-..." → "109";
+// espelho "OTE50-..." → "OTE50"; artepropria "AP1394-..." → "1394". Envolvido em
+// try/catch: no legado uma linha malformada quebraria o forEach inteiro; aqui só
+// cai no fallback (trecho antes do 1º "-").
+const legacySkuNumber = (sku, cleanedName, storeName) => {
+	try {
+		if (!sku) return "Slim"
+		let skuNumber = sku.split("-")[0]
+		if (storeName === "outlet") {
+			if (cleanedName.includes("Quadro")) {
+				skuNumber = sku.split("-")[0].split("OT")[1].split("|")[1]
+			}
+		} else if (storeName === "artepropria") {
+			skuNumber = sku.split("-")[0].split("AP")[1]
+		}
+		return skuNumber ?? sku.split("-")[0]
+	} catch {
+		return sku ? sku.split("-")[0] : "Slim"
+	}
+}
+
+// Vendas históricas por produto (all-time), por loja — reproduz a agregação da
+// tela LEGADA de Produtos sobre a base nova (orders_shop enriquecida).
+// GET /db/product-sales/:store → { products: [...], variations: [...] }
+//
+// Regras (idênticas ao legado, ref.: git b2ed549 src/components/Products/index.jsx):
+//   - Fonte por linha: orders_shop.products_detail { product_id, sku, name, price,
+//     image, variant_values } (preenchido pelo webhook Nuvemshop e pelo backfill).
+//     Fallback para products (só SKUs) quando o detalhe não existe.
+//   - SEM filtro de status: conta TODOS os pedidos (paid/voided/refunded/pending),
+//     como o legado, que lia pedidos_* inteiro. SEM filtro de data (histórico).
+//   - Agrupa por product_id; sales += 1 por linha; revenue += price (histórico da
+//     linha); pula placeholder de Loja Física (nome contém "produto").
+//   - Variações: variant_values.join(", ") — contagem por combinação.
 export const getProductSales = async (req, res) => {
 	try {
 		const { store } = req.params
 
-		// store tem representação numérica em orders_shop (mesmo mapa de getDbQuery).
+		// orders_shop.store é TEXT com o código numérico; resolve nome amigável p/ o legacySkuNumber.
 		const STORE_TO_NUMERIC = { outlet: 3889735, artepropria: 1146504 }
+		const NUMERIC_TO_NAME = { 3889735: "outlet", 1146504: "artepropria" }
 		const storeParam = store !== undefined ? String(store).trim() : ""
 		let storeValue
 		if (storeParam === "outlet" || storeParam === "artepropria") {
@@ -217,27 +247,97 @@ export const getProductSales = async (req, res) => {
 			storeValue = Number(storeParam)
 		} else {
 			// Loja não resolvível → sem resultados.
-			return res.status(200).json([])
+			return res.status(200).json({ products: [], variations: [] })
 		}
+		const storeName = NUMERIC_TO_NAME[storeValue] || null
 
+		// store é TEXT em orders_shop → compara como texto.
 		const sql =
-			"SELECT products, payment_status, payment_method FROM orders_shop WHERE store = $1"
-		const result = await query(sql, [storeValue])
+			"SELECT products, products_detail FROM orders_shop WHERE store = $1"
+		const result = await query(sql, [String(storeValue)])
 
-		const unitsBySku = new Map()
+		const salesMap = new Map() // product_id (ou sku no fallback) -> agregado
+		const variationMap = new Map() // combinação de variação -> { id, name, sales }
+
+		const addVariation = (entry, label) => {
+			if (!label) return
+			entry.variantCount[label] = (entry.variantCount[label] || 0) + 1
+			const v = variationMap.get(label) || { id: label, name: label, sales: 0 }
+			v.sales += 1
+			variationMap.set(label, v)
+		}
+
 		for (const row of result.rows) {
-			// Pagos, excluindo método "other" (parcerias) — igual ao front.
-			if (row.payment_status !== "paid" || row.payment_method === "other") {
-				continue
-			}
-			const skus = parseProductsField(row.products)
-			for (const sku of skus) {
-				unitsBySku.set(sku, (unitsBySku.get(sku) || 0) + 1)
+			const detail = Array.isArray(row.products_detail)
+				? row.products_detail
+				: parseProductsField(row.products_detail)
+
+			if (detail.length > 0) {
+				// ---- Caminho rico (legado fiel) ----
+				for (const line of detail) {
+					const rawName = line?.name || ""
+					const cleanedName = rawName.replace(/\(.*?\)/g, "").trim()
+					if (cleanedName.toLowerCase().includes("produto")) continue // placeholder Loja Física
+
+					// Agrupa por product_id; sem product_id (ex.: Tiny), cai no sku para não colapsar tudo.
+					const key =
+						line?.product_id != null ? String(line.product_id) : `sku:${line?.sku}`
+					let entry = salesMap.get(key)
+					if (!entry) {
+						entry = {
+							id: line?.product_id != null ? line.product_id : line?.sku,
+							sku: line?.sku || null,
+							skuNumber: legacySkuNumber(line?.sku, cleanedName, storeName),
+							name: cleanedName,
+							image: line?.image || null,
+							sales: 0,
+							revenue: 0,
+							variantCount: {}
+						}
+						salesMap.set(key, entry)
+					}
+					entry.sales += 1
+					entry.revenue += parseFloat(line?.price || 0) || 0
+					if (!entry.image && line?.image) entry.image = line.image
+
+					const label = Array.isArray(line?.variant_values)
+						? line.variant_values.join(", ")
+						: ""
+					addVariation(entry, label)
+				}
+			} else {
+				// ---- Fallback (só SKUs): sem product_id/preço/variação ----
+				const skus = parseProductsField(row.products)
+				for (const sku of skus) {
+					if (String(sku).toLowerCase().includes("produto")) continue
+					const key = `sku:${sku}`
+					let entry = salesMap.get(key)
+					if (!entry) {
+						entry = {
+							id: sku,
+							sku,
+							skuNumber: legacySkuNumber(sku, "", storeName),
+							name: sku,
+							image: null,
+							sales: 0,
+							revenue: 0,
+							variantCount: {}
+						}
+						salesMap.set(key, entry)
+					}
+					entry.sales += 1
+				}
 			}
 		}
 
-		const payload = [...unitsBySku].map(([sku, units]) => ({ sku, units }))
-		return res.status(200).json(payload)
+		// Variação mais vendida por produto (para o rótulo por linha), como no novo layout.
+		const products = [...salesMap.values()].map((p) => {
+			const top = Object.entries(p.variantCount).sort((a, b) => b[1] - a[1])[0]
+			return { ...p, variations: top ? top[0] : "" }
+		})
+		const variations = [...variationMap.values()].sort((a, b) => b.sales - a.sales)
+
+		return res.status(200).json({ products, variations })
 	} catch (err) {
 		console.error("Erro ao buscar vendas por produto:", err)
 		return res.status(500).json({ error: "Erro ao buscar vendas por produto" })
