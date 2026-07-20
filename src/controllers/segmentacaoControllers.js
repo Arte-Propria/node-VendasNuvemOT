@@ -20,6 +20,65 @@ import { query } from "../db/db.js"
 // (defesa contra injeção / tabela inválida). Mesmo conjunto usado em upsert.js.
 const ALLOWED_QUERY_TABLES = new Set(Object.values(dataBase))
 
+// Dump por loja — fonte legada da tela de Cupons (mesma tabela lida por /db/orders e por
+// dailySalesRecalc). Nomes fixos, nunca vindos do input (sem risco de injeção).
+const DUMP_TABLES = { outlet: "pedidos_outlet", artepropria: "pedidos_artepropria" }
+const NUMERIC_TO_STORE_NAME = { 3889735: "outlet", 1146504: "artepropria" }
+// created_at é wall-clock UTC (timestamp sem fuso) → dia-calendário de São Paulo (SEM corte
+// 03:00), idêntico ao BRT_DATE_EXPR de dailySalesRecalc.js. Casa com o filtro local (BRT) que
+// a tela legada aplicava via isOrderOnDate.
+const COUPON_BRT_DATE_EXPR =
+	"(o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date"
+
+// Recalcula o uso de cupons a partir do dump pedidos_<loja>, reproduzindo EXATAMENTE a lógica
+// da tela legada de Cupons: filtra pelos mesmos critérios do filterOrders (exclui cancelled,
+// payment_status='voided' e payment_details.method='other' — estes últimos são os cupons
+// DRAFT-ORDER-* de pedidos manuais) e, por pedido sobrevivente, soma 1 uso e o order.total por
+// código de cupom. Garante paridade com o legado sem depender da tabela `coupon` (que é escrita
+// por webhook sem esses filtros).
+const getCouponUsageFromDump = async (store, startDate, endDate) => {
+	let name = store
+	if (/^\d+$/.test(String(store))) name = NUMERIC_TO_STORE_NAME[Number(store)] || null
+	const table = DUMP_TABLES[name]
+	if (!table) return [] // loja desconhecida → sem resultados
+
+	const sql = `
+		SELECT
+			c->>'code'                       AS name,
+			COUNT(*)::int                    AS quantity,
+			ROUND(SUM(o.total)::numeric, 2)  AS total_money,
+			MAX(c->>'type')                  AS discount_type,
+			MAX((c->>'value')::numeric)      AS discount_value
+		FROM ${table} o
+		CROSS JOIN LATERAL jsonb_array_elements(
+			CASE WHEN jsonb_typeof(o.coupon) = 'array' THEN o.coupon ELSE '[]'::jsonb END
+		) AS c
+		WHERE o.created_at IS NOT NULL
+			AND (o.payment_details->>'method') IS DISTINCT FROM 'other'
+			AND o.status         IS DISTINCT FROM 'cancelled'
+			AND o.payment_status IS DISTINCT FROM 'voided'
+			AND ($1::date IS NULL OR ${COUPON_BRT_DATE_EXPR} >= $1::date)
+			AND ($2::date IS NULL OR ${COUPON_BRT_DATE_EXPR} <= $2::date)
+		GROUP BY c->>'code'
+		ORDER BY quantity DESC`
+
+	const { rows } = await query(sql, [startDate || null, endDate || null])
+
+	// Shape compatível com o CouponRow que o front já consome. total_discount recebe o VALOR
+	// do cupom (mesma fonte que o legado usava na coluna Desconto); discount_type habilita o
+	// render type-aware (percentage → "N%" vs absolute → "R$ x,xx") no front.
+	return rows.map((r) => ({
+		date_coupon: null,
+		name: r.name,
+		quantity: Number(r.quantity) || 0,
+		total_money: Number(r.total_money) || 0,
+		total_discount: Number(r.discount_value) || 0,
+		discount_type: r.discount_type || null,
+		order_ids: [],
+		store: name
+	}))
+}
+
 export const getDbQuery = async (req, res) => {
 	try {
 		const { querySelect, startDate, endDate, store } = req.params
@@ -29,6 +88,15 @@ export const getDbQuery = async (req, res) => {
 			return res.status(400).json({
 				error: `Tabela inválida: '${querySelect}'. Permitidas: ${[...ALLOWED_QUERY_TABLES].join(", ")}`
 			})
+		}
+
+		// Cupons: paridade EXATA com a tela legada. Em vez de ler a tabela `coupon` (escrita por
+		// pedido no webhook, sem filtro de status), recalcula o uso a partir do dump pedidos_<loja>
+		// aplicando os mesmos filtros do filterOrders legado — o que exclui os cupons DRAFT-ORDER-*
+		// (pedidos manuais com payment_method='other') e alinha Usado/Faturamento ao legado.
+		if (querySelect === "coupon") {
+			const data = await getCouponUsageFromDump(store, startDate, endDate)
+			return res.status(200).json(data)
 		}
 
 		// A coluna `store` tem REPRESENTAÇÃO diferente por tabela:
