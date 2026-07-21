@@ -4,6 +4,18 @@ dotenv.config()
 
 export const config = {
 	port: process.env.PORT || 3000,
+	db: {
+		host: process.env.POSTGRESQL_HOSTNAME,
+		port: process.env.POSTGRESQL_PORT,
+		database: process.env.POSTGRESQL_DATABASE,
+		user: process.env.POSTGRESQL_USERNAME,
+		password: process.env.POSTGRESQL_PASSWORD,
+		// O banco é compartilhado com outro sistema: o schema precisa ser explícito.
+		schema: process.env.POSTGRESQL_SCHEMA,
+		// O Supabase impõe 2min por padrão; o Render não impunha limite algum.
+		statementTimeout: process.env.POSTGRESQL_STATEMENT_TIMEOUT || "120000",
+		poolMax: Number(process.env.POSTGRESQL_POOL_MAX || 10)
+	},
 	webhookSecret: process.env.WEBHOOK_SECRET || "default-secret",
 	tinyApiToken: process.env.TINY_API_TOKEN,
 	tinyApiTokenBasel: process.env.TINY_API_TOKEN_BASEL,

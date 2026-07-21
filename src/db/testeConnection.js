@@ -1,32 +1,28 @@
-import pkg from "pg"
-import dotenv from "dotenv"
+import { pool, schema } from "./db.js"
 
-dotenv.config()
+const diagnostico = `
+	SELECT current_database() AS banco,
+	       current_schema()   AS schema_efetivo,
+	       (SELECT count(*)
+	          FROM information_schema.tables
+	         WHERE table_schema = current_schema()) AS tabelas
+`
 
-const { Pool } = pkg
+pool
+	.query(diagnostico)
+	.then(({ rows }) => {
+		const { banco, schema_efetivo, tabelas } = rows[0]
+		console.log("Conectado ao banco de dados", { banco, schema_efetivo, tabelas })
 
-const host = process.env.POSTGRESQL_HOSTNAME
-const port = process.env.POSTGRESQL_PORT
-const database = process.env.POSTGRESQL_DATABASE
-const user = process.env.POSTGRESQL_USERNAME
-const password = process.env.POSTGRESQL_PASSWORD
-
-const pool = new Pool({
-	user,
-	host,
-	database,
-	password,
-	port,
-	ssl: {
-		rejectUnauthorized: false
-	}
-})
-
-pool.connect((err, client, release) => {
-	if (err) {
-		return console.error("Erro ao conectar ao banco de dados:", err.stack)
-	}
-	console.log("Conectado ao banco de dados")
-	release()
-	process.exit()
-})
+		if (schema_efetivo !== schema) {
+			console.error(
+				`ATENÇÃO: search_path resolveu para "${schema_efetivo}", esperado "${schema}".`
+			)
+			process.exitCode = 1
+		}
+	})
+	.catch((err) => {
+		console.error("Erro ao conectar ao banco de dados:", err.message)
+		process.exitCode = 1
+	})
+	.finally(() => pool.end())
