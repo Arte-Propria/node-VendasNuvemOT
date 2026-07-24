@@ -559,7 +559,13 @@ async function resolveCouponIds(couponNames, date) {
  * Recalcula os totais de daily_sales (date, store) a partir de orders_shop, sobre um conjunto
  * conhecido de order_ids. É idempotente e reflete o estado ATUAL de cada pedido — capturando
  * transições pending→paid, cancelamentos (active=0) e reenvios de webhook, sem deltas frágeis.
- * Regra Bruto/Pago: BRUTO = todos os pedidos; PAGO = payment_status='paid' E active=1.
+ *
+ * Regras (paridade com o Dashboard/legado `filterOrders`), com E = pedidos onde payment_method ≠ 'other':
+ *   total_money        = Σ total de E                                  (Geral valor; inclui cancelado/estornado)
+ *   total_orders       = contagem de E com active=1 e payment_status ≠ 'voided'   (Geral qtd)
+ *   total_paid_*       = E com active=1 e payment_status='paid'        (Pago)
+ * Parcerias (payment_method='other') são excluídas de todas as somas/contagens numéricas, mas
+ * seus order_id permanecem em id_orders (membership completa do dia).
  */
 async function recomputeDailyTotalsFromOrders(
 	date,
@@ -576,23 +582,27 @@ async function recomputeDailyTotalsFromOrders(
 		logWebhookDB(`🗑️ Daily sales removido (sem pedidos): ${date} - ${store}`)
 		return
 	}
-	const res = await query(`SELECT order_id, total, payment_status, active FROM ${dataBase.orders_shop} WHERE order_id = ANY($1)`,
+	const res = await query(`SELECT order_id, total, payment_status, active, payment_method FROM ${dataBase.orders_shop} WHERE order_id = ANY($1)`,
 		[ids])
 	const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100
 	let totalMoney = 0,
+		totalOrders = 0,
 		paidMoney = 0,
 		paidOrders = 0
 	const presentIds = []
 	for (const r of res.rows) {
+		presentIds.push(Number(r.order_id)) // membership completa (inclui parcerias)
+		if (r.payment_method === "other") continue // parcerias fora de todos os totais
 		const t = toNumber(r.total)
-		totalMoney += t // bruto: todos os pedidos
-		presentIds.push(Number(r.order_id))
-		if (r.payment_status === "paid" && Number(r.active) === 1) {
-			paidMoney += t
-			paidOrders++
+		totalMoney += t // Geral valor: E (inclui cancelado/estornado)
+		if (Number(r.active) === 1 && r.payment_status !== "voided") {
+			totalOrders++ // Geral qtd: E, não cancelado e não estornado
+			if (r.payment_status === "paid") {
+				paidMoney += t
+				paidOrders++
+			}
 		}
 	}
-	const totalOrders = presentIds.length
 	const aov = totalOrders ? round2(totalMoney / totalOrders) : 0
 	await query(`
         UPDATE ${dataBase.daily_sales}
@@ -616,11 +626,12 @@ async function recomputeDailyTotalsFromOrders(
 }
 
 /**
- * Atualiza daily_sales a cada pedido recebido (semântica "Bruto / Pago", dia de negócio BRT):
- * - Linha inexistente: cria a partir do pedido atual.
- * - Linha existente: RECALCULA o dia a partir de orders_shop sobre o conjunto de order_ids
- *   (idempotente; captura pending→paid, cancelamentos e reenvios).
- * BRUTO = todos os pedidos (inclui cancelado/pendente); PAGO = pago E não cancelado (active=1).
+ * Atualiza daily_sales a cada pedido recebido (regras do Dashboard/legado, dia de negócio BRT).
+ * Insert e update seguem a MESMA lógica: monta o conjunto de order_ids do dia e delega a
+ * recomputeDailyTotalsFromOrders, que lê o estado ATUAL de orders_shop (idempotente; captura
+ * pending→paid, cancelamentos, estornos e reenvios). Os totais numéricos excluem parcerias
+ * (payment_method='other') e ajustam cancelado/estornado conforme documentado em
+ * recomputeDailyTotalsFromOrders.
  * @param {string} date - data 'YYYY-MM-DD' (dia de negócio BRT)
  * @param {string} store - identificador da loja
  * @param {Object} currentOrder - { order_id, payment_status, total, coupons, status, ads_ids }
@@ -640,50 +651,49 @@ export async function upsertDailySales(date, store, currentOrder) {
 	const now = new Date().toISOString()
 	const isCancelled = currentOrder.status === "cancelled"
 
-	// Semântica "Bruto / Pago": o pedido conta no BRUTO sempre; no PAGO só se pago e não cancelado.
-	const isPaidContribution =
-    currentOrder.payment_status === "paid" && !isCancelled
 	// Cupons/anúncios a incorporar (cancelado não traz cupom)
 	const incomingCouponIds = isCancelled
 		? []
 		: await resolveCouponIds(currentOrder.coupons, date)
 	const incomingAds = currentOrder.ads_ids || []
+	const orderId = Number(currentOrder.order_id)
 
-	// Inserção de novo registro
+	// Linha inexistente: cria um esqueleto (zeros) e recalcula a partir de orders_shop, para que
+	// insert e update apliquem exatamente as mesmas regras (E ≠ 'other', cancel/estorno).
 	if (!row) {
-		const data = {
-			date_sales: date,
-			total_orders: 1,
-			total_paid_orders: isPaidContribution ? 1 : 0,
-			total_money: toNumber(currentOrder.total),
-			total_paid_money: isPaidContribution ? toNumber(currentOrder.total) : 0,
-			aov: toNumber(currentOrder.total),
-			id_ads: JSON.stringify(incomingAds),
-			store: store,
-			id_orders: JSON.stringify([currentOrder.order_id]),
-			id_coupons: JSON.stringify(incomingCouponIds),
-			active: 1,
-			dt_att_active: now.split("T")[0],
-			created_at: now,
-			updated_at: now
-		}
-		const fields = Object.keys(data)
-		const placeholders = fields.map((_, i) => `$${i + 1}`).join(", ")
-		const insertSql = `INSERT INTO ${dataBase.daily_sales} (${fields.join(", ")}) VALUES (${placeholders})`
-		await query(insertSql,
-			fields.map((f) => data[f]))
+		await query(
+			`INSERT INTO ${dataBase.daily_sales}
+				(date_sales, store, total_orders, total_paid_orders, total_money, total_paid_money,
+				 aov, id_orders, id_coupons, id_ads, active, dt_att_active, created_at, updated_at)
+			 VALUES ($1,$2,0,0,0,0,0,$3,$4,$5,1,$6,$7,$7)`,
+			[
+				date,
+				store,
+				JSON.stringify([orderId]),
+				JSON.stringify(incomingCouponIds),
+				JSON.stringify(incomingAds),
+				now.split("T")[0],
+				now
+			]
+		)
+		await recomputeDailyTotalsFromOrders(
+			date,
+			store,
+			[orderId],
+			incomingCouponIds,
+			incomingAds,
+			now
+		)
 		logWebhookDB(`✅ Daily sales inserido (novo pedido): ${date} - ${store}`)
 		return
 	}
 
 	// Linha existe – RECALCULA o dia a partir de orders_shop sobre o conjunto de pedidos.
 	// (orders_shop já foi atualizado com o pedido atual antes desta chamada.)
-	// Idempotente: captura pending→paid, cancelamentos (active=0) e reenvios de webhook.
 	const id_orders = parseJsonArray(row.id_orders).map(Number)
 	const id_coupons = parseJsonArray(row.id_coupons)
 	const id_ads = parseJsonArray(row.id_ads)
 
-	const orderId = Number(currentOrder.order_id)
 	const newIds = [...new Set([...id_orders, orderId])]
 	const newCoupons = [...new Set([...id_coupons, ...incomingCouponIds])]
 	const newAds = [...new Set([...id_ads, ...incomingAds])]
