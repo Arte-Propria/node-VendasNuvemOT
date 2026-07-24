@@ -695,6 +695,16 @@ export const insertOrder = async (order, store) => {
 	try {
 		const numericUuid = generateNumericId()
 
+		// order_id estável: o wrapper recebido ({ data }) não tem `.orderId`, então antes gravava
+		// sempre NULL e o ON CONFLICT(order_id) nunca deduplicava (reenvio criava duplicata).
+		// Loja física usa o `token` como chave (guard contra o placeholder "999999", que se repete
+		// em pedidos distintos); sem token real, cai no numericUuid (único, não colapsa).
+		const tokenReal =
+			order.data.token && String(order.data.token) !== "999999"
+				? Number(order.data.token)
+				: null
+		const orderIdEstavel = tokenReal ?? numericUuid
+
 		// Concatena o owner_note com o UUID
 		const finalOwnerNote = `${order.data.owner_note}_${numericUuid}`
 
@@ -718,7 +728,7 @@ export const insertOrder = async (order, store) => {
 			order.data.free_shipping_config || null,
 			JSON.stringify(order.data.fulfillments) || null,
 			order.data.has_shippable_products || null,
-			order.orderId || null,
+			orderIdEstavel,
 			numericUuid,
 			order.data.paid_at || null,
 			order.data.payment_count || null,

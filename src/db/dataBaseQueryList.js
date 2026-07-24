@@ -33,6 +33,18 @@ export const dataBase = {
 	product: "categorias"
 }
 
+// order_id sintético p/ pedidos de loja física em orders_shop (PK global). Esses pedidos não
+// têm `number`/`id` da Nuvemshop — só `token`. Usamos `token + offset por loja`, acima do range
+// histórico (numericUuid ~1e6–1e7 e migração até 2e12) e bem abaixo de 2^53 (seguro no front).
+// Determinístico → reenvio do mesmo token faz UPDATE via ON CONFLICT(order_id) em vez de duplicar.
+export const LOJA_FISICA_ORDER_ID_OFFSET = {
+	1146504: 3_000_000_000_000, // artepropria
+	3889735: 4_000_000_000_000 // outlet
+}
+
+// token placeholder usado no dump legado por 1.5k pedidos distintos: NÃO é chave única.
+export const TOKEN_PLACEHOLDER = "999999"
+
 export const dataBaseDb = {
 	ads: {
 		transform: (delivery) => ({
@@ -197,7 +209,23 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	logWebhookDB("Iniciando mapNuvemshopToDelivery")
 	// Usa sempre o identificador real do pedido. Antes, pedidos "Loja Fisica"
 	// recebiam order_id = "Loja Fisica" (literal) e colidiam entre si em orders_shop.
-	const orderNumber = nuvemData?.number || nuvemData?.order_id || nuvemData?.id
+	// Pedido de loja física? (storefront "Loja" ou "Loja Fisica")
+	const isLojaFisica =
+    nuvemData?.storefront === "Loja" || nuvemData?.storefront === "Loja Fisica"
+	// Pedidos de loja física não têm `number`/`id` da Nuvemshop (só `token`). Deriva o order_id
+	// determinístico a partir do token real (guard contra o placeholder) + offset da loja.
+	const storeIdNum = Number(nuvemData?.store_id)
+	const tokenReal =
+    nuvemData?.token && String(nuvemData.token) !== TOKEN_PLACEHOLDER
+    	? Number(nuvemData.token)
+    	: null
+	const orderNumber =
+    nuvemData?.number ||
+    nuvemData?.order_id ||
+    nuvemData?.id ||
+    (isLojaFisica && tokenReal
+    	? tokenReal + (LOJA_FISICA_ORDER_ID_OFFSET[storeIdNum] || 0)
+    	: undefined)
 	logWebhookDB("orderNumber:", orderNumber)
 	const now = new Date().toISOString()
 
@@ -214,10 +242,6 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		GABRIEL: "45688888888",
 		CHATBOT: "45699999999"
 	}
-
-	// Pedido de loja física? (storefront "Loja" ou "Loja Fisica")
-	const isLojaFisica =
-    nuvemData?.storefront === "Loja" || nuvemData?.storefront === "Loja Fisica"
 
 	// Filial: billing_business_name; fallback CHATBOT (mesma regra do ChartLojas do front).
 	let lojaFisica = null
