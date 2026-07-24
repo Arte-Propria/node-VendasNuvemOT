@@ -6,11 +6,12 @@
 // de pedido (order_id) colidem entre lojas (a Nuvemshop numera por loja) e orders_shop tem
 // order_id como chave única, então um mesmo número mistura/perde pedidos entre lojas.
 //
-// Regras aplicadas:
+// Regras aplicadas (paridade com o Dashboard/legado `filterOrders`), E = pedidos com method ≠ 'other':
 //   - Dia de negócio em horário local do Brasil (BRT, UTC-3, DST-aware);
-//   - "Bruto / Pago":
-//       BRUTO (total_orders/total_money/id_orders) = TODOS os pedidos (inclui cancelado/pendente);
-//       PAGO  (total_paid_orders/total_paid_money) = pagos E não cancelados.
+//   - total_money  = Σ total de E (Geral valor; inclui cancelado/estornado);
+//   - total_orders = contagem de E com status≠'cancelled' e payment_status≠'voided' (Geral qtd);
+//   - total_paid_* = E com status≠'cancelled' e payment_status='paid' (Pago);
+//   - id_orders    = todos os pedidos do dia (membership; inclui parcerias).
 //
 // Idempotente: UPSERT por (date_sales, store), preservando id_sales das linhas existentes.
 // ============================================================================
@@ -27,8 +28,8 @@ const isoDate = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : Strin
 
 async function fetchDumpGroups(table, startDate, endDate) {
 	const sql = `
-		SELECT brt_date, number, total, payment_status, status, coupon FROM (
-			SELECT ${BRT_DATE_EXPR} AS brt_date, number, total, payment_status, status, coupon
+		SELECT brt_date, number, total, payment_status, status, coupon, payment_details FROM (
+			SELECT ${BRT_DATE_EXPR} AS brt_date, number, total, payment_status, status, coupon, payment_details
 			FROM ${table}
 			WHERE created_at IS NOT NULL
 		) t
@@ -45,27 +46,46 @@ async function fetchDumpGroups(table, startDate, endDate) {
 	return groups
 }
 
-// Agrega um dia segundo a regra Bruto/Pago.
+// Extrai o método de pagamento do jsonb payment_details (parceria = 'other').
+function paymentMethodOf(o) {
+	const pd = o.payment_details
+	if (!pd) return null
+	if (typeof pd === "string") {
+		try { return JSON.parse(pd)?.method ?? null } catch { return null }
+	}
+	return pd.method ?? null
+}
+
+// Agrega um dia com paridade ao Dashboard/legado `filterOrders`.
+// E = pedidos onde payment_method ≠ 'other' (parcerias fora de todos os totais numéricos):
+//   total_money  = Σ total de E                                     (Geral valor; inclui cancelado/estornado)
+//   total_orders = contagem de E com status≠'cancelled' e payment_status≠'voided'  (Geral qtd)
+//   total_paid_* = E com status≠'cancelled' e payment_status='paid' (Pago)
+// id_orders mantém todos os `number` do dia (membership completa).
 function computeRow(orders) {
-	let totalMoney = 0, paidMoney = 0, paidOrders = 0
+	let totalMoney = 0, totalOrders = 0, paidMoney = 0, paidOrders = 0
 	const idOrders = []
 	const couponCodes = new Set()
 	for (const o of orders) {
+		idOrders.push(Number(o.number)) // membership completa (inclui parcerias)
+		if (paymentMethodOf(o) === "other") continue // parcerias fora dos totais
 		const t = toNumber(o.total)
-		totalMoney += t                 // bruto: todos os pedidos
-		idOrders.push(Number(o.number))
-		if (o.payment_status === "paid" && o.status !== "cancelled") { paidMoney += t; paidOrders++ }
+		totalMoney += t                 // Geral valor: E (inclui cancelado/estornado)
+		if (o.status !== "cancelled" && o.payment_status !== "voided") {
+			totalOrders++               // Geral qtd: E, não cancelado e não estornado
+			if (o.payment_status === "paid") { paidMoney += t; paidOrders++ }
+		}
 		if (o.status !== "cancelled") { // cupom de cancelado é revertido
 			const cps = Array.isArray(o.coupon) ? o.coupon : []
 			for (const c of cps) if (c?.code) couponCodes.add(c.code)
 		}
 	}
 	return {
-		total_orders: orders.length,
+		total_orders: totalOrders,
 		total_paid_orders: paidOrders,
 		total_money: round2(totalMoney),
 		total_paid_money: round2(paidMoney),
-		aov: round2(orders.length ? totalMoney / orders.length : 0),
+		aov: round2(totalOrders ? totalMoney / totalOrders : 0),
 		id_orders: idOrders,
 		couponCodes: [...couponCodes]
 	}
