@@ -14,7 +14,11 @@ import { getDataADSMeta } from "../controllers/dataADSMetaControllers.js"
 import { createOrder } from "../controllers/createOrderController.js"
 import { postProduct } from "../controllers/createProductController.js"
 import { getCategories } from "../controllers/categoriesControllers.js"
-import { deleteOrderByOwnerNote, deleteOrdersByDate } from "../controllers/deleteOrderController.js"
+import {
+	deleteOrderByOwnerNote,
+	deleteOrdersByDate,
+	deleteManualOrder
+} from "../controllers/deleteOrderController.js"
 import {
 	createdOrderWebhook,
 	createOrderMarketplaceWebhook,
@@ -164,6 +168,9 @@ router.put("/shein/order/:orderId/status", updateSheinOrderStatusController)
 router.post("/order/:store", createOrder) // Adicione a rota para criar um novo pedido
 
 // Rota para excluir pedidos
+// Pedido manual pelo order_id da listagem nova (dump + orders_shop + daily_sales).
+// Registrada ANTES da rota por ownerNote, que fica para compatibilidade com o legado.
+router.delete("/order/:store/id/:orderId", deleteManualOrder)
 router.delete("/order/:store/:ownerNote", deleteOrderByOwnerNote) // Adicione a rota para criar um novo pedido
 
 // WEBHOOKS

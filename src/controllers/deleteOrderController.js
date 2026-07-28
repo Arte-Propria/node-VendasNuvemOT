@@ -1,5 +1,73 @@
-import { deleteOrderFromDB, deleteOrdersByBusinessDate } from "../services/deleteOrderServices.js"
+import {
+	deleteOrderFromDB,
+	deleteOrdersByBusinessDate,
+	deleteManualOrderById,
+	pruneEmptyDailySales
+} from "../services/deleteOrderServices.js"
 import { storeMapping } from "../db/dataBaseQueryList.js"
+import { recalcAllDailySales } from "../services/dailySalesRecalc.js"
+import { toBusinessDateBR, toLocalDateBR } from "../tools/helpers.js"
+
+// Normaliza a loja: aceita código numérico ("1146504") ou nome ("artepropria")
+const resolveStore = (store) => {
+	if (storeMapping.nameToNumeric[store]) {
+		return { name: store, numeric: storeMapping.nameToNumeric[store] }
+	}
+	if (storeMapping.numericToName[Number(store)]) {
+		const numeric = Number(store)
+		return { name: storeMapping.numericToName[numeric], numeric }
+	}
+	return null
+}
+
+// Exclui um pedido manual (loja física / chatbot) das DUAS bases pelo order_id da
+// listagem nova, e recalcula daily_sales do dia a partir do dump.
+export const deleteManualOrder = async (req, res) => {
+	const { store, orderId } = req.params
+
+	if (!/^\d+$/.test(String(orderId))) {
+		return res.status(400).json({ error: `orderId inválido: ${orderId}` })
+	}
+
+	const resolved = resolveStore(store)
+	if (!resolved) {
+		return res.status(400).json({
+			error: `Loja desconhecida: ${store}. Use outlet/artepropria ou 3889735/1146504.`
+		})
+	}
+
+	try {
+		const result = await deleteManualOrderById(resolved, Number(orderId))
+		const total = Object.values(result.deleted).reduce((a, b) => a + b, 0)
+		if (total === 0) {
+			return res.status(404).json({ error: "Pedido não encontrado" })
+		}
+
+		// Mesmo intervalo do createOrder: cobre o dia de negócio (corte 03:00) e o
+		// dia-calendário SP, que podem divergir em pedidos de meia-noite.
+		if (result.createdAt) {
+			const businessDate = toBusinessDateBR(result.createdAt)
+			const localDate = toLocalDateBR(result.createdAt)
+			if (businessDate && localDate) {
+				const [startDate, endDate] = businessDate <= localDate
+					? [businessDate, localDate]
+					: [localDate, businessDate]
+				await recalcAllDailySales({
+					stores: [resolved.name], startDate, endDate, apply: true
+				})
+				// recalc só reescreve dias que ainda têm pedidos; se este era o último
+				// do dia, a linha agregada precisa sair.
+				await pruneEmptyDailySales(resolved, startDate)
+				if (endDate !== startDate) await pruneEmptyDailySales(resolved, endDate)
+			}
+		}
+
+		return res.status(200).json({ message: "Pedido excluído", deleted: result.deleted })
+	} catch (err) {
+		console.error("Erro ao excluir pedido manual:", err)
+		return res.status(500).json({ error: "Falha ao excluir pedido" })
+	}
+}
 
 export const deleteOrderByOwnerNote = async (req, res) => {
 	const { ownerNote, store } = req.params // Assume que o ownerNote vem no corpo da requisição

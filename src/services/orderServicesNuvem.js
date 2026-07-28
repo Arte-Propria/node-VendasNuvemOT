@@ -798,8 +798,14 @@ export const insertOrder = async (order, store) => {
 			order.data.gateway_link || null,
 			order.data.gateway_name || null
 		])
+
+		// Devolve os ids gerados aqui para o chamador poder alinhar a segunda escrita
+		// (orders_shop) à MESMA chave do dump. Sem isso, o payload manual chega em
+		// mapNuvemshopToDelivery sem number/id/order_id e o order_id sai undefined.
+		return { orderId: orderIdEstavel, numericUuid, ownerNote: finalOwnerNote }
 	} catch (err) {
 		console.error("Erro ao inserir pedido:", err)
+		return null
 	}
 }
 
