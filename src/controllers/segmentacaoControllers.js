@@ -35,7 +35,8 @@ const COUPON_BRT_DATE_EXPR =
 // payment_status='voided' e payment_details.method='other' — estes últimos são os cupons
 // DRAFT-ORDER-* de pedidos manuais) e, por pedido sobrevivente, soma 1 uso e o order.total por
 // código de cupom. Garante paridade com o legado sem depender da tabela `coupon` (que é escrita
-// por webhook sem esses filtros).
+// por webhook sem esses filtros). Agrega também os order_id dos pedidos sobreviventes, que a
+// tela de Estatísticas usa para mapear cada cupom aos seus pedidos em orders_shop.
 const getCouponUsageFromDump = async (store, startDate, endDate) => {
 	let name = store
 	if (/^\d+$/.test(String(store))) name = NUMERIC_TO_STORE_NAME[Number(store)] || null
@@ -48,7 +49,11 @@ const getCouponUsageFromDump = async (store, startDate, endDate) => {
 			COUNT(*)::int                    AS quantity,
 			ROUND(SUM(o.total)::numeric, 2)  AS total_money,
 			MAX(c->>'type')                  AS discount_type,
-			MAX((c->>'value')::numeric)      AS discount_value
+			MAX((c->>'value')::numeric)      AS discount_value,
+			COALESCE(
+				jsonb_agg(DISTINCT o.order_id) FILTER (WHERE o.order_id IS NOT NULL),
+				'[]'::jsonb
+			)                                AS order_ids
 		FROM ${table} o
 		CROSS JOIN LATERAL jsonb_array_elements(
 			CASE WHEN jsonb_typeof(o.coupon) = 'array' THEN o.coupon ELSE '[]'::jsonb END
@@ -67,6 +72,10 @@ const getCouponUsageFromDump = async (store, startDate, endDate) => {
 	// Shape compatível com o CouponRow que o front já consome. total_discount recebe o VALOR
 	// do cupom (mesma fonte que o legado usava na coluna Desconto); discount_type habilita o
 	// render type-aware (percentage → "N%" vs absolute → "R$ x,xx") no front.
+	// order_ids vem do MESMO conjunto de pedidos que gera quantity/total_money (já sem
+	// cancelled/voided/method='other'), então a contagem casa com a coluna "Usado" da tela de
+	// Cupons. É o que permite ao DataSectionCart (Estatísticas) resolver cada id em orders_shop
+	// — o dump e orders_shop compartilham a mesma identidade order_id.
 	return rows.map((r) => ({
 		date_coupon: null,
 		name: r.name,
@@ -74,7 +83,7 @@ const getCouponUsageFromDump = async (store, startDate, endDate) => {
 		total_money: Number(r.total_money) || 0,
 		total_discount: Number(r.discount_value) || 0,
 		discount_type: r.discount_type || null,
-		order_ids: [],
+		order_ids: Array.isArray(r.order_ids) ? r.order_ids : [],
 		store: name
 	}))
 }
@@ -94,6 +103,7 @@ export const getDbQuery = async (req, res) => {
 		// pedido no webhook, sem filtro de status), recalcula o uso a partir do dump pedidos_<loja>
 		// aplicando os mesmos filtros do filterOrders legado — o que exclui os cupons DRAFT-ORDER-*
 		// (pedidos manuais com payment_method='other') e alinha Usado/Faturamento ao legado.
+		// O retorno inclui order_ids (mesmo conjunto filtrado) para a tela de Estatísticas.
 		if (querySelect === "coupon") {
 			const data = await getCouponUsageFromDump(store, startDate, endDate)
 			return res.status(200).json(data)
