@@ -8,6 +8,7 @@ import {
 import {
 	upsertRecord,
 	upsertClient,
+	resolveClientByEmail,
 	upsertOrderShop,
 	upsertProduct,
 	upsertCoupon,
@@ -229,7 +230,12 @@ export const filterBdByDateRange = (queryData,
 }
 
 // Função para processar um pedido da Nuvenshop
-export async function processOrderFromNuvemshop(nuvemData) {
+// `options.clientEmail` (opcional) faz o cliente ser resolvido pelo E-MAIL em vez do CPF —
+// usado pela rota manual, cujo payload manda sempre o CPF fictício da filial e por isso
+// colapsava todos os operadores no mesmo id_cli, sobrescrevendo nome/e-mail a cada
+// cadastro. Sem a opção, o comportamento é o de sempre (upsertClient por CPF).
+export async function processOrderFromNuvemshop(nuvemData, options = {}) {
+	const { clientEmail = null } = options
 	// Mapear
 	const delivery = mapNuvemshopToDelivery(nuvemData)
 	/*
@@ -264,7 +270,9 @@ export async function processOrderFromNuvemshop(nuvemData) {
 	for (const client of safeDelivery.clients) {
 		const record = dataBaseDb.clients.transform(client)
 		//console.log("Client record:", record) // debug
-		clientId = await upsertClient(record)
+		clientId = clientEmail
+			? await resolveClientByEmail(clientEmail, record)
+			: await upsertClient(record)
 	}
 	for (const prod of safeDelivery.product) {
 		const record = dataBaseDb.product.transform(prod)

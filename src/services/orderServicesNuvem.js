@@ -2,8 +2,30 @@ import axios from "axios"
 import dotenv from "dotenv"
 import { query } from "../db/db.js"
 import { generateNumericId } from "../tools/tools.js"
+import { TOKEN_PLACEHOLDER } from "../db/dataBaseQueryList.js"
 
 dotenv.config()
+
+// Aceita apenas token puramente numérico e dentro do range seguro de JS. Os tokens reais
+// da Nuvemshop são hexadecimais de 40 chars: Number() devolve NaN e `NaN ?? fallback`
+// NÃO cai no fallback (?? só trata null/undefined), estourando o insert em order_id bigint.
+const tokenNumerico = (valor) => {
+	const s = String(valor ?? "").trim()
+	if (!s || s === TOKEN_PLACEHOLDER || !/^\d+$/.test(s)) return null
+	const n = Number(s)
+	return Number.isSafeInteger(n) ? n : null
+}
+
+// generateNumericId usa só os 7 últimos dígitos do epoch, então repete a cada ~2h46min.
+// Numa colisão o pedido caía no ON CONFLICT/UPDATE e sobrescrevia outro em silêncio.
+const numeroLivre = async (tabela) => {
+	for (let i = 0; i < 5; i++) {
+		const n = generateNumericId()
+		const { rows } = await query(`SELECT 1 FROM ${tabela} WHERE number = $1`, [n])
+		if (!rows.length) return n
+	}
+	throw new Error("Não foi possível obter um number livre após 5 tentativas")
+}
 
 export const fetchOrders = async (params = {}) => {
 	const { store } = params
@@ -575,6 +597,9 @@ export const insertOrders = async (orders, store) => {
 export const insertOrder = async (order, store) => {
 	const tableName =
     store === "outlet" ? "pedidos_outlet" : "pedidos_artepropria"
+	// `number` e `id` NÃO entram no DO UPDATE: num reenvio (mesma chave de idempotência
+	// em order_id) trocá-los geraria um number novo e orfanaria a linha já criada em
+	// orders_shop, que é chaveada pelo number original.
 	const queryText = `
     INSERT INTO ${tableName} (
       weight, app_id, attributes, cancelled_at, checkout_enabled, client_details,
@@ -622,7 +647,7 @@ export const insertOrder = async (order, store) => {
       free_shipping_config = EXCLUDED.free_shipping_config,
       fulfillments = EXCLUDED.fulfillments,
       has_shippable_products = EXCLUDED.has_shippable_products,
-      number = EXCLUDED.number,
+      number = ${tableName}.number,
       paid_at = EXCLUDED.paid_at,
       payment_count = EXCLUDED.payment_count,
       payment_details = EXCLUDED.payment_details,
@@ -644,7 +669,7 @@ export const insertOrder = async (order, store) => {
       total = EXCLUDED.total,
       total_usd = EXCLUDED.total_usd,
       updated_at = EXCLUDED.updated_at,
-      id = EXCLUDED.id,
+      id = ${tableName}.id,
       shipping_carrier_name = EXCLUDED.shipping_carrier_name,
       shipping_store_branch_name = EXCLUDED.shipping_store_branch_name,
       landing_url = EXCLUDED.landing_url,
@@ -693,22 +718,20 @@ export const insertOrder = async (order, store) => {
     RETURNING *`
 
 	try {
-		const numericUuid = generateNumericId()
+		const numericUuid = await numeroLivre(tableName)
 
 		// order_id estável: o wrapper recebido ({ data }) não tem `.orderId`, então antes gravava
 		// sempre NULL e o ON CONFLICT(order_id) nunca deduplicava (reenvio criava duplicata).
-		// Loja física usa o `token` como chave (guard contra o placeholder "999999", que se repete
-		// em pedidos distintos); sem token real, cai no numericUuid (único, não colapsa).
-		const tokenReal =
-			order.data.token && String(order.data.token) !== "999999"
-				? Number(order.data.token)
-				: null
-		const orderIdEstavel = tokenReal ?? numericUuid
+		// O popup manda uma chave de idempotência no `token` (guard contra o placeholder
+		// TOKEN_PLACEHOLDER, que se repete em 1.5k pedidos distintos do dump histórico): reenviar
+		// a MESMA submissão conflita e atualiza a linha em vez de duplicar. Sem token válido,
+		// cai no numericUuid (único, não colapsa).
+		const orderIdEstavel = tokenNumerico(order.data.token) ?? numericUuid
 
 		// Concatena o owner_note com o UUID
 		const finalOwnerNote = `${order.data.owner_note}_${numericUuid}`
 
-		await query(queryText, [
+		const { rows } = await query(queryText, [
 			order.data.weight || null,
 			order.data.app_id || null,
 			order.data.attributes || null,
@@ -799,10 +822,15 @@ export const insertOrder = async (order, store) => {
 			order.data.gateway_name || null
 		])
 
-		// Devolve os ids gerados aqui para o chamador poder alinhar a segunda escrita
-		// (orders_shop) à MESMA chave do dump. Sem isso, o payload manual chega em
-		// mapNuvemshopToDelivery sem number/id/order_id e o order_id sai undefined.
-		return { orderId: orderIdEstavel, numericUuid, ownerNote: finalOwnerNote }
+		// Devolve os ids EFETIVAMENTE persistidos (RETURNING *), não os gerados aqui: num
+		// reenvio o DO UPDATE preserva number/id da linha original, e é esse number que o
+		// chamador precisa para alinhar a segunda escrita (orders_shop) à MESMA linha.
+		const persisted = rows[0] ?? {}
+		return {
+			orderId: persisted.order_id ?? orderIdEstavel,
+			numericUuid: persisted.number ?? numericUuid,
+			ownerNote: persisted.owner_note ?? finalOwnerNote
+		}
 	} catch (err) {
 		console.error("Erro ao inserir pedido:", err)
 		return null

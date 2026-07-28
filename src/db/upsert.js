@@ -88,6 +88,49 @@ export async function upsertRecord(tableName, record, referenceField) {
 }
 
 /**
+ * Insere um cliente novo consumindo a sequência de id_cli. Extraído para ser
+ * compartilhado entre upsertClient (chave CPF) e resolveClientByEmail (chave e-mail).
+ */
+async function criarCliente(cleanRecord, motivo) {
+	const seqResult = await query("SELECT nextval('clients_id_seq') as new_id")
+	const newId = seqResult.rows[0].new_id
+	const newRecord = { ...cleanRecord, id_cli: newId }
+	const fields = Object.keys(newRecord)
+	const placeholders = fields.map((_, idx) => `$${idx + 1}`).join(", ")
+	const insertSql = `INSERT INTO ${dataBase.clients} (${fields.join(", ")}) VALUES (${placeholders})`
+	const values = fields.map((f) => newRecord[f])
+	await query(insertSql, values)
+	logWebhookDB(`Cliente inserido: ${motivo}, id_cli ${newId}`)
+	return newId
+}
+
+/**
+ * Resolve o cliente de um pedido MANUAL (popup "Cadastrar pedido") pelo e-mail do
+ * operador. Diferente de upsertClient, que chaveia por CPF: o form manda sempre o CPF
+ * fictício da filial (mapaLojas.CHATBOT), então todos os pedidos do chatbot colapsavam
+ * no mesmo id_cli e o UPDATE sobrescrevia nome/e-mail com os do último operador.
+ * Aqui o e-mail é a identidade: existindo, reusamos o id_cli e NÃO alteramos o registro.
+ */
+export async function resolveClientByEmail(email, fallbackRecord) {
+	const normalized = String(email ?? "").trim().toLowerCase()
+	if (!normalized) return null
+
+	// ORDER BY id_cli: não há UNIQUE em email_cli, então fixamos o mais antigo para a
+	// escolha ser determinística mesmo com duplicatas herdadas da base legada.
+	const selectSql = `SELECT id_cli FROM ${dataBase.clients}
+	   WHERE lower(email_cli) = $1 ORDER BY id_cli ASC LIMIT 1`
+	const { rows } = await query(selectSql, [normalized])
+	if (rows.length > 0) {
+		logWebhookDB(`Cliente reaproveitado por e-mail ${normalized}: id_cli ${rows[0].id_cli}`)
+		return rows[0].id_cli
+	}
+
+	const cleanRecord = removeNullFields({ ...fallbackRecord, email_cli: normalized })
+	delete cleanRecord.id_cli // gerado pela sequência
+	return criarCliente(cleanRecord, `e-mail ${normalized}`)
+}
+
+/**
  * Upsert (inserir ou atualizar) cliente usando CPF/CNPJ como referência.
  * O campo id_cli é gerado automaticamente pela sequência.
  */
@@ -119,16 +162,7 @@ export async function upsertClient(clientRecord) {
 				return existingId
 			} else {
 				// Inserir novo cliente – obtém próximo ID da sequência
-				const seqResult = await query("SELECT nextval('clients_id_seq') as new_id")
-				const newId = seqResult.rows[0].new_id
-				const newRecord = { ...cleanRecord, id_cli: newId }
-				const fields = Object.keys(newRecord)
-				const placeholders = fields.map((_, idx) => `$${idx + 1}`).join(", ")
-				const insertSql = `INSERT INTO ${dataBase.clients} (${fields.join(", ")}) VALUES (${placeholders})`
-				const values = fields.map((f) => newRecord[f])
-				await query(insertSql, values)
-				logWebhookDB(`Cliente inserido: CPF ${cpf}, id_cli ${newId}`)
-				return newId
+				return criarCliente(cleanRecord, `CPF ${cpf}`)
 			}
 		} catch (error) {
 			// Se for erro de violação de unique (código 23505) e ainda há tentativas, aguarda e repete
