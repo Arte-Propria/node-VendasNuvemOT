@@ -199,7 +199,9 @@ export async function upsertOrderShop(updateRecord, fullRecord) {
 
 	if (selectResult.rows.length > 0) {
 		// ---- UPDATE PARCIAL ----
-		// Lista de campos que podem ser atualizados após a criação do pedido
+		// Lista de campos que podem ser atualizados após a criação do pedido.
+		// shipping_cost_owner NÃO entra aqui de propósito: o Tiny não tem esse dado e
+		// mandaria 0/null por cima do valor vindo do dump/popup. Ver mapTinyToDelivery.
 		const updatableFields = [
 			"products",
 			"products_detail",

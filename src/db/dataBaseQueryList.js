@@ -199,6 +199,13 @@ export const dataBaseDb = {
 			fiscal_note: delivery.fiscal_note,
 			estimated_delivery: delivery.estimated_delivery,
 			shipping_cost: delivery.shipping_cost,
+			// Frete pago pela LOJA. Nos pedidos manuais ('Loja'/'Loja Fisica') o campo é
+			// reaproveitado para o total de vendas de clientes (novos na Loja Física,
+			// recorrentes no Chatbot) — é dele que a aba Estatísticas tira
+			// totalNovosClientes e totalRecorrentesClientesChatbot.
+			// `?? null` e NUNCA 0: removeNullFields descarta null, então um re-sync sem o
+			// campo deixa a coluna intacta em vez de zerar o valor migrado do dump.
+			shipping_cost_owner: delivery.shipping_cost_owner ?? null,
 			order_tracking_link: delivery.order_tracking_link ?? null
 		})
 	},
@@ -413,6 +420,21 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		? `${storeBaseUrl}/checkout/v3/success/${nuvemData.id}/${nuvemData.token}`
 		: null
 
+	// shipping_cost_owner: frete pago pela LOJA na Nuvemshop. Nos pedidos MANUAIS
+	// (popup "Cadastrar pedido") o campo é reaproveitado para o total de vendas de
+	// clientes, que a aba Estatísticas soma por storefront.
+	//
+	// AUSÊNCIA ≠ ZERO. shippingCost()/toNumber() devolvem 0 para undefined, e o 0
+	// sobrevive ao removeNullFields — entraria no SET do UPDATE do upsertRecord e
+	// ZERARIA o valor migrado a cada re-sync do pedido. Só emitimos número quando o
+	// payload realmente traz o campo; sem ele mandamos null, que é descartado e deixa a
+	// coluna intacta. Um 0 EXPLÍCITO do payload continua sendo gravado.
+	const ownerCostRaw = nuvemData?.shipping_cost_owner
+	const shippingCostOwner =
+    ownerCostRaw === undefined || ownerCostRaw === null || ownerCostRaw === ""
+    	? null
+    	: shippingCost(ownerCostRaw)
+
 	// Pedido
 	const orderDelivery = {
 		order_id: orderNumber,
@@ -442,6 +464,7 @@ export function mapNuvemshopToDelivery(nuvemData) {
 		estimated_delivery: calculateEstimatedDeliveryDate(nuvemData?.created_at,
 			nuvemData?.shipping_max_days),
 		shipping_cost: shippingCost(nuvemData?.shipping_cost_customer),
+		shipping_cost_owner: shippingCostOwner,
 		order_tracking_link: orderTrackingLink
 	}
 	//logWebhookDB("orderDelivery:", orderDelivery)
@@ -586,7 +609,11 @@ export async function mapTinyToDelivery(tinyData, fiscalNoteLink = null) {
 		markers_order_tiny: markers,
 		fiscal_note: fiscalNoteLink,
 		estimated_delivery: estimatedDelivery,
-		shipping_cost: shippingCostValue
+		shipping_cost: shippingCostValue,
+		// O Tiny não tem o conceito de shipping_cost_owner e nunca recebe pedido manual.
+		// null (e não 0) para o removeNullFields descartar o campo — um 0 vindo de uma
+		// origem que não tem o dado apagaria o valor real gravado pela Nuvemshop/backfill.
+		shipping_cost_owner: null
 	}
 	console.log(`[mapTinyToDelivery] Pedido ${orderDelivery.order_id} mapeado. Nota fiscal: ${fiscalNoteLink ? "presente" : "não disponível"}`)
 
