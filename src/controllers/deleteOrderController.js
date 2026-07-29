@@ -2,7 +2,8 @@ import {
 	deleteOrderFromDB,
 	deleteOrdersByBusinessDate,
 	deleteManualOrderById,
-	pruneEmptyDailySales
+	pruneEmptyDailySales,
+	orderStillInDailySales
 } from "../services/deleteOrderServices.js"
 import { storeMapping } from "../db/dataBaseQueryList.js"
 import { recalcAllDailySales } from "../services/dailySalesRecalc.js"
@@ -20,8 +21,51 @@ const resolveStore = (store) => {
 	return null
 }
 
+/**
+ * Recalcula daily_sales dos dias afetados pela exclusão.
+ *
+ * Roda depois do COMMIT — o pedido já sumiu quando isto executa. Por isso a falha nunca
+ * é silenciosa: volta no corpo da resposta para a tela avisar, em vez de exibir sucesso
+ * com o Dashboard mostrando o pedido excluído.
+ *
+ * @returns {Promise<{recalculado:boolean, dias:string[], erro?:string}>}
+ */
+const refreshDailySalesFor = async (store, createdAt) => {
+	if (!createdAt) {
+		return {
+			recalculado: false,
+			dias: [],
+			erro: "pedido excluído sem created_at (dump e orders_shop) — não há dia para recalcular"
+		}
+	}
+
+	// Mesmo intervalo do createOrder: cobre o dia de negócio (corte 03:00) e o
+	// dia-calendário SP, que podem divergir em pedidos de meia-noite.
+	const businessDate = toBusinessDateBR(createdAt)
+	const localDate = toLocalDateBR(createdAt)
+	if (!businessDate || !localDate) {
+		return { recalculado: false, dias: [], erro: `created_at inválido: ${createdAt}` }
+	}
+
+	const [startDate, endDate] = businessDate <= localDate
+		? [businessDate, localDate]
+		: [localDate, businessDate]
+	const dias = startDate === endDate ? [startDate] : [startDate, endDate]
+
+	try {
+		await recalcAllDailySales({ stores: [store.name], startDate, endDate, apply: true })
+		// recalc só reescreve dias que ainda têm pedidos; se este era o último
+		// do dia, a linha agregada precisa sair.
+		for (const dia of dias) await pruneEmptyDailySales(store, dia)
+		return { recalculado: true, dias }
+	} catch (err) {
+		console.error("Erro ao recalcular daily_sales após exclusão:", err)
+		return { recalculado: false, dias, erro: err.message }
+	}
+}
+
 // Exclui um pedido manual (loja física / chatbot) das DUAS bases pelo order_id da
-// listagem nova, e recalcula daily_sales do dia a partir do dump.
+// listagem nova, limpa os cupons vinculados e recalcula daily_sales do dia a partir do dump.
 export const deleteManualOrder = async (req, res) => {
 	const { store, orderId } = req.params
 
@@ -43,26 +87,31 @@ export const deleteManualOrder = async (req, res) => {
 			return res.status(404).json({ error: "Pedido não encontrado" })
 		}
 
-		// Mesmo intervalo do createOrder: cobre o dia de negócio (corte 03:00) e o
-		// dia-calendário SP, que podem divergir em pedidos de meia-noite.
-		if (result.createdAt) {
-			const businessDate = toBusinessDateBR(result.createdAt)
-			const localDate = toLocalDateBR(result.createdAt)
-			if (businessDate && localDate) {
-				const [startDate, endDate] = businessDate <= localDate
-					? [businessDate, localDate]
-					: [localDate, businessDate]
-				await recalcAllDailySales({
-					stores: [resolved.name], startDate, endDate, apply: true
-				})
-				// recalc só reescreve dias que ainda têm pedidos; se este era o último
-				// do dia, a linha agregada precisa sair.
-				await pruneEmptyDailySales(resolved, startDate)
-				if (endDate !== startDate) await pruneEmptyDailySales(resolved, endDate)
+		const dailySales = await refreshDailySalesFor(resolved, result.createdAt)
+
+		// Confere o resultado na fonte em vez de confiar que o recálculo rodou.
+		if (dailySales.recalculado) {
+			if (await orderStillInDailySales(resolved, result.number, dailySales.dias)) {
+				dailySales.recalculado = false
+				dailySales.erro = `pedido ${result.number} continua em daily_sales.id_orders após o recálculo`
+			} else if (result.dumpOrfao) {
+				// Sem o `number` não dá para conferir; o dump intacto já indica que o
+				// recálculo (que lê o dump) voltaria a contar o pedido.
+				dailySales.recalculado = false
+				dailySales.erro =
+					"pedido removido de orders_shop mas não do dump legado: o recálculo lê o dump e continuaria contando o pedido"
 			}
 		}
 
-		return res.status(200).json({ message: "Pedido excluído", deleted: result.deleted })
+		// 207: o pedido foi excluído, mas a agregação do dia continua com o valor antigo.
+		// Responder 200 aqui foi o que deixou o Dashboard divergir sem ninguém perceber.
+		return res.status(dailySales.recalculado ? 200 : 207).json({
+			message: dailySales.recalculado
+				? "Pedido excluído"
+				: "Pedido excluído, mas daily_sales não foi recalculado",
+			deleted: result.deleted,
+			dailySales
+		})
 	} catch (err) {
 		console.error("Erro ao excluir pedido manual:", err)
 		return res.status(500).json({ error: "Falha ao excluir pedido" })

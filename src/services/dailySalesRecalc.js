@@ -109,19 +109,29 @@ async function adsIdsFor(day, storeName) {
 }
 
 async function upsertRow(day, storeNum, c, idCoupons, idAds, now) {
-	const exists = (await query(
-		`SELECT id_sales FROM ${dataBase.daily_sales} WHERE date_sales = $1 AND store = $2`, [day, storeNum]
-	)).rows[0]
+	// Não há índice único em (date_sales, store): dias com linha duplicada existem na base
+	// e o Dashboard soma todas as linhas do período, contando o dia em dobro. Mantemos a
+	// mais antiga (menor id_sales) e descartamos as demais.
+	const existing = (await query(
+		`SELECT id_sales FROM ${dataBase.daily_sales}
+		 WHERE date_sales = $1 AND store = $2 ORDER BY id_sales`, [day, storeNum]
+	)).rows
 
-	if (exists) {
+	if (existing.length) {
+		if (existing.length > 1) {
+			await query(
+				`DELETE FROM ${dataBase.daily_sales} WHERE id_sales = ANY($1)`,
+				[existing.slice(1).map((r) => r.id_sales)]
+			)
+		}
 		await query(`
 			UPDATE ${dataBase.daily_sales} SET
 				total_orders=$1, total_paid_orders=$2, total_money=$3, total_paid_money=$4,
 				aov=$5, id_orders=$6, id_coupons=$7, id_ads=$8, active=1, updated_at=$9
-			WHERE date_sales=$10 AND store=$11`,
+			WHERE id_sales=$10`,
 		[c.total_orders, c.total_paid_orders, c.total_money, c.total_paid_money, c.aov,
 			JSON.stringify(c.id_orders), JSON.stringify(idCoupons), JSON.stringify(idAds),
-			now, day, storeNum])
+			now, existing[0].id_sales])
 		return "UPDATE"
 	}
 	await query(`
