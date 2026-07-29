@@ -3,7 +3,8 @@ import {
 	dataBaseDb,
 	storeMapping,
 	mapNuvemshopToDelivery,
-	mapTinyToDelivery
+	mapTinyToDelivery,
+	resolveFilialLojaFisica
 } from "../db/dataBaseQueryList.js"
 import {
 	upsertRecord,
@@ -266,11 +267,20 @@ export async function processOrderFromNuvemshop(nuvemData, options = {}) {
 	//console.log("\n--- REGISTROS A SEREM PERSISTIDOS ---")
 
 	// C3: captura o id_cli serial do cliente para vincular ao pedido (FK real)
+	//
+	// A resolução por e-mail existe para UM caso só: o pedido de CHATBOT lançado pelo popup do
+	// dashboard, onde o e-mail é o do usuário logado e portanto identifica o criador do pedido.
+	// Pedidos das FILIAIS físicas (billing_business_name = MOEMA/TURIASSU/ANALIA/GABRIEL) chegam
+	// todos com o mesmo e-mail genérico, então resolver por e-mail colapsava todas as filiais no
+	// cliente mais antigo com aquele e-mail — era o que fazia toda filial aparecer como TURIASSU.
+	// Qualquer outro pedido (ecommerce/Tiny) segue pelo upsertClient de sempre.
+	const { filial } = resolveFilialLojaFisica(nuvemData)
+	const resolverPorEmail = Boolean(clientEmail) && filial === "CHATBOT"
 	let clientId = null
 	for (const client of safeDelivery.clients) {
 		const record = dataBaseDb.clients.transform(client)
 		//console.log("Client record:", record) // debug
-		clientId = clientEmail
+		clientId = resolverPorEmail
 			? await resolveClientByEmail(clientEmail, record)
 			: await upsertClient(record)
 	}

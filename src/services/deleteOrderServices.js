@@ -11,13 +11,19 @@ export const deleteOrderFromDB = async (owner_note, store) => {
 // Tabelas dump por loja — nomes fixos, nunca vindos do input (sem risco de injeção)
 const DUMP_TABLES = { outlet: "pedidos_outlet", artepropria: "pedidos_artepropria" };
 
+// Offset aplicado ao `token` para formar o order_id de pedidos de loja física em orders_shop
+// (LOJA_FISICA_ORDER_ID_OFFSET: 3e12 artepropria, 4e12 outlet). Qualquer order_id acima deste
+// limiar é sintético e o resto da divisão devolve o token do dump.
+const LOJA_FISICA_ID_THRESHOLD = 1_000_000_000_000
+
 /**
  * Exclui UM pedido manual (loja física / chatbot) pelas duas bases, em transação.
  *
  * A tela nova (OrdersShop) lê orders_shop, que não tem `owner_note` — a chave que o
- * DELETE legado usava. Como createOrder passou a gravar
- * orders_shop.order_id == pedidos_<loja>.number, o `order_id` da listagem é chave
- * suficiente para as duas tabelas.
+ * DELETE legado usava. O `order_id` da listagem é chave suficiente para as duas tabelas,
+ * mas casa com colunas diferentes do dump conforme a convenção do pedido:
+ *   - order_id sintético (>= 1e12) → `token = order_id % 1e12` (loja física com token real);
+ *   - order_id "cru"               → `number = order_id` (chatbot e histórico com token placeholder).
  *
  * daily_sales NÃO é tocada aqui: quem recalcula é o controller, via recalcAllDailySales
  * na data do pedido (a agregação do dia sobrevive à remoção de um pedido).
@@ -33,14 +39,22 @@ export const deleteManualOrderById = async (store, orderId) => {
   try {
     await client.query("BEGIN");
 
-    // 1) Dump — `number` é o id estável dos pedidos manuais (order_id pode ser NULL
-    //    em registros antigos, anteriores ao orderIdEstavel)
-    const dumpResult = await client.query(
-      `DELETE FROM ${dumpTable}
-       WHERE number = $1
-       RETURNING created_at, owner_note`,
-      [orderId]
-    );
+    // 1) Dump — a coluna de busca depende da convenção do order_id (ver doc acima).
+    //    `order_id` do dump não serve: é NULL na quase totalidade dos pedidos manuais.
+    const isSyntheticId = Number(orderId) >= LOJA_FISICA_ID_THRESHOLD;
+    const dumpResult = isSyntheticId
+      ? await client.query(
+          `DELETE FROM ${dumpTable}
+           WHERE token = $1
+           RETURNING created_at, owner_note`,
+          [String(Number(orderId) % LOJA_FISICA_ID_THRESHOLD)]
+        )
+      : await client.query(
+          `DELETE FROM ${dumpTable}
+           WHERE number = $1
+           RETURNING created_at, owner_note`,
+          [orderId]
+        );
 
     // 2) orders_shop — store::text pois os tipos podem diferir entre tabelas
     const osResult = await client.query(

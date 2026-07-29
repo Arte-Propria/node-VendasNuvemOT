@@ -4,7 +4,7 @@ import {
 	parseJsonArray
 } from "../tools/helpers.js"
 import { query } from "../db/db.js"
-import { dataBase, storeMapping } from "./dataBaseQueryList.js"
+import { dataBase, storeMapping, CPF_PLACEHOLDER } from "./dataBaseQueryList.js"
 import { logWebhookDB } from "../utils/logger.js"
 
 // Q2: só permitimos operar nas tabelas conhecidas e validamos os identificadores SQL,
@@ -117,9 +117,15 @@ export async function resolveClientByEmail(email, fallbackRecord) {
 
 	// ORDER BY id_cli: não há UNIQUE em email_cli, então fixamos o mais antigo para a
 	// escolha ser determinística mesmo com duplicatas herdadas da base legada.
+	// O CPF placeholder é excluído: registros legados com 99999999999 misturam origens
+	// diferentes (havia um chamado "TURIASSU") e "o mais antigo com este e-mail" acabava
+	// caindo neles. Os CPFs de filial NÃO são excluídos — o cliente de chatbot usa o CPF
+	// da filial CHATBOT, e ignorá-lo faria esta função criar um cliente novo a cada pedido.
 	const selectSql = `SELECT id_cli FROM ${dataBase.clients}
-	   WHERE lower(email_cli) = $1 ORDER BY id_cli ASC LIMIT 1`
-	const { rows } = await query(selectSql, [normalized])
+	   WHERE lower(email_cli) = $1
+	     AND (cpf_cnpj_cli IS NULL OR cpf_cnpj_cli <> $2)
+	   ORDER BY id_cli ASC LIMIT 1`
+	const { rows } = await query(selectSql, [normalized, CPF_PLACEHOLDER])
 	if (rows.length > 0) {
 		logWebhookDB(`Cliente reaproveitado por e-mail ${normalized}: id_cli ${rows[0].id_cli}`)
 		return rows[0].id_cli

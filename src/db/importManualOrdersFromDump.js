@@ -50,6 +50,17 @@ const OWNER_NOTE_LIKE = arg("owner-note", "Chatbot%")
 // Dia-calendário de São Paulo, mesmo critério do dailySalesRecalc e do filtro da tela.
 const BRT_DATE_EXPR = "(p.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date"
 
+// Offset do order_id sintético de loja física, por loja (espelha LOJA_FISICA_ORDER_ID_OFFSET).
+const LOJA_FISICA_OFFSET = { artepropria: 3_000_000_000_000, outlet: 4_000_000_000_000 }
+
+// O pedido pode já estar em orders_shop sob DUAS convenções de order_id:
+//   - `number` do dump (chatbot e histórico, cujo token é o placeholder "999999");
+//   - `offset + token` (loja física com token real — a convenção canônica do pipeline).
+// Reconhecer só a primeira faria este script reimportar como "ausente" todo pedido migrado.
+//
+// O cast do token vai dentro de um CASE (e não guardado por AND) porque `token` é varchar e
+// pedidos de ecommerce guardam ali um hash: com AND o planner avalia o cast antes do regex e
+// estoura. CASE garante a ordem; token não-numérico vira NULL e a comparação fica falsa.
 const SELECT_MISSING = (table) => `
   SELECT p.*
   FROM ${table} p
@@ -59,7 +70,14 @@ const SELECT_MISSING = (table) => `
     AND ($3::date IS NULL OR ${BRT_DATE_EXPR} <= $3::date)
     AND NOT EXISTS (
       SELECT 1 FROM orders_shop os
-      WHERE os.store::text = $4 AND os.order_id = p.number::numeric
+      WHERE os.store::text = $4
+        AND (
+          os.order_id = p.number::numeric
+          OR os.order_id = $5::numeric + (
+            CASE WHEN p.token ~ '^[0-9]{1,15}$' AND p.token <> '999999'
+                 THEN p.token::numeric END
+          )
+        )
     )
   ORDER BY p.created_at, p.number
 `
@@ -131,7 +149,8 @@ async function main() {
 
 	try {
 		const { rows } = await pool.query(SELECT_MISSING(table), [
-			OWNER_NOTE_LIKE, START, END, String(storeNum)
+			OWNER_NOTE_LIKE, START, END, String(storeNum),
+			String(LOJA_FISICA_OFFSET[STORE] ?? 0)
 		])
 
 		console.log(`Pedidos ausentes em orders_shop: ${rows.length}`)

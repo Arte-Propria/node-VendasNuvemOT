@@ -45,6 +45,53 @@ export const LOJA_FISICA_ORDER_ID_OFFSET = {
 // token placeholder usado no dump legado por 1.5k pedidos distintos: NÃO é chave única.
 export const TOKEN_PLACEHOLDER = "999999"
 
+// Cada loja física recebe um CPF fictício próprio, para os pedidos físicos não colapsarem
+// todos no mesmo cliente (99999999999). CHATBOT é a filial "virtual" dos pedidos lançados
+// pelo popup do dashboard.
+export const LOJA_FISICA_CPF_MAP = {
+	MOEMA: "12311111111",
+	TURIASSU: "45611111111",
+	ANALIA: "78911111111",
+	GABRIEL: "45688888888",
+	CHATBOT: "45699999999"
+}
+
+// CPF genérico herdado da base legada. É compartilhado por pedidos de origens diferentes,
+// então NUNCA identifica um cliente — só existe como fallback.
+export const CPF_PLACEHOLDER = "99999999999"
+
+/**
+ * Identifica a filial de um pedido de loja física a partir do payload Nuvemshop.
+ * Regra única, espelhada no ChartLojas do front: a filial vem de `billing_business_name`;
+ * na ausência dela, `billing_name === "Cliente Loja Física"` indica o CHATBOT.
+ *
+ * @returns {{ isLojaFisica: boolean, filial: string|null, cpf: string|null,
+ *             viaBillingBusinessName: boolean }}
+ *   `filial`/`cpf` são null quando o pedido não é de loja física ou a filial é desconhecida.
+ */
+export function resolveFilialLojaFisica(nuvemData) {
+	const isLojaFisica =
+    nuvemData?.storefront === "Loja" || nuvemData?.storefront === "Loja Fisica"
+	if (!isLojaFisica) {
+		return { isLojaFisica: false, filial: null, cpf: null, viaBillingBusinessName: false }
+	}
+
+	const viaBillingBusinessName = Boolean(nuvemData?.billing_business_name)
+	let filial = nuvemData?.billing_business_name || null
+	if (!filial && nuvemData?.billing_name === "Cliente Loja Física") {
+		filial = "CHATBOT"
+	}
+
+	const cpf = filial ? LOJA_FISICA_CPF_MAP[filial] || null : null
+	// Filial desconhecida (sem CPF mapeado) não é tratada como filial.
+	return {
+		isLojaFisica: true,
+		filial: cpf ? filial : null,
+		cpf,
+		viaBillingBusinessName: viaBillingBusinessName && Boolean(cpf)
+	}
+}
+
 export const dataBaseDb = {
 	ads: {
 		transform: (delivery) => ({
@@ -210,8 +257,8 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	// Usa sempre o identificador real do pedido. Antes, pedidos "Loja Fisica"
 	// recebiam order_id = "Loja Fisica" (literal) e colidiam entre si em orders_shop.
 	// Pedido de loja física? (storefront "Loja" ou "Loja Fisica")
-	const isLojaFisica =
-    nuvemData?.storefront === "Loja" || nuvemData?.storefront === "Loja Fisica"
+	const filialLojaFisica = resolveFilialLojaFisica(nuvemData)
+	const isLojaFisica = filialLojaFisica.isLojaFisica
 	// Pedidos de loja física não têm `number`/`id` da Nuvemshop (só `token`). Deriva o order_id
 	// determinístico a partir do token real (guard contra o placeholder) + offset da loja.
 	const storeIdNum = Number(nuvemData?.store_id)
@@ -219,13 +266,20 @@ export function mapNuvemshopToDelivery(nuvemData) {
     nuvemData?.token && String(nuvemData.token) !== TOKEN_PLACEHOLDER
     	? Number(nuvemData.token)
     	: null
+	// Loja física: o token é o número REAL do pedido no PDV (é o que a tela legada imprime),
+	// então ele tem prioridade sobre o `number`. Sem essa precedência a rota /order/:store —
+	// que injeta o `number` do dump — gravava um order_id diferente do gerado pelo webhook,
+	// e o mesmo pedido ficava com duas convenções. Sem token real (placeholder "999999",
+	// caso do chatbot e do histórico), mantém-se o fallback para `number`/`id`.
+	const lojaFisicaOrderId =
+    isLojaFisica && tokenReal
+    	? tokenReal + (LOJA_FISICA_ORDER_ID_OFFSET[storeIdNum] || 0)
+    	: undefined
 	const orderNumber =
+    lojaFisicaOrderId ||
     nuvemData?.number ||
     nuvemData?.order_id ||
-    nuvemData?.id ||
-    (isLojaFisica && tokenReal
-    	? tokenReal + (LOJA_FISICA_ORDER_ID_OFFSET[storeIdNum] || 0)
-    	: undefined)
+    nuvemData?.id
 	logWebhookDB("orderNumber:", orderNumber)
 	const now = new Date().toISOString()
 
@@ -233,25 +287,11 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	const c = nuvemData?.customer || {}
 	//logWebhookDB("customer data:", c)
 
-	// mapaLojas: cada loja física recebe um CPF fictício próprio, para os pedidos
-	// físicos não colapsarem todos no mesmo cliente (99999999999).
-	const mapaLojas = {
-		MOEMA: "12311111111",
-		TURIASSU: "45611111111",
-		ANALIA: "78911111111",
-		GABRIEL: "45688888888",
-		CHATBOT: "45699999999"
-	}
-
 	// Filial: billing_business_name; fallback CHATBOT (mesma regra do ChartLojas do front).
-	let lojaFisica = null
-	if (isLojaFisica) {
-		lojaFisica = nuvemData?.billing_business_name || null
-		if (!lojaFisica && nuvemData?.billing_name === "Cliente Loja Física") {
-			lojaFisica = "CHATBOT"
-		}
-	}
-	const cpfLojaFisica = lojaFisica ? mapaLojas[lojaFisica] || null : null
+	// A regra vive em resolveFilialLojaFisica para ser compartilhada com o pipeline de
+	// persistência (que precisa saber se o pedido é de filial ou de chatbot).
+	const lojaFisica = filialLojaFisica.filial
+	const cpfLojaFisica = filialLojaFisica.cpf
 
 	// CPF final: filial física tem prioridade; senão, o CPF do próprio pedido.
 	const cpfFinal = cpfLojaFisica || cleanCpfCnpj(c.identification)
@@ -329,13 +369,18 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	// products_detail: linha a linha do pedido, preservando os campos que a tela
 	// legada de Produtos usava (product_id, price histórico, variant_values, name,
 	// image). orders_shop.products continua sendo só SKUs; este campo é aditivo.
+	// `quantity` só é gravado para loja física: lá a linha única do placeholder guarda a
+	// QUANTIDADE DE CLIENTES do dia (o que a tela legada imprimia na coluna Produtos) e não há
+	// como recuperá-la do array de SKUs. Nos demais pedidos o shape de products_detail fica
+	// exatamente como estava.
 	const produtosDetail = (nuvemData?.products || []).map((prod) => ({
 		product_id: prod.product_id ?? null,
 		sku: (prod.sku || `nuvem_${prod.id}`).toUpperCase(),
 		name: prod.name || null,
 		price: parseFloat(prod.price) || 0,
 		image: prod.image?.src || null,
-		variant_values: Array.isArray(prod.variant_values) ? prod.variant_values : []
+		variant_values: Array.isArray(prod.variant_values) ? prod.variant_values : [],
+		...(isLojaFisica ? { quantity: Number(prod.quantity) || 0 } : {})
 	}))
 
 	// Cupons

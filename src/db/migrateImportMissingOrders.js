@@ -33,18 +33,40 @@ import { pool } from "./db.js"
 const APPLY = process.argv.includes("--apply")
 
 const STORES = [
-	{ name: "outlet", table: "pedidos_outlet", num: 3889735, offset: 1000000000000 },
-	{ name: "artepropria", table: "pedidos_artepropria", num: 1146504, offset: 2000000000000 }
+	{
+		name: "outlet", table: "pedidos_outlet", num: 3889735,
+		offset: 1000000000000, lojaFisicaOffset: 4000000000000
+	},
+	{
+		name: "artepropria", table: "pedidos_artepropria", num: 1146504,
+		offset: 2000000000000, lojaFisicaOffset: 3000000000000
+	}
 ]
 
 // Pedidos do legado ausentes em orders_shop (por loja), só com products em array.
+//
+// Pedidos de LOJA FÍSICA podem estar em orders_shop sob a convenção canônica do pipeline
+// (`lojaFisicaOffset + token`) em vez do `number`. Sem reconhecê-la, esta migração os veria
+// como ausentes e reinseriria duplicatas. A condição extra é restrita a storefront de loja
+// física — a varredura dos pedidos de ecommerce continua idêntica.
 const whereMissing = (s) => `
   FROM ${s.table} p
   WHERE p.number IS NOT NULL
     AND jsonb_typeof(p.products) = 'array'
     AND NOT EXISTS (
       SELECT 1 FROM orders_shop os
-      WHERE os.store = '${s.num}' AND os.order_id = p.number::numeric
+      WHERE os.store = '${s.num}'
+        AND (
+          os.order_id = p.number::numeric
+          OR os.order_id = ${s.lojaFisicaOffset}::numeric + (
+            -- CASE (e não AND) porque token é varchar: em pedidos de ecommerce guarda um
+            -- hash, e com AND o planner avalia o cast antes do regex e estoura. Token
+            -- não-numérico/placeholder vira NULL e a comparação fica falsa.
+            CASE WHEN p.storefront IN ('Loja', 'Loja Fisica')
+                  AND p.token ~ '^[0-9]{1,15}$' AND p.token <> '999999'
+                 THEN p.token::numeric END
+          )
+        )
     )
 `
 
