@@ -96,11 +96,14 @@ const selectRow = (s) => `
     (SELECT jsonb_agg(UPPER(elem->>'sku'))
        FROM jsonb_array_elements(p.products) elem
       WHERE elem->>'sku' IS NOT NULL) AS products,
+    -- `cost`: custo congelado da venda (fonte do card "Custo de Produto").
+    -- Ausente/null vira 0, como no legado (`product.cost ? parseFloat(...) : 0`).
     (SELECT jsonb_agg(jsonb_build_object(
         'product_id', elem->'product_id',
         'sku', UPPER(elem->>'sku'),
         'name', elem->>'name',
         'price', COALESCE(NULLIF(elem->>'price','')::numeric, 0),
+        'cost', COALESCE(NULLIF(elem->>'cost','')::numeric, 0),
         'image', elem#>>'{image,src}',
         'variant_values', COALESCE(elem->'variant_values', '[]'::jsonb)
       ))

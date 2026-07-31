@@ -1,13 +1,13 @@
 import {
 	deleteOrderFromDB,
-	deleteOrdersByBusinessDate,
+	deleteOrdersByDateBRT,
 	deleteManualOrderById,
 	pruneEmptyDailySales,
 	orderStillInDailySales
 } from "../services/deleteOrderServices.js"
 import { storeMapping } from "../db/dataBaseQueryList.js"
 import { recalcAllDailySales } from "../services/dailySalesRecalc.js"
-import { toBusinessDateBR, toLocalDateBR } from "../tools/helpers.js"
+import { toLocalDateBR } from "../tools/helpers.js"
 
 // Normaliza a loja: aceita código numérico ("1146504") ou nome ("artepropria")
 const resolveStore = (store) => {
@@ -39,21 +39,17 @@ const refreshDailySalesFor = async (store, createdAt) => {
 		}
 	}
 
-	// Mesmo intervalo do createOrder: cobre o dia de negócio (corte 03:00) e o
-	// dia-calendário SP, que podem divergir em pedidos de meia-noite.
-	const businessDate = toBusinessDateBR(createdAt)
-	const localDate = toLocalDateBR(createdAt)
-	if (!businessDate || !localDate) {
+	// Dia-calendário BRT: a mesma e única regra do motor de recálculo e da listagem.
+	// Antes eram DOIS dias (o de negócio com corte 03:00 e o de calendário), porque as
+	// duas regras coexistiam e podiam divergir em pedidos de meia-noite.
+	const day = toLocalDateBR(createdAt)
+	if (!day) {
 		return { recalculado: false, dias: [], erro: `created_at inválido: ${createdAt}` }
 	}
-
-	const [startDate, endDate] = businessDate <= localDate
-		? [businessDate, localDate]
-		: [localDate, businessDate]
-	const dias = startDate === endDate ? [startDate] : [startDate, endDate]
+	const dias = [day]
 
 	try {
-		await recalcAllDailySales({ stores: [store.name], startDate, endDate, apply: true })
+		await recalcAllDailySales({ stores: [store.name], startDate: day, endDate: day, apply: true })
 		// recalc só reescreve dias que ainda têm pedidos; se este era o último
 		// do dia, a linha agregada precisa sair.
 		for (const dia of dias) await pruneEmptyDailySales(store, dia)
@@ -172,7 +168,7 @@ export const deleteOrdersByDate = async (req, res) => {
 	}
 
 	try {
-		const result = await deleteOrdersByBusinessDate({ name, numeric }, date, { apply })
+		const result = await deleteOrdersByDateBRT({ name, numeric }, date, { apply })
 		const total = Object.values(result.deleted).reduce((a, b) => a + b, 0)
 		if (total === 0) {
 			return res.status(404).json({

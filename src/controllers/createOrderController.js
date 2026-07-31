@@ -1,7 +1,7 @@
 import { insertOrder } from "../services/orderServicesNuvem.js"
 import { processOrderFromNuvemshop } from "../services/segmentacaoServices.js"
 import { recalcAllDailySales } from "../services/dailySalesRecalc.js"
-import { toBusinessDateBR, toLocalDateBR } from "../tools/helpers.js"
+import { toLocalDateBR } from "../tools/helpers.js"
 
 const STORE_NAMES = new Set(["outlet", "artepropria"])
 
@@ -50,19 +50,14 @@ export const createOrder = async (req, res) => {
 		warnings.push({ step: "orders_shop", message: error.message })
 	}
 
-	// 3) daily_sales: upsertDailySales (dentro do passo 2) usa o dia de NEGÓCIO com corte
-	//    03:00, enquanto a listagem e o Dashboard usam o dia-calendário SP do dump. Recalcula
-	//    o intervalo que cobre as duas leituras para as fontes ficarem consistentes.
+	// 3) daily_sales: reforço idempotente. O passo 2 já recalcula o dia (upsertDailySales
+	//    delega ao mesmo motor e usa a MESMA regra de dia-calendário BRT), mas se ele falhou
+	//    o dump está commitado e o dia precisa fechar mesmo assim.
 	if (STORE_NAMES.has(store)) {
 		try {
-			const createdAt = order[0].data?.created_at
-			const businessDate = toBusinessDateBR(createdAt)
-			const localDate = toLocalDateBR(createdAt)
-			if (businessDate && localDate) {
-				const [startDate, endDate] = businessDate <= localDate
-					? [businessDate, localDate]
-					: [localDate, businessDate]
-				await recalcAllDailySales({ stores: [store], startDate, endDate, apply: true })
+			const day = toLocalDateBR(order[0].data?.created_at)
+			if (day) {
+				await recalcAllDailySales({ stores: [store], startDate: day, endDate: day, apply: true })
 			}
 		} catch (error) {
 			console.error("Erro ao recalcular daily_sales (pedido já gravado):", error)

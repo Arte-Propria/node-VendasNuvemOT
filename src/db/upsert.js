@@ -5,6 +5,7 @@ import {
 } from "../tools/helpers.js"
 import { query } from "../db/db.js"
 import { dataBase, storeMapping, CPF_PLACEHOLDER } from "./dataBaseQueryList.js"
+import { recalcAllDailySales } from "../services/dailySalesRecalc.js"
 import { logWebhookDB } from "../utils/logger.js"
 
 // Q2: só permitimos operar nas tabelas conhecidas e validamos os identificadores SQL,
@@ -582,171 +583,40 @@ export async function upsertCoupon(couponRecord, orderStatus, orderId) {
 	}
 }
 
-/**
- * Resolve os IDs numéricos (id_coupon) a partir dos nomes/códigos de cupom para uma data.
- * C2: garante que daily_sales.id_coupons guarde SEMPRE IDs numéricos (tanto na inserção
- * quanto no update), e não os códigos do cupom.
- */
-async function resolveCouponIds(couponNames, date) {
-	const ids = []
-	for (const name of couponNames || []) {
-		const res = await query(`SELECT id_coupon FROM ${dataBase.coupon} WHERE name = $1 AND date_coupon = $2`,
-			[name, date])
-		if (res.rows.length) ids.push(res.rows[0].id_coupon)
-	}
-	return ids
-}
 
 /**
- * Recalcula os totais de daily_sales (date, store) a partir de orders_shop, sobre um conjunto
- * conhecido de order_ids. É idempotente e reflete o estado ATUAL de cada pedido — capturando
- * transições pending→paid, cancelamentos (active=0) e reenvios de webhook, sem deltas frágeis.
+ * Atualiza daily_sales a cada pedido recebido, delegando ao motor único
+ * (`recalcAllDailySales`) — o mesmo que a criação/exclusão de pedido manual e o backfill usam.
  *
- * Regras (paridade com o Dashboard/legado `filterOrders`), com E = pedidos onde payment_method ≠ 'other':
- *   total_money        = Σ total de E                                  (Geral valor; inclui cancelado/estornado)
- *   total_orders       = contagem de E com active=1 e payment_status ≠ 'voided'   (Geral qtd)
- *   total_paid_*       = E com active=1 e payment_status='paid'        (Pago)
- * Parcerias (payment_method='other') são excluídas de todas as somas/contagens numéricas, mas
- * seus order_id permanecem em id_orders (membership completa do dia).
- */
-async function recomputeDailyTotalsFromOrders(
-	date,
-	store,
-	orderIds,
-	idCoupons,
-	idAds,
-	now
-) {
-	const ids = [...new Set((orderIds || []).map(Number))].filter((x) => !Number.isNaN(x))
-	if (ids.length === 0) {
-		await query(`DELETE FROM ${dataBase.daily_sales} WHERE date_sales = $1 AND store = $2`,
-			[date, store])
-		logWebhookDB(`🗑️ Daily sales removido (sem pedidos): ${date} - ${store}`)
-		return
-	}
-	const res = await query(`SELECT order_id, total, payment_status, active, payment_method FROM ${dataBase.orders_shop} WHERE order_id = ANY($1)`,
-		[ids])
-	const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100
-	let totalMoney = 0,
-		totalOrders = 0,
-		paidMoney = 0,
-		paidOrders = 0
-	const presentIds = []
-	for (const r of res.rows) {
-		presentIds.push(Number(r.order_id)) // membership completa (inclui parcerias)
-		if (r.payment_method === "other") continue // parcerias fora de todos os totais
-		const t = toNumber(r.total)
-		totalMoney += t // Geral valor: E (inclui cancelado/estornado)
-		if (Number(r.active) === 1 && r.payment_status !== "voided") {
-			totalOrders++ // Geral qtd: E, não cancelado e não estornado
-			if (r.payment_status === "paid") {
-				paidMoney += t
-				paidOrders++
-			}
-		}
-	}
-	const aov = totalOrders ? round2(totalMoney / totalOrders) : 0
-	await query(`
-        UPDATE ${dataBase.daily_sales}
-        SET total_orders = $1, total_paid_orders = $2, total_money = $3, total_paid_money = $4,
-            aov = $5, id_orders = $6, id_coupons = $7, id_ads = $8, updated_at = $9
-        WHERE date_sales = $10 AND store = $11
-    `,
-	[
-		totalOrders,
-		paidOrders,
-		round2(totalMoney),
-		round2(paidMoney),
-		aov,
-		JSON.stringify(presentIds),
-		JSON.stringify(idCoupons || []),
-		JSON.stringify(idAds || []),
-		now,
-		date,
-		store
-	])
-}
-
-/**
- * Atualiza daily_sales a cada pedido recebido (regras do Dashboard/legado, dia de negócio BRT).
- * Insert e update seguem a MESMA lógica: monta o conjunto de order_ids do dia e delega a
- * recomputeDailyTotalsFromOrders, que lê o estado ATUAL de orders_shop (idempotente; captura
- * pending→paid, cancelamentos, estornos e reenvios). Os totais numéricos excluem parcerias
- * (payment_method='other') e ajustam cancelado/estornado conforme documentado em
- * recomputeDailyTotalsFromOrders.
- * @param {string} date - data 'YYYY-MM-DD' (dia de negócio BRT)
- * @param {string} store - identificador da loja
- * @param {Object} currentOrder - { order_id, payment_status, total, coupons, status, ads_ids }
+ * Antes esta função agregava por conta própria a partir de orders_shop e com o dia de NEGÓCIO
+ * (corte 03:00), enquanto o recálculo em lote agregava do dump com o dia-calendário BRT. Os dois
+ * se sobrescreviam: em 30/07/2026 isso apagou R$ 13.117,42 de loja física do Dashboard, porque
+ * esses pedidos têm created_at 03:00 UTC (= 00:00 BRT) e o corte os lançava no dia anterior.
+ * Também deixava `id_orders` heterogêneo (order_id aqui, `number` no lote), o que fazia o
+ * recálculo seguinte não encontrar os pedidos e zerar o dia.
+ *
+ * O motor recalcula o dia inteiro de forma idempotente, então continua capturando
+ * pending→paid, cancelamentos, estornos e reenvios de webhook.
+ *
+ * @param {string} date - data 'YYYY-MM-DD' (dia-calendário BRT)
+ * @param {string|number} store - código numérico da loja (3889735 | 1146504)
+ * @param {Object} currentOrder - mantido por compatibilidade com os chamadores; o motor relê o dia
  */
 export async function upsertDailySales(date, store, currentOrder) {
-	if (!date || !store || !currentOrder) {
-		console.error("❌ upsertDailySales: parâmetros inválidos", {
-			date,
-			store,
-			currentOrder
-		})
+	if (!date || !store) {
+		console.error("❌ upsertDailySales: parâmetros inválidos", { date, store, currentOrder })
 		return
 	}
-	const selectSql = `SELECT * FROM ${dataBase.daily_sales} WHERE date_sales = $1 AND store = $2`
-	const existing = await query(selectSql, [date, store])
-	const row = existing.rows[0]
-	const now = new Date().toISOString()
-	const isCancelled = currentOrder.status === "cancelled"
-
-	// Cupons/anúncios a incorporar (cancelado não traz cupom)
-	const incomingCouponIds = isCancelled
-		? []
-		: await resolveCouponIds(currentOrder.coupons, date)
-	const incomingAds = currentOrder.ads_ids || []
-	const orderId = Number(currentOrder.order_id)
-
-	// Linha inexistente: cria um esqueleto (zeros) e recalcula a partir de orders_shop, para que
-	// insert e update apliquem exatamente as mesmas regras (E ≠ 'other', cancel/estorno).
-	if (!row) {
-		await query(
-			`INSERT INTO ${dataBase.daily_sales}
-				(date_sales, store, total_orders, total_paid_orders, total_money, total_paid_money,
-				 aov, id_orders, id_coupons, id_ads, active, dt_att_active, created_at, updated_at)
-			 VALUES ($1,$2,0,0,0,0,0,$3,$4,$5,1,$6,$7,$7)`,
-			[
-				date,
-				store,
-				JSON.stringify([orderId]),
-				JSON.stringify(incomingCouponIds),
-				JSON.stringify(incomingAds),
-				now.split("T")[0],
-				now
-			]
-		)
-		await recomputeDailyTotalsFromOrders(
-			date,
-			store,
-			[orderId],
-			incomingCouponIds,
-			incomingAds,
-			now
-		)
-		logWebhookDB(`✅ Daily sales inserido (novo pedido): ${date} - ${store}`)
+	const storeName = storeMapping.numericToName[Number(store)]
+	if (!storeName) {
+		console.warn(`⚠️ upsertDailySales: loja ${store} não mapeada; daily_sales não atualizado`)
 		return
 	}
-
-	// Linha existe – RECALCULA o dia a partir de orders_shop sobre o conjunto de pedidos.
-	// (orders_shop já foi atualizado com o pedido atual antes desta chamada.)
-	const id_orders = parseJsonArray(row.id_orders).map(Number)
-	const id_coupons = parseJsonArray(row.id_coupons)
-	const id_ads = parseJsonArray(row.id_ads)
-
-	const newIds = [...new Set([...id_orders, orderId])]
-	const newCoupons = [...new Set([...id_coupons, ...incomingCouponIds])]
-	const newAds = [...new Set([...id_ads, ...incomingAds])]
-
-	await recomputeDailyTotalsFromOrders(
-		date,
-		store,
-		newIds,
-		newCoupons,
-		newAds,
-		now
-	)
-	logWebhookDB(`🔄 Daily sales recalculado de orders_shop: ${date} - ${store} (gatilho: pedido ${orderId})`)
+	await recalcAllDailySales({
+		stores: [storeName],
+		startDate: date,
+		endDate: date,
+		apply: true
+	})
+	logWebhookDB(`🔄 Daily sales recalculado: ${date} - ${storeName} (gatilho: pedido ${currentOrder?.order_id})`)
 }

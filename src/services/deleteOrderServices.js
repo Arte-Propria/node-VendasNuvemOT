@@ -193,13 +193,12 @@ export const deleteManualOrderById = async (store, orderId) => {
   }
 };
 
-// Dia de NEGÓCIO BRT com corte às 03:00 — espelho SQL de toBusinessDateBR (helpers.js).
-// created_at guarda relógio UTC como timestamp without time zone.
-// Atenção: dailySalesRecalc.js usa a variante SEM o corte de 3h; se daily_sales tiver
-// sido reescrito pelo recalc, pedidos de 00:00–03:00 BRT podem estar em dia diferente —
-// o dry-run expõe divergências antes de aplicar.
-const BUSINESS_DATE_EXPR =
-  "(((created_at - interval '3 hours') AT TIME ZONE 'UTC') AT TIME ZONE 'America/Sao_Paulo')::date";
+// Dia-calendário BRT — espelho SQL de toLocalDateBR (helpers.js) e do BRT_DATE_EXPR de
+// dailySalesRecalc.js. created_at guarda relógio UTC como timestamp without time zone.
+// Era o corte de NEGÓCIO às 03:00, que divergia do recalc e fazia "apagar o dia X" atingir
+// um conjunto de pedidos diferente do que o Dashboard exibia para o dia X.
+const BRT_DATE_EXPR =
+  "((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Sao_Paulo')::date";
 
 /**
  * Confirma na fonte que o pedido saiu da agregação do dia.
@@ -256,7 +255,7 @@ export const pruneEmptyDailySales = async (store, date) => {
 };
 
 /**
- * Exclui, em transação única, todos os pedidos de uma loja em um dia de negócio (BRT)
+ * Exclui, em transação única, todos os pedidos de uma loja em um dia-calendário BRT
  * das tabelas: dump (pedidos_<loja>), orders_shop, daily_sales e coupon.
  * clientes/categorias/ads não são tocadas (dados compartilhados).
  *
@@ -266,7 +265,7 @@ export const pruneEmptyDailySales = async (store, date) => {
  *   ROLLBACK, retornando contagens exatas sem excluir nada
  * @returns {Promise<{deleted:Object, orderNumbers:number[]}>}
  */
-export const deleteOrdersByBusinessDate = async (store, date, { apply = false } = {}) => {
+export const deleteOrdersByDateBRT = async (store, date, { apply = false } = {}) => {
   const dumpTable = DUMP_TABLES[store.name];
   const client = await pool.connect();
 
@@ -276,7 +275,7 @@ export const deleteOrdersByBusinessDate = async (store, date, { apply = false } 
     // 1) Dump — RETURNING number para vincular os cupons legados (store IS NULL)
     const dumpResult = await client.query(
       `DELETE FROM ${dumpTable}
-       WHERE ${BUSINESS_DATE_EXPR} = $1::date
+       WHERE ${BRT_DATE_EXPR} = $1::date
        RETURNING number`,
       [date]
     );
@@ -286,7 +285,7 @@ export const deleteOrdersByBusinessDate = async (store, date, { apply = false } 
     const osResult = await client.query(
       `DELETE FROM orders_shop
        WHERE store::text = $1
-         AND ${BUSINESS_DATE_EXPR} = $2::date`,
+         AND ${BRT_DATE_EXPR} = $2::date`,
       [String(store.numeric), date]
     );
 

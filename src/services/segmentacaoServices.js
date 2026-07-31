@@ -16,7 +16,7 @@ import {
 	upsertDailySales
 } from "../db/upsert.js"
 import { query } from "../db/db.js"
-import { toNumber, cleanCpfCnpj, toBusinessDateBR, toLocalDateBR, toISOString } from "../tools/helpers.js"
+import { toNumber, cleanCpfCnpj, toLocalDateBR, toISOString } from "../tools/helpers.js"
 import {
 	fetchLinkNote,
 	fetchNoteOrderTiny,
@@ -319,7 +319,10 @@ export async function processOrderFromNuvemshop(nuvemData, options = {}) {
 	// Dentro de processOrderFromNuvemshop, após o upsert do pedido
 	const firstOrder = safeDelivery.orders_shop[0]
 	if (firstOrder) {
-		const orderDate = toBusinessDateBR(nuvemData?.created_at) // dia de negócio BRT, corte às 03:00
+		// Dia-calendário BRT (00:00–23:59 SP) — MESMA regra do motor de recálculo. Não usar o
+		// dia de negócio com corte 03:00 aqui: pedidos de loja física têm created_at 03:00 UTC
+		// (= 00:00 BRT) e o corte os lançava no dia anterior, onde o recálculo depois os apagava.
+		const orderDate = toLocalDateBR(nuvemData?.created_at)
 		const storeId = nuvemData?.store_id?.toString() // "3889735"
 		if (orderDate && storeId) {
 			// Converte código numérico para nome amigável (ex: "outlet")

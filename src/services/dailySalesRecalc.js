@@ -1,13 +1,26 @@
 // ============================================================================
-// Recálculo em lote de daily_sales (corretivo).
+// Motor ÚNICO de agregação de daily_sales.
 //
-// FONTE: o dump por loja (pedidos_outlet / pedidos_artepropria), que guarda a data real
-// do pedido na Nuvemshop. ATENÇÃO: NÃO usar orders_shop como fonte de agregação — os números
-// de pedido (order_id) colidem entre lojas (a Nuvemshop numera por loja) e orders_shop tem
-// order_id como chave única, então um mesmo número mistura/perde pedidos entre lojas.
+// Todo caminho que grava daily_sales passa por aqui: o webhook (via upsertDailySales),
+// a criação/exclusão de pedido manual e o backfill em lote. Ter um só motor é o que
+// impede a classe de bug de jul/2026, em que dois escritores com definições de dia
+// diferentes se sobrescreviam e apagavam pedidos de loja física do Dashboard.
+//
+// FONTE PRIMÁRIA: o dump por loja (pedidos_outlet / pedidos_artepropria), que guarda a data
+// real do pedido na Nuvemshop. NÃO usar orders_shop sozinho como fonte: os números de pedido
+// colidem entre lojas (a Nuvemshop numera por loja) e order_id é chave única lá — são 1492
+// colisões históricas confirmadas, que misturariam/perderiam pedidos entre as lojas.
+//
+// FONTE COMPLEMENTAR: pedidos que só existem em orders_shop. `POST /webhook/db/nuvemshop`,
+// `syncNuvemshopOrders` e o fluxo Tiny gravam orders_shop SEM passar pelo dump — um motor
+// dump-only os perderia. O anti-join abaixo os recupera sem risco de dupla contagem.
+//
+// DIA: dia-calendário BRT (00:00–23:59 em São Paulo), a mesma regra que o legado imprimia
+// (`isOrderOnDate`) e que a listagem de pedidos/Estatísticas já usam. NÃO existe mais o
+// "dia de negócio" com corte às 03:00: pedidos de loja física têm created_at 03:00 UTC
+// (= 00:00 BRT) e o corte os lançava sistematicamente no dia anterior.
 //
 // Regras aplicadas (paridade com o Dashboard/legado `filterOrders`), E = pedidos com method ≠ 'other':
-//   - Dia de negócio em horário local do Brasil (BRT, UTC-3, DST-aware);
 //   - total_money  = Σ total de E (Geral valor; inclui cancelado/estornado);
 //   - total_orders = contagem de E com status≠'cancelled' e payment_status≠'voided' (Geral qtd);
 //   - total_paid_* = E com status≠'cancelled' e payment_status='paid' (Pago);
@@ -16,7 +29,7 @@
 // Idempotente: UPSERT por (date_sales, store), preservando id_sales das linhas existentes.
 // ============================================================================
 import { query } from "../db/db.js"
-import { dataBase, storeMapping } from "../db/dataBaseQueryList.js"
+import { dataBase, storeMapping, LOJA_FISICA_ORDER_ID_OFFSET } from "../db/dataBaseQueryList.js"
 import { toNumber } from "../tools/helpers.js"
 
 const TABLES = { outlet: "pedidos_outlet", artepropria: "pedidos_artepropria" }
@@ -26,17 +39,56 @@ const BRT_DATE_EXPR = "(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_
 const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100
 const isoDate = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10))
 
-async function fetchDumpGroups(table, startDate, endDate) {
+/**
+ * Agrupa por dia-calendário BRT os pedidos da loja: o dump UNIÃO os pedidos que existem
+ * apenas em orders_shop (chegam por `POST /webhook/db/nuvemshop`, `syncNuvemshopOrders` ou
+ * pelo fluxo Tiny, que não passam pelo dump).
+ *
+ * O anti-join usa as DUAS convenções de order_id de loja física: `number` (chatbot e histórico
+ * com token placeholder) e `token + offset da loja`. Subtrai o offset — nunca `% 1e12`, que só
+ * acerta enquanto o token cabe em 1e12 e o popup "Cadastrar pedido" gera ~1,8e15.
+ */
+async function fetchDayGroups(table, storeNum, startDate, endDate) {
 	const sql = `
-		SELECT brt_date, number, total, payment_status, status, coupon, payment_details FROM (
-			SELECT ${BRT_DATE_EXPR} AS brt_date, number, total, payment_status, status, coupon, payment_details
+		WITH dump AS (
+			SELECT ${BRT_DATE_EXPR} AS brt_date, number::numeric AS id_order, total::numeric AS total,
+			       payment_status::text AS payment_status, status::text AS status, coupon, payment_details,
+			       -- CASE obrigatório: o planner avalia o cast antes do regex, e token guarda hash
+			       -- alfanumérico nos pedidos de ecommerce ("invalid input syntax for numeric").
+			       CASE WHEN token ~ '^[0-9]{1,15}$' AND token <> '999999' THEN token::numeric END AS tok
 			FROM ${table}
 			WHERE created_at IS NOT NULL
+		),
+		orfaos AS (
+			SELECT (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date AS brt_date,
+			       o.order_id AS id_order, o.total::numeric AS total,
+			       o.payment_status::text AS payment_status,
+			       -- orders_shop não tem coluna status: active=0 é o equivalente de status='cancelled'
+			       CASE WHEN o.active = 1 THEN NULL ELSE 'cancelled' END::text AS status,
+			       NULL::jsonb AS coupon,
+			       jsonb_build_object('method', o.payment_method) AS payment_details
+			FROM ${dataBase.orders_shop} o
+			WHERE o.store::text = $3::text
+			  AND o.created_at IS NOT NULL
+			  AND NOT EXISTS (
+			      SELECT 1 FROM dump d
+			      -- pedidos correspondentes compartilham created_at; ±1 dia cobre a borda do fuso
+			      -- e evita varrer o dump inteiro quando há filtro de período
+			      WHERE ($1::date IS NULL OR d.brt_date >= $1::date - 1)
+			        AND ($2::date IS NULL OR d.brt_date <= $2::date + 1)
+			        AND (d.id_order = o.order_id OR d.tok = o.order_id - $4::numeric)
+			  )
+		)
+		SELECT brt_date, id_order, total, payment_status, status, coupon, payment_details FROM (
+			SELECT brt_date, id_order, total, payment_status, status, coupon, payment_details FROM dump
+			UNION ALL
+			SELECT brt_date, id_order, total, payment_status, status, coupon, payment_details FROM orfaos
 		) t
 		WHERE ($1::date IS NULL OR brt_date >= $1::date)
 		  AND ($2::date IS NULL OR brt_date <= $2::date)
-		ORDER BY brt_date, number`
-	const rows = (await query(sql, [startDate, endDate])).rows
+		ORDER BY brt_date, id_order`
+	const offset = LOJA_FISICA_ORDER_ID_OFFSET[storeNum] || 0
+	const rows = (await query(sql, [startDate, endDate, String(storeNum), offset])).rows
 	const groups = new Map()
 	for (const r of rows) {
 		const day = isoDate(r.brt_date)
@@ -61,13 +113,14 @@ function paymentMethodOf(o) {
 //   total_money  = Σ total de E                                     (Geral valor; inclui cancelado/estornado)
 //   total_orders = contagem de E com status≠'cancelled' e payment_status≠'voided'  (Geral qtd)
 //   total_paid_* = E com status≠'cancelled' e payment_status='paid' (Pago)
-// id_orders mantém todos os `number` do dia (membership completa).
+// id_orders mantém todos os identificadores do dia (membership completa): o `number` do dump
+// e, para os pedidos que só existem em orders_shop, o próprio `order_id`.
 function computeRow(orders) {
 	let totalMoney = 0, totalOrders = 0, paidMoney = 0, paidOrders = 0
 	const idOrders = []
 	const couponCodes = new Set()
 	for (const o of orders) {
-		idOrders.push(Number(o.number)) // membership completa (inclui parcerias)
+		idOrders.push(Number(o.id_order)) // membership completa (inclui parcerias)
 		if (paymentMethodOf(o) === "other") continue // parcerias fora dos totais
 		const t = toNumber(o.total)
 		totalMoney += t                 // Geral valor: E (inclui cancelado/estornado)
@@ -146,7 +199,9 @@ async function upsertRow(day, storeNum, c, idCoupons, idAds, now) {
 }
 
 /**
- * Recalcula daily_sales (regra Bruto/Pago, dia BRT) a partir do dump pedidos_<store>.
+ * Recalcula daily_sales (regra Bruto/Pago, dia-calendário BRT) a partir do dump pedidos_<store>
+ * unido aos pedidos que só existem em orders_shop. É o motor único: o webhook chega aqui via
+ * upsertDailySales, e criação/exclusão de pedido manual e backfill chamam esta função direto.
  * @param {Object} [options]
  * @param {string[]} [options.stores=["outlet","artepropria"]]
  * @param {string|null} [options.startDate=null] - filtro BRT inicial 'YYYY-MM-DD' (inclusive)
@@ -174,7 +229,7 @@ export async function recalcAllDailySales(options = {}) {
 			if (onProgress) onProgress({ type: "warn", message: `Loja desconhecida: ${store}` })
 			continue
 		}
-		const groups = await fetchDumpGroups(table, startDate, endDate)
+		const groups = await fetchDayGroups(table, storeNum, startDate, endDate)
 		if (onProgress) onProgress({ type: "store", store, storeNum, days: groups.size })
 
 		for (const [day, orders] of [...groups.entries()].sort()) {

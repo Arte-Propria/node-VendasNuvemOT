@@ -35,7 +35,11 @@ const STORES = [
 ]
 
 // Subquery: para cada pedido legado, agrega as linhas de `products` no formato
-// products_detail { product_id, sku(UPPER), name, price(number), image(src), variant_values }.
+// products_detail { product_id, sku(UPPER), name, price(number), cost(number),
+// image(src), variant_values }.
+// `cost` é o custo congelado da venda (o legado somava exatamente este campo por
+// linha no card "Custo de Produto"); ausente/null vira 0, como no legado
+// (`product.cost ? parseFloat(product.cost) : 0`).
 const detailSub = (table) => `
   SELECT p.number AS num,
          jsonb_agg(
@@ -44,6 +48,7 @@ const detailSub = (table) => `
              'sku', UPPER(elem->>'sku'),
              'name', elem->>'name',
              'price', COALESCE(NULLIF(elem->>'price','')::numeric, 0),
+             'cost', COALESCE(NULLIF(elem->>'cost','')::numeric, 0),
              'image', elem#>>'{image,src}',
              'variant_values', COALESCE(elem->'variant_values', '[]'::jsonb)
            )

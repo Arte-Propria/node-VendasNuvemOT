@@ -380,20 +380,32 @@ export function mapNuvemshopToDelivery(nuvemData) {
 	// QUANTIDADE DE CLIENTES do dia (o que a tela legada imprimia na coluna Produtos) e não há
 	// como recuperá-la do array de SKUs. Nos demais pedidos o shape de products_detail fica
 	// exatamente como estava.
+	//
+	// `cost` é o custo CONGELADO da venda — o mesmo snapshot que a base legada
+	// guardava em pedidos_<loja>.products[].cost e que o card "Custo de Produto"
+	// somava por linha. NÃO confundir com categorias.custo_categoria, que é o custo
+	// ATUAL do catálogo e é sobrescrito a cada webhook (usá-lo reprecifica pedidos
+	// antigos retroativamente). Pedido manual (Loja Física/Chatbot) não traz `cost`
+	// no payload → grava 0, exatamente como o legado imprimia.
 	const produtosDetail = (nuvemData?.products || []).map((prod) => ({
 		product_id: prod.product_id ?? null,
 		sku: (prod.sku || `nuvem_${prod.id}`).toUpperCase(),
 		name: prod.name || null,
 		price: parseFloat(prod.price) || 0,
+		cost: parseFloat(prod.cost) || 0,
 		image: prod.image?.src || null,
 		variant_values: Array.isArray(prod.variant_values) ? prod.variant_values : [],
 		...(isLojaFisica ? { quantity: Number(prod.quantity) || 0 } : {})
 	}))
 
 	// Cupons
-	// B6: date_coupon como data pura (YYYY-MM-DD) para casar com o lookup do daily_sales
-	//     e garantir a agregação por dia no ON CONFLICT (name, date_coupon).
-	//     Dia de negócio BRT com corte às 03:00 (mesmo critério do daily_sales).
+	// B6: date_coupon como data pura (YYYY-MM-DD) para garantir a agregação por dia no
+	//     ON CONFLICT (name, date_coupon).
+	// ATENÇÃO: continua no dia de NEGÓCIO (corte 03:00), enquanto daily_sales passou a usar o
+	// dia-calendário BRT. Para pedidos entre 00:00 e 03:00 os dois divergem em um dia e o
+	// lookup exato de resolveCouponIds falha, caindo no fallback ORDER BY date_coupon DESC.
+	// Só afeta daily_sales.id_coupons (os KPIs do Dashboard não usam essa coluna). Alinhar
+	// as duas datas mudaria date_coupon na tela de Cupons — decisão pendente do usuário.
 	const couponDate = toBusinessDateBR(nuvemData?.created_at)
 	// Nome amigável da loja (ex.: "outlet"/"artepropria") para rastrear a origem do cupom.
 	const couponStore =
