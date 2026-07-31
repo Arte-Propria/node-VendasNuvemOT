@@ -183,6 +183,41 @@ export async function upsertClient(clientRecord) {
 	}
 	throw new Error(`Falha ao upsert cliente após ${maxRetries} tentativas`)
 }
+// Preserva o `cost` já gravado nas linhas de products_detail quando o payload que
+// está atualizando o pedido não traz esse campo.
+//
+// Motivo: `cost` é o custo CONGELADO da venda, a fonte do card "Custo de Produto".
+// Só a Nuvemshop fornece esse dado; o mapeamento do Tiny (mapTinyToDelivery) monta
+// products_detail sem ele. Como products_detail está em updatableFields, um sync do
+// Tiny depois do webhook Nuvemshop substituiria o array inteiro e apagaria o custo
+// em silêncio — mesmo cuidado que já existe para custo_categoria e
+// shipping_cost_owner, que usam null para o removeNullFields descartar o campo.
+//
+// Pareamento: posicional quando os dois arrays têm o mesmo tamanho e o SKU da
+// posição bate (products_detail é 1:1 com as linhas do pedido, na mesma ordem);
+// caso contrário, lookup por SKU. É a mesma estratégia do migrateProductsDetailCost.js.
+function preserveFrozenCost(incoming, existing) {
+	if (!Array.isArray(incoming) || !Array.isArray(existing) || existing.length === 0) {
+		return incoming
+	}
+
+	const skuOf = (line) => String(line?.sku ?? "").toUpperCase()
+	const hasCost = (line) => line?.cost !== undefined && line?.cost !== null
+	const costBySku = new Map()
+	existing.forEach((line) => {
+		if (hasCost(line) && !costBySku.has(skuOf(line))) costBySku.set(skuOf(line), line.cost)
+	})
+
+	const alinhado = incoming.length === existing.length
+
+	return incoming.map((line, idx) => {
+		if (hasCost(line)) return line
+		const posicional = alinhado && skuOf(existing[idx]) === skuOf(line) ? existing[idx] : null
+		const cost = posicional && hasCost(posicional) ? posicional.cost : costBySku.get(skuOf(line))
+		return cost === undefined ? line : { ...line, cost }
+	})
+}
+
 /**
  * Upsert específico para orders_shop:
  * - Se o pedido existe: atualiza apenas products, shipping_option, updated_at, shipping_status
@@ -195,7 +230,7 @@ export async function upsertOrderShop(updateRecord, fullRecord) {
 	const orderId = cleanUpdate.order_id || cleanFull.order_id
 	if (!orderId) throw new Error("order_id é obrigatório")
 
-	const selectSql = `SELECT order_id FROM ${dataBase.orders_shop} WHERE order_id = $1`
+	const selectSql = `SELECT order_id, products_detail FROM ${dataBase.orders_shop} WHERE order_id = $1`
 	const selectResult = await query(selectSql, [orderId])
 
 	if (selectResult.rows.length > 0) {
@@ -221,6 +256,12 @@ export async function upsertOrderShop(updateRecord, fullRecord) {
 		if (fieldsToUpdate.length === 0) {
 			console.log(`Nenhum campo atualizável para o pedido ${orderId}.`)
 			return
+		}
+		// Custo congelado: o array novo herda o `cost` do que já está gravado quando
+		// a origem da atualização não fornece esse dado (ver preserveFrozenCost).
+		if (cleanUpdate.products_detail !== undefined) {
+			const atual = parseJsonArray(selectResult.rows[0]?.products_detail)
+			cleanUpdate.products_detail = preserveFrozenCost(cleanUpdate.products_detail, atual)
 		}
 		// Prepara valores e cláusula SET
 		const setClauses = []
