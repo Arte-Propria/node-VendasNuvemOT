@@ -27,6 +27,8 @@
 //   - id_orders    = todos os pedidos do dia (membership; inclui parcerias).
 //
 // Idempotente: UPSERT por (date_sales, store), preservando id_sales das linhas existentes.
+// Linhas da janela cujo dia ficou sem nenhum pedido são zeradas (ver zeroOrphanDays) — é o que
+// remove as linhas fantasma deixadas pelo corte 03:00 e faz o recálculo convergir sozinho.
 // ============================================================================
 import { query } from "../db/db.js"
 import { dataBase, storeMapping, LOJA_FISICA_ORDER_ID_OFFSET } from "../db/dataBaseQueryList.js"
@@ -144,6 +146,54 @@ function computeRow(orders) {
 	}
 }
 
+/**
+ * Zera as linhas de daily_sales da janela que não correspondem a nenhum dia com pedido.
+ *
+ * O laço principal itera sobre `groups`, que só contém dias COM pedido — uma linha de um dia
+ * que ficou sem pedido nenhum nunca é visitada e sobrevive intacta. É assim que sobraram as
+ * linhas do motor antigo (corte 03:00), que lançava o pedido de loja física (created_at 03:00
+ * UTC = 00:00 BRT de D) no dia D−1: o mesmo pedido conta na linha fantasma de D−1 e na linha
+ * correta de D. Sem esta passagem, o recálculo não converge e a dupla contagem persiste.
+ *
+ * Zera em vez de deletar: preserva id_sales e o id_ads já vinculado à linha.
+ */
+async function zeroOrphanDays(storeNum, startDate, endDate, groups, apply, now) {
+	const rows = (await query(`
+		SELECT date_sales,
+		       coalesce(sum(total_orders), 0)::int AS total_orders,
+		       coalesce(sum(total_money), 0)::numeric AS total_money,
+		       coalesce(sum(total_paid_money), 0)::numeric AS total_paid_money,
+		       coalesce(sum(jsonb_array_length(coalesce(id_orders, '[]'::jsonb))), 0)::int AS qtd_id_orders
+		FROM ${dataBase.daily_sales}
+		WHERE store = $1
+		  AND ($2::date IS NULL OR date_sales >= $2::date)
+		  AND ($3::date IS NULL OR date_sales <= $3::date)
+		GROUP BY date_sales
+		ORDER BY date_sales`, [storeNum, startDate, endDate])).rows
+
+	const orphans = []
+	for (const r of rows) {
+		const day = isoDate(r.date_sales)
+		if (groups.has(day)) continue
+		const alreadyZero = r.total_orders === 0 && r.qtd_id_orders === 0 &&
+			toNumber(r.total_money) === 0 && toNumber(r.total_paid_money) === 0
+		if (alreadyZero) continue // idempotente: nada a reescrever
+		orphans.push({ day, prev: r })
+	}
+
+	if (apply) {
+		for (const o of orphans) {
+			// dias duplicados existem (não há índice único em (date_sales, store)): zera todas as linhas
+			await query(`
+				UPDATE ${dataBase.daily_sales} SET
+					total_orders = 0, total_paid_orders = 0, total_money = 0, total_paid_money = 0,
+					aov = 0, id_orders = '[]'::jsonb, updated_at = $1
+				WHERE date_sales = $2 AND store = $3`, [now, o.day, storeNum])
+		}
+	}
+	return orphans
+}
+
 async function resolveCouponIds(codes, day) {
 	const ids = []
 	for (const code of codes) {
@@ -255,6 +305,17 @@ export async function recalcAllDailySales(options = {}) {
 				else totals.updates++
 			}
 			if (onProgress) onProgress({ type: "day", store, day, changed, prev, computed: c, applied: apply })
+		}
+
+		// Linhas da janela sem nenhum pedido no dia: o laço acima não as alcança.
+		const zeroed = { total_orders: 0, total_paid_orders: 0, total_money: 0, total_paid_money: 0, aov: 0 }
+		for (const o of await zeroOrphanDays(storeNum, startDate, endDate, groups, apply, now)) {
+			totals.daysEvaluated++
+			totals.daysChanged++
+			if (apply) totals.updates++
+			if (onProgress) {
+				onProgress({ type: "day", store, day: o.day, changed: true, prev: o.prev, computed: zeroed, applied: apply })
+			}
 		}
 	}
 	return totals
