@@ -30,6 +30,130 @@ const NUMERIC_TO_STORE_NAME = { 3889735: "outlet", 1146504: "artepropria" }
 const COUPON_BRT_DATE_EXPR =
 	"(o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date"
 
+// ---------------------------------------------------------------------------
+// PUSHDOWN DO FILTRO DE DATA
+//
+// Antes, getDbQuery baixava a tabela INTEIRA da loja e o período era aplicado
+// depois, em JS, por filterBdByDateRange. Medido: um mês do outlet transferia
+// 26.256 linhas / ~32 MB para devolver ~320 pedidos.
+//
+// Regra de ouro: quem DEFINE o resultado continua sendo filterBdByDateRange.
+// O SQL abaixo só PRÉ-FILTRA — e de propósito com 1 dia de folga em cada extremo.
+//
+// Motivo da folga: o filtro JS é sensível ao fuso do PROCESSO Node. O driver `pg`
+// materializa `timestamp without time zone` como Date em hora LOCAL, e
+// toLocalDateBR converte esse instante para America/Sao_Paulo — então o dia
+// calculado muda conforme o TZ. Comprovado por scripts/checkBrtParity.js: sob
+// TZ=UTC (o da Render) o predicado SQL bate em 30.307 das 30.309 linhas; sob
+// TZ=America/Sao_Paulo, 4.018 divergem.
+//
+// Com a folga de ±1 dia o conjunto entregue ao JS é sempre um SUPERCONJUNTO do
+// que ele manteria, qualquer que seja o TZ — logo a saída final é idêntica à de
+// antes por construção, sem depender do ambiente. Custo: ~2 dias extras num
+// período de 31 (≈ +6% de linhas).
+const DATE_PAD_DAYS = 1
+
+// Espelho SQL do `dateFieldMap` de filterBdByDateRange (segmentacaoServices.js).
+// MANTENHA OS DOIS EM SINCRONIA: uma tabela nova precisa entrar nos dois mapas.
+//   kind "date"      → coluna DATE, comparada por dia-calendário
+//   kind "timestamp" → coluna TIMESTAMP, comparada por instante (limite superior
+//                      é meia-noite EXCLUSIVA, que reproduz o <= 23:59:59.999 do JS)
+//   kind "brt"       → TIMESTAMP gravado em UTC convertido para o dia-calendário
+//                      de São Paulo. Única tabela que hoje passa por toLocalDateBR.
+const DATE_FILTER = {
+	[dataBase.ads]: { kind: "date", expr: "date_ads" },
+	[dataBase.clients]: { kind: "timestamp", expr: "dt_criacao_cli" },
+	[dataBase.coupon]: { kind: "date", expr: "date_coupon" },
+	[dataBase.daily_sales]: { kind: "date", expr: "date_sales" },
+	[dataBase.orders_shop]: {
+		kind: "brt",
+		expr: "((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Sao_Paulo')::date"
+	},
+	[dataBase.product]: { kind: "date", expr: "dt_att_categoria" }
+}
+
+// Só empurra para o SQL datas que EXISTEM de fato. "2026-13-45" casa com o regex
+// mas estoura no `::date` do Postgres (500), enquanto o parseDate do JS hoje a
+// normaliza em silêncio e devolve 200. Nesses casos não geramos predicado algum
+// e deixamos o JS decidir, exatamente como antes.
+const isRealIsoDate = (s) => {
+	if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
+	const [y, m, d] = s.split("-").map(Number)
+	const dt = new Date(Date.UTC(y, m - 1, d))
+	return (
+		dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
+	)
+}
+
+/** Devolve as cláusulas de data da tabela e ANEXA os parâmetros em `params`. */
+const buildDateClauses = (table, startDate, endDate, params) => {
+	const cfg = DATE_FILTER[table]
+	// Tabela sem campo de data mapeado → sem predicado, igual a hoje
+	// (filterBdByDateRange loga o aviso e devolve tudo).
+	if (!cfg) return []
+
+	// Período INVERTIDO (start > end): não empurra nada para o SQL.
+	//
+	// filterBdByDateRange lança "Data inicial não pode ser maior que data final"
+	// → o catch de getDbQuery devolve 500. Mas essa validação está DEPOIS do
+	// early-return de lista vazia (`if (queryData.length === 0) return []`), então
+	// um pré-filtro que corta tudo faria o 500 virar 200 [] — regressão silenciosa
+	// pega pelo scripts/parityDiff.js. Deixando o conjunto completo chegar ao JS,
+	// o erro continua sendo lançado exatamente como antes.
+	if (
+		isRealIsoDate(startDate) &&
+		isRealIsoDate(endDate) &&
+		startDate > endDate // ISO YYYY-MM-DD ordena lexicograficamente = cronologicamente
+	) {
+		return []
+	}
+
+	const clauses = []
+	if (isRealIsoDate(startDate)) {
+		params.push(startDate)
+		clauses.push(`${cfg.expr} >= ($${params.length}::date - ${DATE_PAD_DAYS})`)
+	}
+	if (isRealIsoDate(endDate)) {
+		params.push(endDate)
+		// +1 do padding e +1 da meia-noite exclusiva do dia seguinte.
+		clauses.push(`${cfg.expr} < ($${params.length}::date + ${DATE_PAD_DAYS + 1})`)
+	}
+	return clauses
+}
+
+// Colunas exatamente no conjunto que cada dataBaseDb.<t>.transform consome.
+// Nota honesta: hoje isso NÃO reduz payload — todo transform usa 100% das colunas
+// da sua tabela (só `coupon.id_coupon` sobra, e esse caminho nem é alcançado,
+// porque getCouponUsageFromDump intercepta antes). A lista existe para congelar o
+// contrato: um ALTER TABLE ... ADD COLUMN futuro não entra sozinho na resposta.
+// A ordem das chaves no JSON é ditada pelo transform, não por este SELECT.
+const SELECT_COLUMNS = {
+	[dataBase.orders_shop]:
+		"order_id, id_cli, store, total, subtotal, payment_status, coupons, " +
+		"coupon_discount, products, products_detail, shipping_option, created_at, " +
+		"paid_at, updated_at, active, storefront, shipping_status, gateway_link, " +
+		"payment_method, url_tracking, markers_order_tiny, fiscal_note, " +
+		"estimated_delivery, shipping_cost, shipping_cost_owner, order_tracking_link",
+	[dataBase.ads]:
+		"id_ads, date_ads, plataform, funding_ecom, funding_store, funding_general, " +
+		"funding_chatbot, funding_insta, funding_mirror, funding_painting, active, " +
+		"store, funding_all, total_visits, users_by_device, carts, begin_checkout, impressions",
+	[dataBase.clients]:
+		"id_cli, cpf_cnpj_cli, nome_cli, email_cli, fone_cli, tipo_cli, bairro_cli, " +
+		"cidade_cli, numero_cli, uf_cli, cep_cli, endereco_cli, dt_criacao_cli, " +
+		"ativo, dt_att_ativo, origem_cli",
+	[dataBase.daily_sales]:
+		"id_sales, date_sales, total_orders, total_paid_orders, total_money, " +
+		"total_paid_money, aov, id_ads, store, id_orders, id_coupons, active, " +
+		"dt_att_active, created_at, updated_at",
+	[dataBase.product]:
+		"cod_categoria, nome_categoria, desc_categoria, grp_categoria, ativo, " +
+		"dim_categoria, cor_categoria, tipo_categoria, dt_att_ativo, dt_att_categoria, " +
+		"img_categoria, custo_categoria, tempo_prod_categoria, preco",
+	[dataBase.coupon]:
+		"date_coupon, name, quantity, total_money, total_discount, order_ids, store"
+}
+
 // Recalcula o uso de cupons a partir do dump pedidos_<loja>, reproduzindo EXATAMENTE a lógica
 // da tela legada de Cupons: filtra pelos mesmos critérios do filterOrders (exclui cancelled,
 // payment_status='voided' e payment_details.method='other' — estes últimos são os cupons
@@ -159,17 +283,30 @@ export const getDbQuery = async (req, res) => {
 			}
 		}
 
-		// Monta a consulta SQL
-		let sql = `SELECT * FROM ${querySelect}`
+		// Monta a consulta SQL: filtro de loja + PRÉ-filtro de data (com folga).
 		const params = []
+		const where = []
 
 		if (storeValue !== undefined) {
-			sql += " WHERE store = $1"
 			params.push(storeValue)
+			where.push(`store = $${params.length}`)
 		}
+		where.push(...buildDateClauses(querySelect, startDate, endDate, params))
+
+		// ORDER BY ctid preserva a ordem FÍSICA que o Seq Scan produzia antes do
+		// índice. Sem isso um Index Scan reordenaria o array e a resposta, embora
+		// com o mesmo conjunto de linhas, teria bytes diferentes. Custo: um Sort de
+		// algumas centenas de linhas.
+		const sql =
+			`SELECT ${SELECT_COLUMNS[querySelect] ?? "*"} FROM ${querySelect}` +
+			(where.length ? ` WHERE ${where.join(" AND ")}` : "") +
+			" ORDER BY ctid"
 
 		const result = await query(sql, params)
 		const queryData = await fetchRequest(result, querySelect)
+		// PERMANECE: é ele quem define o contrato de saída (inclusive os erros de
+		// validação, como startDate > endDate → 500). Agora opera sobre centenas de
+		// linhas em vez de dezenas de milhares.
 		const filterDataByDate = await filterBdByDateRange(queryData, querySelect, {
 			startDate,
 			endDate
@@ -520,6 +657,156 @@ export const getItemById = async (req, res) => {
 		return res.status(200).json(data)
 	} catch (err) {
 		console.error(`Erro ao buscar ${table} por ID:`, err)
+		return res.status(500).json({ error: "Erro interno" })
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ENDPOINTS EM LOTE
+//
+// O frontend resolvia catálogo e clientes um a um: GET /db/product/:sku por SKU
+// (até ~900 num mês da artepropria) e GET /db/clients/:id por pedido. Cada um
+// desses cai em getItemById, e o de clientes chega a fazer DUAS queries
+// sequenciais. Estes dois handlers resolvem tudo numa chamada.
+//
+// São POST, e não GET, por dois motivos: existe cod_categoria com vírgula na
+// base (um separador em querystring quebraria) e 200 SKUs estouram o limite
+// prático de URL depois do encodeURIComponent.
+//
+// Paridade: cada um reproduz exatamente a resolução do getItemById unitário —
+// mesma normalização de chave, mesmo transform e `null` onde o unitário daria
+// 404. Verificado por scripts/batchDiff.js.
+const MAX_BATCH = 200
+
+// Serial plausível: mesma regra do getItemById para `clients` (cabe em int4 e
+// não tem zero à esquerda, que CPF/CNPJ podem ter).
+const looksSerialId = (raw) =>
+	/^\d+$/.test(raw) && raw.length <= 9 && !raw.startsWith("0") && Number(raw) <= 2147483647
+
+/**
+ * POST /db/products/batch   body: { skus: string[] }
+ * → { "<sku pedido>": ProductRow | null, ... }
+ */
+export const getProductsBatch = async (req, res) => {
+	try {
+		const requested = Array.isArray(req.body?.skus) ? req.body.skus : null
+		if (!requested) {
+			return res.status(400).json({ error: "Body deve conter { skus: string[] }" })
+		}
+		if (requested.length === 0) return res.status(200).json({})
+		if (requested.length > MAX_BATCH) {
+			return res.status(400).json({ error: `Máximo de ${MAX_BATCH} SKUs por chamada` })
+		}
+
+		// Mesma normalização do getItemById: String(id).toUpperCase().trim()
+		const norm = (s) => String(s).toUpperCase().trim()
+		const keys = [...new Set(requested.map(norm))].filter(Boolean)
+
+		const { rows } = keys.length
+			? await query(
+				`SELECT ${SELECT_COLUMNS[dataBase.product]} FROM ${dataBase.product}
+				 WHERE cod_categoria = ANY($1::text[])`,
+				[keys]
+			)
+			: { rows: [] }
+
+		// cod_categoria tem índice único → no máximo 1 linha por chave.
+		const byCod = new Map(rows.map((r) => [norm(r.cod_categoria), r]))
+
+		const out = {}
+		for (const sku of requested) {
+			const row = byCod.get(norm(sku))
+			out[String(sku)] = row ? dataBaseDb.product.transform(row) : null
+		}
+		return res.status(200).json(out)
+	} catch (err) {
+		console.error("Erro no lote de produtos:", err)
+		return res.status(500).json({ error: "Erro interno" })
+	}
+}
+
+/**
+ * POST /db/clients/batch   body: { ids: (string|number)[] }
+ * → { "<id pedido>": ClientRow | null, ... }
+ *
+ * Espelha getItemById(table="clients"): tenta id_cli quando o valor parece
+ * serial e cai para cpf_cnpj_cli quando não parece OU quando o id_cli não achou
+ * nada. Na base, 88% dos orders_shop.id_cli NÃO parecem serial, então o caminho
+ * do CPF é o dominante.
+ *
+ * Desempate de CPF duplicado (1.523 CPFs se repetem em `clientes`): a query
+ * unitária faz Index Scan e o controller pega rows[0] — ou seja, a escolha é a
+ * ORDEM DO ÍNDICE, que não corresponde a ctid nem a id_cli e não é reproduzível
+ * por nenhum ORDER BY (verificado: o índice devolve (7558,44), (7558,35),
+ * (7558,36) nessa ordem). Por isso os CPFs com mais de uma linha são resolvidos
+ * com a MESMA query unitária, um a um. São raros — num período típico, zero ou
+ * poucos — então o custo é desprezível e a paridade fica exata por construção.
+ */
+export const getClientsBatch = async (req, res) => {
+	try {
+		const requested = Array.isArray(req.body?.ids) ? req.body.ids : null
+		if (!requested) {
+			return res.status(400).json({ error: "Body deve conter { ids: (string|number)[] }" })
+		}
+		if (requested.length === 0) return res.status(200).json({})
+		if (requested.length > MAX_BATCH) {
+			return res.status(400).json({ error: `Máximo de ${MAX_BATCH} ids por chamada` })
+		}
+
+		const raws = [...new Set(requested.map((i) => String(i).trim()))]
+		const serials = raws.filter(looksSerialId).map(Number)
+		const cols = SELECT_COLUMNS[dataBase.clients]
+
+		const [serialRes, cpfRes] = await Promise.all([
+			serials.length
+				? query(`SELECT ${cols} FROM ${dataBase.clients} WHERE id_cli = ANY($1::int[])`, [
+					serials
+				])
+				: Promise.resolve({ rows: [] }),
+			// TODOS os raws entram aqui: os não-seriais vão direto e os seriais
+			// precisam do fallback caso id_cli não encontre nada.
+			raws.length
+				? query(
+					`SELECT ${cols} FROM ${dataBase.clients}
+					 WHERE cpf_cnpj_cli = ANY($1::text[])`,
+					[raws]
+				)
+				: Promise.resolve({ rows: [] })
+		])
+
+		const bySerial = new Map(serialRes.rows.map((r) => [String(r.id_cli), r]))
+
+		// Agrupa por CPF para detectar os duplicados.
+		const byCpf = new Map()
+		const duplicados = new Set()
+		for (const r of cpfRes.rows) {
+			const k = String(r.cpf_cnpj_cli)
+			if (byCpf.has(k)) duplicados.add(k)
+			else byCpf.set(k, r)
+		}
+
+		// CPF duplicado → refaz a query unitária para herdar a ordem do índice.
+		if (duplicados.size > 0) {
+			const escolhidos = await Promise.all(
+				[...duplicados].map((cpf) =>
+					query(`SELECT ${cols} FROM ${dataBase.clients} WHERE cpf_cnpj_cli = $1`, [cpf])
+				)
+			)
+			;[...duplicados].forEach((cpf, i) => {
+				const row = escolhidos[i].rows[0]
+				if (row) byCpf.set(cpf, row)
+			})
+		}
+
+		const out = {}
+		for (const id of requested) {
+			const raw = String(id).trim()
+			const row = (looksSerialId(raw) ? bySerial.get(raw) : undefined) ?? byCpf.get(raw)
+			out[String(id)] = row ? dataBaseDb.clients.transform(row) : null
+		}
+		return res.status(200).json(out)
+	} catch (err) {
+		console.error("Erro no lote de clientes:", err)
 		return res.status(500).json({ error: "Erro interno" })
 	}
 }

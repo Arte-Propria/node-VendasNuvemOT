@@ -87,6 +87,8 @@ import {
 	getClientById,
 	getProductBySku,
 	getProductSales,
+	getProductsBatch,
+	getClientsBatch,
 	postDbQueryNuvemshop,
 	postDbQueryTiny,
 	postDbQueryAds,
@@ -125,6 +127,14 @@ router.post("/product/:store", postProduct)
 // Total histórico de unidades vendidas por SKU (all-time), por loja.
 // Registrada ANTES do genérico "/db/:table/:id" para não ser capturada por ele.
 router.get("/db/product-sales/:store", getProductSales)
+
+// Resolução em LOTE de catálogo e clientes — substitui o N+1 sobre HTTP que o
+// frontend fazia (1 GET /db/product/:sku por SKU e 1 GET /db/clients/:id por
+// pedido). POST porque há cod_categoria com vírgula e a lista estoura a URL.
+// Registradas antes do genérico "/db/:table/:id" por clareza (não há colisão
+// real, pois o método é outro).
+router.post("/db/products/batch", getProductsBatch)
+router.post("/db/clients/batch", getClientsBatch)
 
 // Rota para buscar todos os pedidos de uma loja específica
 router.get("/db/orders/:store", getOrdersByStore)
