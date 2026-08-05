@@ -20,11 +20,26 @@
 // "dia de negócio" com corte às 03:00: pedidos de loja física têm created_at 03:00 UTC
 // (= 00:00 BRT) e o corte os lançava sistematicamente no dia anterior.
 //
-// Regras aplicadas (paridade com o Dashboard/legado `filterOrders`), E = pedidos com method ≠ 'other':
-//   - total_money  = Σ total de E (Geral valor; inclui cancelado/estornado);
-//   - total_orders = contagem de E com status≠'cancelled' e payment_status≠'voided' (Geral qtd);
+// Regras aplicadas, E = pedidos com method ≠ 'other' (parcerias = permuta, sem receita):
+//   - total_orders = contagem de TODOS os pedidos do dia, sem exceção (Geral qtd);
+//   - total_money  = Σ total de E        (Geral valor; inclui cancelado/estornado);
 //   - total_paid_* = E com status≠'cancelled' e payment_status='paid' (Pago);
 //   - id_orders    = todos os pedidos do dia (membership; inclui parcerias).
+//
+// A QUANTIDADE DO "GERAL" É A CONTAGEM DA TELA DE PEDIDOS (decisão do usuário, ago/2026).
+// Essa tela lista orders_shop sem filtro nenhum além de loja + data (getDbQuery monta só esses
+// predicados, e o front começa com status/método/frete em 'all'), então é o número que se usa
+// para conferir o dia. Por isso total_orders não exclui NADA: nem parceria, nem cancelado, nem
+// estornado. São 134 parcerias no histórico (130 outlet, 4 artepropria), em 75 dias.
+//
+// Consequência assumida: qtd e valor têm bases diferentes nesses 75 dias, e o aov fica diluído
+// (denominador com parceria, numerador sem). É deliberado — incluir R$ 37.924,47 de permuta no
+// faturamento seria pior. NÃO "consertar" isso sem falar com o usuário.
+//
+// Histórico: até ago/2026 a qtd excluía cancelado/estornado enquanto o valor os somava — defeito
+// herdado do legado (`ordersToday.length` vs Σ `ordersAllToday` em filterOrders.js, removido em
+// 07b7bb0), que fazia 30/07/2026 artepropria exibir "5 Vendas / R$ 42.774,28" com R$ 1.444,86
+// vindos de 2 estornos. Corrigido junto com a mudança acima.
 //
 // Idempotente: UPSERT por (date_sales, store), preservando id_sales das linhas existentes.
 // Linhas da janela cujo dia ficou sem nenhum pedido são zeradas (ver zeroOrphanDays) — é o que
@@ -38,6 +53,16 @@ const TABLES = { outlet: "pedidos_outlet", artepropria: "pedidos_artepropria" }
 // O dump grava timestamp sem fuso (wall-clock UTC). Converte para a data local de São Paulo.
 const BRT_DATE_EXPR = "(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date"
 
+// Offsets legados de NUMERAÇÃO em orders_shop: order_id = `number` do dump + k·1e12. Não
+// confundir com LOJA_FISICA_ORDER_ID_OFFSET, que soma ao TOKEN. Comprovados no banco:
+//   1e12 → 1477 pedidos do outlet (24/11/2023 a 06/02/2024), todos casando com o dump por
+//          number, com total e created_at idênticos;
+//   2e12 → 1 pedido da artepropria (number 1138).
+// Sem eles o anti-join falha e o pedido é contado duas vezes (dump + órfão).
+// Para checar se surgiu um offset novo:
+//   SELECT store, count(*) FROM orders_shop WHERE order_id >= 1e12 GROUP BY 1, trunc(order_id/1e12);
+const LEGACY_NUMBER_OFFSETS = [1_000_000_000_000, 2_000_000_000_000]
+
 const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100
 const isoDate = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10))
 
@@ -46,9 +71,13 @@ const isoDate = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : Strin
  * apenas em orders_shop (chegam por `POST /webhook/db/nuvemshop`, `syncNuvemshopOrders` ou
  * pelo fluxo Tiny, que não passam pelo dump).
  *
- * O anti-join usa as DUAS convenções de order_id de loja física: `number` (chatbot e histórico
- * com token placeholder) e `token + offset da loja`. Subtrai o offset — nunca `% 1e12`, que só
- * acerta enquanto o token cabe em 1e12 e o popup "Cadastrar pedido" gera ~1,8e15.
+ * O anti-join precisa cobrir TODAS as convenções de order_id, senão o pedido escapa como
+ * "órfão" e é contado DUAS vezes (uma pelo dump, outra pelo orfaos):
+ *   1. `number` puro — chatbot e histórico com token placeholder;
+ *   2. `token + offset da loja` (LOJA_FISICA_ORDER_ID_OFFSET) — loja física atual;
+ *   3. `number + offset legado de numeração` (LEGACY_NUMBER_OFFSETS) — importações antigas.
+ * Sempre SUBTRAINDO o offset — nunca `% 1e12`, que só acerta enquanto o token cabe em 1e12 e o
+ * popup "Cadastrar pedido" gera ~1,8e15.
  */
 async function fetchDayGroups(table, storeNum, startDate, endDate) {
 	const sql = `
@@ -78,7 +107,12 @@ async function fetchDayGroups(table, storeNum, startDate, endDate) {
 			      -- e evita varrer o dump inteiro quando há filtro de período
 			      WHERE ($1::date IS NULL OR d.brt_date >= $1::date - 1)
 			        AND ($2::date IS NULL OR d.brt_date <= $2::date + 1)
-			        AND (d.id_order = o.order_id OR d.tok = o.order_id - $4::numeric)
+			        AND (
+			             d.id_order = o.order_id
+			          OR d.tok      = o.order_id - $4::numeric
+			          -- offsets legados de NUMERAÇÃO (number + k·1e12), distintos do offset de token
+			          OR d.id_order = ANY(SELECT o.order_id - x FROM unnest($5::numeric[]) AS x)
+			        )
 			  )
 		)
 		SELECT brt_date, id_order, total, payment_status, status, coupon, payment_details FROM (
@@ -90,7 +124,7 @@ async function fetchDayGroups(table, storeNum, startDate, endDate) {
 		  AND ($2::date IS NULL OR brt_date <= $2::date)
 		ORDER BY brt_date, id_order`
 	const offset = LOJA_FISICA_ORDER_ID_OFFSET[storeNum] || 0
-	const rows = (await query(sql, [startDate, endDate, String(storeNum), offset])).rows
+	const rows = (await query(sql, [startDate, endDate, String(storeNum), offset, LEGACY_NUMBER_OFFSETS])).rows
 	const groups = new Map()
 	for (const r of rows) {
 		const day = isoDate(r.brt_date)
@@ -110,11 +144,11 @@ function paymentMethodOf(o) {
 	return pd.method ?? null
 }
 
-// Agrega um dia com paridade ao Dashboard/legado `filterOrders`.
-// E = pedidos onde payment_method ≠ 'other' (parcerias fora de todos os totais numéricos):
-//   total_money  = Σ total de E                                     (Geral valor; inclui cancelado/estornado)
-//   total_orders = contagem de E com status≠'cancelled' e payment_status≠'voided'  (Geral qtd)
-//   total_paid_* = E com status≠'cancelled' e payment_status='paid' (Pago)
+// Agrega um dia. E = pedidos onde payment_method ≠ 'other' (parcerias fora dos totais em R$):
+//   total_orders = contagem de TODOS os pedidos do dia               (Geral qtd; ver cabeçalho)
+//   total_money  = Σ total de E                                      (Geral valor; inclui cancelado/estornado)
+//   aov          = total_money / total_orders                        (denominador inclui parcerias)
+//   total_paid_* = E com status≠'cancelled' e payment_status='paid'  (Pago)
 // id_orders mantém todos os identificadores do dia (membership completa): o `number` do dump
 // e, para os pedidos que só existem em orders_shop, o próprio `order_id`.
 function computeRow(orders) {
@@ -123,13 +157,16 @@ function computeRow(orders) {
 	const couponCodes = new Set()
 	for (const o of orders) {
 		idOrders.push(Number(o.id_order)) // membership completa (inclui parcerias)
-		if (paymentMethodOf(o) === "other") continue // parcerias fora dos totais
+		// Geral qtd = TODO pedido do dia, sem exceção: é o que faz o card bater com a tela de
+		// Pedidos, que lista orders_shop sem filtro nenhum (só loja + data).
+		totalOrders++
+		// Parceria (permuta) entra SÓ na contagem: não tem receita, então fica fora de
+		// total_money, de Pago e da coleta de cupons.
+		if (paymentMethodOf(o) === "other") continue
 		const t = toNumber(o.total)
-		totalMoney += t                 // Geral valor: E (inclui cancelado/estornado)
-		if (o.status !== "cancelled" && o.payment_status !== "voided") {
-			totalOrders++               // Geral qtd: E, não cancelado e não estornado
-			if (o.payment_status === "paid") { paidMoney += t; paidOrders++ }
-		}
+		totalMoney += t
+		// Pago: 'paid' já exclui 'voided' por construção; resta descartar o cancelado.
+		if (o.status !== "cancelled" && o.payment_status === "paid") { paidMoney += t; paidOrders++ }
 		if (o.status !== "cancelled") { // cupom de cancelado é revertido
 			const cps = Array.isArray(o.coupon) ? o.coupon : []
 			for (const c of cps) if (c?.code) couponCodes.add(c.code)
