@@ -98,6 +98,7 @@ import {
 import { getNuvemshopCallback } from "../controllers/authNuvemshop.js"
 import { getStatusPlatform } from "../controllers/statusPlatformController.js"
 import { generateTagsIA } from "../controllers/generateTagsControllers.js"
+import { getImg3dwebar } from "../controllers/img3dwebarController.js"
 
 const router = express.Router()
 
@@ -146,6 +147,9 @@ router.get("/db/orders/:store/:createdAtMin/:createdAtMax", getOrdersByDate)
 // em transação única: dump (pedidos_<loja>), orders_shop, daily_sales, coupon.
 // Dry-run por padrão; só exclui com ?apply=true.
 router.delete("/db/orders/:store/:date", deleteOrdersByDate)
+
+// Imagens (artes) de um produto para o visualizador AR (3DWebAR), por número do SKU
+router.get("/webar/images/:store/:id", getImg3dwebar)
 
 // Meta ADS
 router.get("/ads/meta/:store/:createdAtMin/:createdAtMax", getDataADSMeta)
