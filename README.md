@@ -33,7 +33,7 @@ Credenciais do app da 3print (partner 2039038) ficam em `SHOPEE_3PRINT_*` — **
 |---|---|---|
 | `SHOPEE_3PRINT_PARTNER_ID` | sim | partner_id do app da 3print (2039038) |
 | `SHOPEE_3PRINT_PARTNER_KEY` | sim | partner_key do app (a chave da API, não a de push) |
-| `SHOPEE_GATEWAY_KEYS` | sim | chaves aceitas em `X-Gateway-Key`, CSV. Gerar com `openssl rand -hex 32`. Duas ao mesmo tempo durante uma rotação |
+| `SHOPEE_GATEWAY_KEYS` | sim | chaves aceitas em `X-Gateway-Key`, CSV — a mesma que está em `gateway_key` no `config/marketplace.php` do 3print. Duas ao mesmo tempo durante uma rotação |
 | `SHOPEE_3PRINT_HOST` | não | default `https://partner.shopeemobile.com` |
 | `SHOPEE_3PRINT_TIMEOUT_MS` | não | default `20000` (o 3print espera 25 s pelo gateway) |
 | `WHOAMI_UPSTREAM` | não | default `https://checkip.amazonaws.com` |
@@ -87,16 +87,16 @@ assinatura, a chamada e a classificação funcionam sem precisar de token de loj
 
 1. Render → serviço → **Connect** → aba **Outbound**: anote os IPs. `GET /gateway/shopee/whoami`
    tem que devolver um deles.
-2. 3print (Vapor): `SHOPEE_GATEWAY_URL=https://node-vendasnuvemot.onrender.com/gateway/shopee`,
-   `SHOPEE_GATEWAY_KEY`, `SHOPEE_WHITELISTED_IPS` (os IPs do passo 1). Deploy. Neste ponto todo o
+2. 3print: URL e chave do gateway já estão como default em `config/marketplace.php` (sem env na
+   Vapor); os IPs do passo 1 vão em `whitelisted_ips` no mesmo config. Deploy. Neste ponto todo o
    tráfego já sai pelo gateway com o whitelist ainda desligado.
 3. Shopee Open Platform → App List → app da 3print → Go Live → **IP Address Whitelist**: os IPs do
    passo 1 → Enable → Submit.
 4. O 3print roda `marketplace:shopee-egress --assert` todo dia: se a Render trocar os IPs da
    região, o comando avisa e o whitelist precisa ser atualizado.
 
-Rotação da chave: adicione a nova em `SHOPEE_GATEWAY_KEYS` (CSV com as duas), troque
-`SHOPEE_GATEWAY_KEY` no 3print, depois remova a antiga.
+Rotação da chave: adicione a nova em `SHOPEE_GATEWAY_KEYS` (CSV com as duas), troque o default de
+`gateway_key` no config do 3print, depois remova a antiga.
 
 Rollback: desligar o whitelist na Shopee **e** voltar a release do 3print que chamava a Shopee
 direto — nessa ordem; com o whitelist ligado a chamada direta é recusada.
