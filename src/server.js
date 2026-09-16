@@ -3,12 +3,17 @@ import dotenv from "dotenv"
 import cors from "cors"
 import compression from "compression"
 import router from "./routes/router.js"
+import shopeeGatewayRouter from "./routes/shopeeGatewayRouter.js"
 import { config } from "./config/env.js"
 
 dotenv.config()
 
 const app = express()
 const PORT = config.port
+
+app.disable("x-powered-by")
+// Atrás do proxy da Render: sem isto req.ip é o IP interno do proxy.
+app.set("trust proxy", true)
 
 app.use(cors({ origin: "*" }))
 
@@ -19,6 +24,9 @@ app.use(cors({ origin: "*" }))
 app.use(compression())
 
 app.use(express.json())
+
+// Gateway da Shopee para o 3print (IP de saída fixo). Tem autenticação própria.
+app.use("/gateway/shopee", shopeeGatewayRouter)
 
 app.use(router)
 

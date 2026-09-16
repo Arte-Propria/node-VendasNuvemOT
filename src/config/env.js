@@ -33,6 +33,26 @@ export const config = {
 	shopeePartnerId: process.env.SHOPEE_PARTNER_ID,
 	shopeePartnerKey: process.env.SHOPEE_PARTNER_KEY,
 	shopeeRedirectUri: process.env.SHOPEE_REDIRECT_URI,
+	// Gateway da Shopee para o 3print: este serviço tem IP de saída fixo na
+	// Render, e a Shopee só libera dados do comprador para IP whitelistado.
+	// É o app da 3PRINT (partner 2039038) — não o SHOPEE_PARTNER_* acima, que
+	// é outro app. Ver README › "Gateway da Shopee para o 3print".
+	shopeeGateway: {
+		partnerId: process.env.SHOPEE_3PRINT_PARTNER_ID,
+		partnerKey: process.env.SHOPEE_3PRINT_PARTNER_KEY,
+		host: process.env.SHOPEE_3PRINT_HOST || "https://partner.shopeemobile.com",
+		// Abaixo dos 25s que o 3print espera pelo gateway: o 502 chega antes
+		// de o outro lado estourar o próprio timeout.
+		timeoutMs: Number(process.env.SHOPEE_3PRINT_TIMEOUT_MS || 20000),
+		// Chaves aceitas no X-Gateway-Key. CSV para rotação sem janela: duas
+		// chaves valem ao mesmo tempo enquanto o 3print troca para a nova.
+		keys: (process.env.SHOPEE_GATEWAY_KEYS || "")
+			.split(",")
+			.map((key) => key.trim())
+			.filter(Boolean),
+		whoamiUpstream:
+      process.env.WHOAMI_UPSTREAM || "https://checkip.amazonaws.com"
+	},
 	sheinClientId: process.env.SHEIN_APP_ID,
 	sheinClientSecret: process.env.SHEIN_SECRET_KEY,
 	sheinRedirectUri: process.env.SHEIN_REDIRECT_URI,
