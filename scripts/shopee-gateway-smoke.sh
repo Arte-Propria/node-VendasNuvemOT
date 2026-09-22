@@ -84,6 +84,24 @@ check "token/refresh inválido -> 401 shopee_token_rejected (error_shop_refresh_
 call POST /orders/list "{\"shop_id\":$SHOP_ID,\"access_token\":\"token-invalido\",\"time_range_field\":\"update_time\",\"time_from\":1700000000,\"time_to\":1700000100}" "$AUTH"
 check "orders/list token inválido -> 401" 401 shopee_token_rejected "$RESP_STATUS" "$RESP_BODY"
 
+call POST /orders/invoice-upload "{\"shop_id\":$SHOP_ID,\"access_token\":\"x\",\"order_sn\":\"250911ABC\"}" "$AUTH"
+check "orders/invoice-upload sem XML -> 400" 400 xml_base64 "$RESP_STATUS" "$RESP_BODY"
+
+# Multipart assinado chegando à Shopee: o token inválido volta classificado.
+xml_b64="$(printf '<nfeProc/>' | base64)"
+call POST /orders/invoice-upload "{\"shop_id\":$SHOP_ID,\"access_token\":\"token-invalido\",\"order_sn\":\"250911ABC\",\"xml_base64\":\"$xml_b64\"}" "$AUTH"
+check "orders/invoice-upload token inválido -> 401 (multipart chegou à Shopee)" 401 shopee_token_rejected "$RESP_STATUS" "$RESP_BODY"
+
+call POST /logistics/ship-order "{\"shop_id\":$SHOP_ID,\"access_token\":\"x\",\"order_sn\":\"250911ABC\",\"pickup\":{\"address_id\":1},\"dropoff\":{}}" "$AUTH"
+check "logistics/ship-order com coleta E drop-off -> 400" 400 "exatamente um" "$RESP_STATUS" "$RESP_BODY"
+
+call POST /logistics/shipping-parameter "{\"shop_id\":$SHOP_ID,\"access_token\":\"token-invalido\",\"order_sn\":\"250911ABC\"}" "$AUTH"
+check "logistics/shipping-parameter token inválido -> 401" 401 shopee_token_rejected "$RESP_STATUS" "$RESP_BODY"
+
+# Rota binária: o erro da Shopee (JSON) precisa ser lido como erro, não como arquivo.
+call POST /logistics/document-download "{\"shop_id\":$SHOP_ID,\"access_token\":\"token-invalido\",\"order_sn\":\"250911ABC\",\"shipping_document_type\":\"THERMAL_AIR_WAYBILL\"}" "$AUTH"
+check "logistics/document-download token inválido -> 401 (erro lido no download)" 401 shopee_token_rejected "$RESP_STATUS" "$RESP_BODY"
+
 call POST /auth/authorize-url '{"redirect":"https://3print-srv-01.com.br/api/marketplace/shopee/callback"}' "$AUTH"
 check "auth/authorize-url -> url assinada" 200 auth_partner "$RESP_STATUS" "$RESP_BODY"
 

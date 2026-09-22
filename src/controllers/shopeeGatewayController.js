@@ -2,7 +2,17 @@ import { createRequire } from "module"
 import { GatewayNotConfigured, RESULT } from "../services/shopeeGateway/client.js"
 import { authorizeUrl, exchangeCode, refreshAccessToken } from "../services/shopeeGateway/auth.js"
 import { getItemBaseInfo, getItemList, getModelList } from "../services/shopeeGateway/items.js"
-import { getOrderDetail, getOrderList, getTrackingNumber } from "../services/shopeeGateway/orders.js"
+import {
+	createShippingDocument,
+	downloadShippingDocument,
+	getShippingDocumentParameter,
+	getShippingDocumentResult,
+	getShippingParameter,
+	shipOrder
+} from "../services/shopeeGateway/logistics.js"
+import {
+	getOrderDetail, getOrderList, getTrackingNumber, uploadInvoiceDoc
+} from "../services/shopeeGateway/orders.js"
 import { egressIp } from "../services/shopeeGateway/whoami.js"
 import { logShopeeGateway } from "../utils/logger.js"
 
@@ -38,6 +48,8 @@ const isIdList = (value, max) => Array.isArray(value)
 	&& value.every((item) => isNonEmptyString(item) || isId(item))
 
 const isIntInRange = (value, min, max) => Number.isInteger(value) && value >= min && value <= max
+
+const isPlainObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value)
 
 /** shop_id + access_token: presentes em toda chamada de loja. */
 const shopFields = (body, details) => {
@@ -165,6 +177,109 @@ export const ordersTrackingNumber = shopOperation("orders/tracking-number",
 		}
 	},
 	getTrackingNumber)
+
+// ── Nota fiscal e logística (envio + etiqueta) ───────────────────────────
+
+/** Limite da Shopee para o arquivo do upload_invoice_doc. */
+const MAX_INVOICE_BYTES = 1024 * 1024
+
+/** order_sn + package_number? — a chave de toda operação de envio. */
+const packageRef = (body, details) => {
+	if (!isNonEmptyString(body.order_sn)) details.push("order_sn: obrigatório")
+
+	return {
+		orderSn: body.order_sn,
+		packageNumber: optionalString(body.package_number, "package_number", details)
+	}
+}
+
+/** THERMAL_AIR_WAYBILL, NORMAL_AIR_WAYBILL… — ausente, vale o padrão da Shopee. */
+const optionalDocumentType = (value, details) => {
+	if (value === undefined || value === null) return undefined
+	if (typeof value !== "string" || !/^[A-Z_]{3,60}$/.test(value)) {
+		details.push("shipping_document_type: ex. THERMAL_AIR_WAYBILL")
+	}
+
+	return value
+}
+
+export const ordersInvoiceUpload = shopOperation("orders/invoice-upload",
+	(body, details) => {
+		if (!isNonEmptyString(body.order_sn)) details.push("order_sn: obrigatório")
+
+		const xml = isNonEmptyString(body.xml_base64)
+			? Buffer.from(body.xml_base64, "base64")
+			: Buffer.alloc(0)
+
+		if (xml.length === 0) details.push("xml_base64: XML da NF-e em base64")
+		if (xml.length > MAX_INVOICE_BYTES) details.push("xml_base64: a Shopee aceita arquivo de até 1 MB")
+
+		return { orderSn: body.order_sn, xml }
+	},
+	uploadInvoiceDoc)
+
+export const logisticsShippingParameter = shopOperation("logistics/shipping-parameter",
+	packageRef,
+	getShippingParameter)
+
+/**
+ * Exatamente UM modo: coleta (endereço + horário que o get_shipping_parameter
+ * ofereceu) ou drop-off (a Shopee não pede campo no drop-off comum). Envio
+ * "não integrado" não passa por aqui — o 3print manda organizar pela Central
+ * do Vendedor.
+ */
+export const logisticsShipOrder = shopOperation("logistics/ship-order",
+	(body, details) => {
+		const hasPickup = body.pickup !== undefined && body.pickup !== null
+		const hasDropoff = body.dropoff !== undefined && body.dropoff !== null
+
+		if (hasPickup === hasDropoff) details.push("pickup | dropoff: exatamente um dos dois")
+		if (hasPickup && !(isPlainObject(body.pickup) && isId(body.pickup.address_id))) {
+			details.push("pickup.address_id: obrigatório, numérico")
+		}
+		if (hasDropoff && !isPlainObject(body.dropoff)) details.push("dropoff: objeto")
+
+		const pickup = hasPickup && isPlainObject(body.pickup)
+			? {
+				address_id: Number(body.pickup.address_id),
+				pickup_time_id: optionalString(body.pickup.pickup_time_id, "pickup.pickup_time_id", details)
+			}
+			: undefined
+
+		return {
+			...packageRef(body, details),
+			pickup,
+			dropoff: hasDropoff ? {} : undefined
+		}
+	},
+	shipOrder)
+
+export const logisticsDocumentParameter = shopOperation("logistics/document-parameter",
+	packageRef,
+	getShippingDocumentParameter)
+
+export const logisticsDocumentCreate = shopOperation("logistics/document-create",
+	(body, details) => ({
+		...packageRef(body, details),
+		trackingNumber: optionalString(body.tracking_number, "tracking_number", details),
+		shippingDocumentType: optionalDocumentType(body.shipping_document_type, details)
+	}),
+	createShippingDocument)
+
+export const logisticsDocumentResult = shopOperation("logistics/document-result",
+	(body, details) => ({
+		...packageRef(body, details),
+		shippingDocumentType: optionalDocumentType(body.shipping_document_type, details)
+	}),
+	getShippingDocumentResult)
+
+/** Sucesso: `data: { content_base64, content_type }` — o arquivo da etiqueta. */
+export const logisticsDocumentDownload = shopOperation("logistics/document-download",
+	(body, details) => ({
+		...packageRef(body, details),
+		shippingDocumentType: optionalDocumentType(body.shipping_document_type, details)
+	}),
+	downloadShippingDocument)
 
 // ── Catálogo ─────────────────────────────────────────────────────────────
 

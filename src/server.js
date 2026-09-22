@@ -23,10 +23,12 @@ app.use(cors({ origin: "*" }))
 // É transparente para o frontend: o `fetch` descomprime sozinho.
 app.use(compression())
 
-app.use(express.json())
-
-// Gateway da Shopee para o 3print (IP de saída fixo). Tem autenticação própria.
+// Gateway da Shopee para o 3print (IP de saída fixo). Tem autenticação e
+// parser JSON próprios — por isso vem ANTES do parser global: com limite de
+// 100 kb, ele recusaria o XML da NF-e antes de a rota ser alcançada.
 app.use("/gateway/shopee", shopeeGatewayRouter)
+
+app.use(express.json())
 
 app.use(router)
 

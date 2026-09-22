@@ -124,7 +124,47 @@ const classify = (response) => {
 	}
 }
 
-const request = async ({ method, path, params, body }) => {
+const parseJson = (bytes) => {
+	try {
+		return JSON.parse(bytes.toString("utf8"))
+	} catch {
+		return {}
+	}
+}
+
+/**
+ * Resposta de DOWNLOAD (etiqueta): o sucesso é o arquivo em bytes, mas o erro
+ * a Shopee devolve em JSON, no envelope de sempre — por isso ele passa pelo
+ * mesmo `classify`. O arquivo sai em base64 dentro do contrato JSON de sempre,
+ * e o 3print não precisa conhecer um segundo formato de resposta.
+ */
+const classifyFile = (response) => {
+	const bytes = Buffer.from(response.data || [])
+	const contentType = String(response.headers["content-type"] || "")
+
+	if (contentType.includes("json") || response.status >= 400 || bytes.length === 0) {
+		const outcome = classify({ status: response.status, data: parseJson(bytes) })
+
+		// JSON sem erro num download é resposta sem arquivo: não é sucesso.
+		if (outcome.result !== RESULT.OK) return outcome
+
+		return {
+			result: RESULT.SHOPEE_ERROR,
+			status: response.status,
+			shopee: { error: "no_file", message: "a Shopee não devolveu o arquivo", request_id: outcome.requestId }
+		}
+	}
+
+	return {
+		result: RESULT.OK,
+		status: response.status,
+		data: { content_base64: bytes.toString("base64"), content_type: contentType }
+	}
+}
+
+const request = async ({
+	method, path, params, body, binary = false
+}) => {
 	const { host, timeoutMs } = config.shopeeGateway
 
 	try {
@@ -135,15 +175,20 @@ const request = async ({ method, path, params, body }) => {
 			paramsSerializer: serializeParams,
 			data: body,
 			timeout: timeoutMs,
+			// Arquivo vem em bytes: como texto, a axios corromperia o binário.
+			...(binary ? { responseType: "arraybuffer" } : {}),
 			// Status HTTP entra na classificação; erro só para falha de rede.
 			validateStatus: () => true,
 			headers: {
-				"Content-Type": "application/json",
+				// Multipart (upload da NF-e): o Content-Type, com o boundary, é a
+				// axios quem monta. Com JSON forçado aqui ela serializaria o
+				// formulário como JSON e o arquivo sumiria.
+				...(body instanceof FormData ? {} : { "Content-Type": "application/json" }),
 				"User-Agent": "node-vendasnuvemot-shopee-gateway"
 			}
 		})
 
-		return classify(response)
+		return binary ? classifyFile(response) : classify(response)
 	} catch (error) {
 		const timedOut = error.code === "ECONNABORTED"
 		const message = timedOut ? `Shopee não respondeu em ${timeoutMs}ms` : error.message
@@ -152,14 +197,18 @@ const request = async ({ method, path, params, body }) => {
 	}
 }
 
-/** Chamada de loja: assina com o access_token da loja que o 3print mandou. */
+/**
+ * Chamada de loja: assina com o access_token da loja que o 3print mandou.
+ * `binary` = a resposta é um arquivo (download de etiqueta).
+ */
 export const callShop = ({
 	shopId,
 	accessToken,
 	method = "GET",
 	path,
 	params = {},
-	body
+	body,
+	binary = false
 }) => {
 	const timestamp = Math.floor(Date.now() / 1000)
 
@@ -176,7 +225,8 @@ export const callShop = ({
 			),
 			...params
 		},
-		body
+		body,
+		binary
 	})
 }
 

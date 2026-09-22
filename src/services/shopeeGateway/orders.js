@@ -51,6 +51,37 @@ export const getOrderList = ({
 		}
 	})
 
+/** `file_type` do upload_invoice_doc: 4 = XML (a NF-e autorizada). */
+const INVOICE_FILE_XML = "4"
+
+/**
+ * POST /api/v2/order/upload_invoice_doc — o XML da NF-e do pedido (Brasil).
+ *
+ * Multipart, não JSON. A assinatura não muda: os parâmetros comuns continuam
+ * na query, como em toda chamada de loja. A Shopee não devolve eco — quem
+ * confirma é o `invoice_data` do get_order_detail.
+ */
+export const uploadInvoiceDoc = ({
+	shopId,
+	accessToken,
+	orderSn,
+	xml
+}) => {
+	const form = new FormData()
+
+	form.append("order_sn", orderSn)
+	form.append("file_type", INVOICE_FILE_XML)
+	form.append("file", new Blob([xml], { type: "application/xml" }), `${orderSn}.xml`)
+
+	return callShop({
+		shopId,
+		accessToken,
+		method: "POST",
+		path: "/api/v2/order/upload_invoice_doc",
+		body: form
+	})
+}
+
 /** GET /api/v2/logistics/get_tracking_number */
 export const getTrackingNumber = ({
 	shopId,

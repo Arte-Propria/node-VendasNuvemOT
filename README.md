@@ -49,6 +49,13 @@ a URL nos logs de acesso).
 | `POST orders/detail` | `shop_id, access_token, order_sn_list[] (1–50), response_optional_fields?, request_order_status_pending?` | `order/get_order_detail` |
 | `POST orders/list` | `shop_id, access_token, time_range_field, time_from, time_to (≤ 15 dias), page_size? (≤ 100), cursor?, order_status?, response_optional_fields?` | `order/get_order_list` |
 | `POST orders/tracking-number` | `shop_id, access_token, order_sn, package_number?` | `logistics/get_tracking_number` |
+| `POST orders/invoice-upload` | `shop_id, access_token, order_sn, xml_base64` (XML da NF-e, ≤ 1 MB) | `order/upload_invoice_doc` (multipart, `file_type=4`) |
+| `POST logistics/shipping-parameter` | `shop_id, access_token, order_sn, package_number?` | `logistics/get_shipping_parameter` |
+| `POST logistics/ship-order` | `shop_id, access_token, order_sn, package_number?` + **um** de `pickup: { address_id, pickup_time_id? }` / `dropoff: {}` | `logistics/ship_order` |
+| `POST logistics/document-parameter` | `shop_id, access_token, order_sn, package_number?` | `logistics/get_shipping_document_parameter` |
+| `POST logistics/document-create` | `shop_id, access_token, order_sn, package_number?, tracking_number?, shipping_document_type?` | `logistics/create_shipping_document` |
+| `POST logistics/document-result` | `shop_id, access_token, order_sn, package_number?, shipping_document_type?` | `logistics/get_shipping_document_result` |
+| `POST logistics/document-download` | `shop_id, access_token, order_sn, package_number?, shipping_document_type?` | `logistics/download_shipping_document` — `data: { content_base64, content_type }` (PDF, ou ZIP com o ZPL) |
 | `POST items/list` | `shop_id, access_token, offset?, page_size? (≤ 100), item_status?[]` | `product/get_item_list` |
 | `POST items/base-info` | `shop_id, access_token, item_id_list[] (1–50)` | `product/get_item_base_info` |
 | `POST items/models` | `shop_id, access_token, item_id` | `product/get_model_list` |
@@ -72,6 +79,9 @@ a URL nos logs de acesso).
 
 Sem retry, sem cache. Log: uma linha `SHOPEE-GATEWAY: {op, shop_id, result, shopee_status, ms}`
 por chamada — nunca token, assinatura, corpo ou query.
+
+Corpo JSON das rotas do gateway: até 2 mb (o XML da NF-e vai em base64). O download da etiqueta
+segue o mesmo contrato: o arquivo vem em base64 no `data`; erro da Shopee, como nas outras rotas.
 
 ### Validação
 
