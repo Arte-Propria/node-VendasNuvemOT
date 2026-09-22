@@ -53,3 +53,8 @@ export const logStatusPlatform = (message) => {
 export const logWebhookDB = (message) => {
 	console.log(`WEBHOOK DB: ${message}`)
 }
+// Gateway da Shopee (3print): uma linha JSON por chamada, sem token, sign,
+// corpo nem query — só o que serve para diagnosticar.
+export const logShopeeGateway = (fields) => {
+	console.log(`SHOPEE-GATEWAY: ${JSON.stringify(fields)}`)
+}
