@@ -17,6 +17,15 @@ export const config = {
 		poolMax: Number(process.env.POSTGRESQL_POOL_MAX || 10)
 	},
 	webhookSecret: process.env.WEBHOOK_SECRET || "default-secret",
+	// Sem fallback de propósito: um default tornaria a chave pública e previsível.
+	// Ausente, as rotas de escrita de /webar/images respondem 503.
+	webarWriteKey: process.env.WEBAR_WRITE_KEY,
+	// Storage das artes do WebAR. Segredos sem fallback pelo mesmo motivo acima:
+	// ausentes, a rota de upload responde 503 em vez de abrir por omissão.
+	supabaseUrl: process.env.SUPABASE_URL,
+	supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY,
+	// Nome de bucket não é segredo: default explícito é aceitável.
+	webarBucket: process.env.WEBAR_BUCKET || "webar-quadros",
 	tinyApiToken: process.env.TINY_API_TOKEN,
 	tinyApiTokenBasel: process.env.TINY_API_TOKEN_BASEL,
 	tinyApiTokenArteIntegrada: process.env.TINY_API_TOKEN_ARTEINTEGRADA,

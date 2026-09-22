@@ -98,7 +98,15 @@ import {
 import { getNuvemshopCallback } from "../controllers/authNuvemshop.js"
 import { getStatusPlatform } from "../controllers/statusPlatformController.js"
 import { generateTagsIA } from "../controllers/generateTagsControllers.js"
-import { getImg3dwebar } from "../controllers/img3dwebarController.js"
+import {
+	getImg3dwebar,
+	postImg3dwebar,
+	putImg3dwebar,
+	deleteImg3dwebar,
+	requireWebarWriteKey,
+	parseWebarUploadBody,
+	postWebarUpload
+} from "../controllers/img3dwebarController.js"
 
 const router = express.Router()
 
@@ -148,8 +156,23 @@ router.get("/db/orders/:store/:createdAtMin/:createdAtMax", getOrdersByDate)
 // Dry-run por padrão; só exclui com ?apply=true.
 router.delete("/db/orders/:store/:date", deleteOrdersByDate)
 
-// Imagens (artes) de um produto para o visualizador AR (3DWebAR), por número do SKU
+// Imagens (artes) de um produto para o visualizador AR (3DWebAR), por número do SKU.
+// A leitura é pública (o tema da loja consome direto); a escrita exige o header
+// x-api-key com WEBAR_WRITE_KEY.
 router.get("/webar/images/:store/:id", getImg3dwebar)
+router.post("/webar/images", requireWebarWriteKey, postImg3dwebar)
+router.put("/webar/images/:store/:id", requireWebarWriteKey, putImg3dwebar)
+router.delete("/webar/images/:store/:id", requireWebarWriteKey, deleteImg3dwebar)
+
+// Sobe uma arte (JPEG cru no corpo) para o bucket público do Storage e devolve a
+// URL pública — é o que a importação em lote do painel usa para gerar os links.
+// A chave de escrita é conferida antes de bufferizar os bytes.
+router.post(
+	"/webar/upload",
+	requireWebarWriteKey,
+	parseWebarUploadBody,
+	postWebarUpload
+)
 
 // Meta ADS
 router.get("/ads/meta/:store/:createdAtMin/:createdAtMax", getDataADSMeta)
