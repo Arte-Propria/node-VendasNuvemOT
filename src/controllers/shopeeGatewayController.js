@@ -234,14 +234,19 @@ export const logisticsShipOrder = shopOperation("logistics/ship-order",
 		const hasDropoff = body.dropoff !== undefined && body.dropoff !== null
 
 		if (hasPickup === hasDropoff) details.push("pickup | dropoff: exatamente um dos dois")
-		if (hasPickup && !(isPlainObject(body.pickup) && isId(body.pickup.address_id))) {
-			details.push("pickup.address_id: obrigatório, numérico")
+		if (hasPickup && !isPlainObject(body.pickup)) details.push("pickup: objeto")
+		// `address_id` é OPCIONAL na Shopee: quando `info_needed.pickup` vem
+		// vazio ela organiza a coleta sem campo nenhum, e a doc manda enviar
+		// `pickup` assim mesmo. Exigir aqui recusava com invalid_request um
+		// payload que ela aceita — e o pedido ficava sem etiqueta.
+		if (hasPickup && body.pickup?.address_id !== undefined && !isId(body.pickup.address_id)) {
+			details.push("pickup.address_id: numérico")
 		}
 		if (hasDropoff && !isPlainObject(body.dropoff)) details.push("dropoff: objeto")
 
 		const pickup = hasPickup && isPlainObject(body.pickup)
 			? {
-				address_id: Number(body.pickup.address_id),
+				address_id: isId(body.pickup.address_id) ? Number(body.pickup.address_id) : undefined,
 				pickup_time_id: optionalString(body.pickup.pickup_time_id, "pickup.pickup_time_id", details)
 			}
 			: undefined

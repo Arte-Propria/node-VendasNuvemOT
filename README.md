@@ -51,7 +51,7 @@ a URL nos logs de acesso).
 | `POST orders/tracking-number` | `shop_id, access_token, order_sn, package_number?` | `logistics/get_tracking_number` |
 | `POST orders/invoice-upload` | `shop_id, access_token, order_sn, xml_base64` (XML da NF-e, ≤ 1 MB) | `order/upload_invoice_doc` (multipart, `file_type=4`) |
 | `POST logistics/shipping-parameter` | `shop_id, access_token, order_sn, package_number?` | `logistics/get_shipping_parameter` |
-| `POST logistics/ship-order` | `shop_id, access_token, order_sn, package_number?` + **um** de `pickup: { address_id, pickup_time_id? }` / `dropoff: {}` | `logistics/ship_order` |
+| `POST logistics/ship-order` | `shop_id, access_token, order_sn, package_number?` + **um** de `pickup: { address_id?, pickup_time_id? }` / `dropoff: {}` | `logistics/ship_order` |
 | `POST logistics/document-parameter` | `shop_id, access_token, order_sn, package_number?` | `logistics/get_shipping_document_parameter` |
 | `POST logistics/document-create` | `shop_id, access_token, order_sn, package_number?, tracking_number?, shipping_document_type?` | `logistics/create_shipping_document` |
 | `POST logistics/document-result` | `shop_id, access_token, order_sn, package_number?, shipping_document_type?` | `logistics/get_shipping_document_result` |
