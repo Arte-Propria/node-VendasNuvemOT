@@ -33,14 +33,21 @@ export const getShippingParameter = ({
 		}
 	})
 
-/** POST /api/v2/logistics/ship_order — organiza o envio. Não tem volta. */
+/**
+ * POST /api/v2/logistics/ship_order — organiza o envio. Não tem volta.
+ *
+ * Três modos, um por vez: coleta, drop-off e `non_integrated` — a Logística do
+ * Vendedor, em que a Shopee não gera etiqueta nem rastreio e o vendedor informa
+ * o código que despachou por conta própria.
+ */
 export const shipOrder = ({
 	shopId,
 	accessToken,
 	orderSn,
 	packageNumber,
 	pickup,
-	dropoff
+	dropoff,
+	nonIntegrated
 }) =>
 	callShop({
 		shopId,
@@ -51,7 +58,8 @@ export const shipOrder = ({
 			order_sn: orderSn,
 			package_number: packageNumber,
 			pickup,
-			dropoff
+			dropoff,
+			non_integrated: nonIntegrated
 		}
 	})
 
