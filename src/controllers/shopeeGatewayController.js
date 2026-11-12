@@ -224,16 +224,25 @@ export const logisticsShippingParameter = shopOperation("logistics/shipping-para
 
 /**
  * Exatamente UM modo: coleta (endereço + horário que o get_shipping_parameter
- * ofereceu) ou drop-off (a Shopee não pede campo no drop-off comum). Envio
- * "não integrado" não passa por aqui — o 3print manda organizar pela Central
- * do Vendedor.
+ * ofereceu), drop-off (a Shopee não pede campo no drop-off comum) ou
+ * `non_integrated` — a Logística do Vendedor, em que ela não gera etiqueta nem
+ * rastreio e o vendedor informa o código com que despachou por conta própria
+ * (é o que o `info_needed` do get_shipping_parameter traz sozinho nesse canal).
  */
 export const logisticsShipOrder = shopOperation("logistics/ship-order",
 	(body, details) => {
 		const hasPickup = body.pickup !== undefined && body.pickup !== null
 		const hasDropoff = body.dropoff !== undefined && body.dropoff !== null
+		const hasNonIntegrated = body.non_integrated !== undefined && body.non_integrated !== null
 
-		if (hasPickup === hasDropoff) details.push("pickup | dropoff: exatamente um dos dois")
+		if ([hasPickup, hasDropoff, hasNonIntegrated].filter(Boolean).length !== 1) {
+			details.push("pickup | dropoff | non_integrated: exatamente um dos três")
+		}
+		if (hasNonIntegrated && !isPlainObject(body.non_integrated)) details.push("non_integrated: objeto")
+		if (hasNonIntegrated && isPlainObject(body.non_integrated)
+			&& !isNonEmptyString(body.non_integrated.tracking_number)) {
+			details.push("non_integrated.tracking_number: obrigatório")
+		}
 		if (hasPickup && !isPlainObject(body.pickup)) details.push("pickup: objeto")
 		// `address_id` é OPCIONAL na Shopee: quando `info_needed.pickup` vem
 		// vazio ela organiza a coleta sem campo nenhum, e a doc manda enviar
@@ -254,7 +263,10 @@ export const logisticsShipOrder = shopOperation("logistics/ship-order",
 		return {
 			...packageRef(body, details),
 			pickup,
-			dropoff: hasDropoff ? {} : undefined
+			dropoff: hasDropoff ? {} : undefined,
+			nonIntegrated: hasNonIntegrated && isPlainObject(body.non_integrated)
+				? { tracking_number: body.non_integrated.tracking_number }
+				: undefined
 		}
 	},
 	shipOrder)
